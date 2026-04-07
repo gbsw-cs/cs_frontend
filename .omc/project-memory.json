@@ -111,6 +111,12 @@
   },
   "hotPaths": [
     {
+      "path": "anjava/app/dashboard/page.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1775543393532,
+      "type": "file"
+    },
+    {
       "path": "anjava\\app\\page.tsx",
       "accessCount": 3,
       "lastAccessed": 1775538153149,
@@ -138,6 +144,30 @@
       "path": "anjava\\app\\globals.css",
       "accessCount": 2,
       "lastAccessed": 1775538196961,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/globals.css",
+      "accessCount": 2,
+      "lastAccessed": 1775543328884,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/login/page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775543398686,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/register/page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775543402367,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775543415370,
       "type": "file"
     },
     {

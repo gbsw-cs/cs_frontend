@@ -5,8 +5,14 @@
   --foreground: #171717;
 }
 
+html {
+  /* Fluid base font: 14px on small laptops → 16px on large displays */
+  font-size: clamp(14px, 0.75vw + 11px, 16px);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
 }
