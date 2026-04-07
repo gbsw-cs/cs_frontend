@@ -5,6 +5,11 @@
   --foreground: #171717;
 }
 
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 html {
   /* Fluid base font: 14px on small laptops → 16px on large displays */
   font-size: clamp(14px, 0.75vw + 11px, 16px);

@@ -1,14 +1,16 @@
+import Link from "next/link";
+
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mx-auto w-full max-w-[1400px]">
-        <div className="mb-5 flex justify-center">
-          <span className="rounded-full bg-[#2563EB]/10 px-4 py-1.5 text-xs font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-6 sm:px-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[1600px]">
+        <div className="mb-7 flex justify-center">
+          <span className="rounded-full bg-[#2563EB]/10 px-5 py-2 text-sm font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
             ● AI 신체 활성화 중
           </span>
         </div>
 
-        <div className="grid grid-cols-12 gap-3 sm:gap-4">
+        <div className="grid grid-cols-12 gap-4 sm:gap-5">
           {/* Row 1 */}
           <Card className="col-span-12 sm:col-span-6 lg:col-span-3">
             <div className="flex items-start justify-between">
@@ -19,14 +21,32 @@ export default function DashboardPage() {
                   <div className="text-[11px] text-zinc-500">교정 마스터</div>
                 </div>
               </div>
-              <button className="text-zinc-300">⋯</button>
+              <Link
+                href="/settings"
+                aria-label="개인 설정"
+                className="text-zinc-400 transition hover:text-[#2563EB]"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </Link>
             </div>
             <div className="mt-3 text-[11px] text-zinc-500">뱃지</div>
             <div className="mt-1 flex gap-2 text-xl">🏆 🎖 🥇</div>
           </Card>
 
           <Card className="col-span-12 sm:col-span-6 lg:col-span-9">
-            <div className="text-sm font-semibold">최근 활동</div>
+            <div className="text-base font-semibold">최근 활동</div>
             <div className="text-[11px] text-zinc-400">오늘 당신이 만든 자세 변화입니다.</div>
             <ul className="mt-3 space-y-2 text-xs text-zinc-700">
               {[
@@ -56,7 +76,7 @@ export default function DashboardPage() {
 
           <Card className="col-span-12 lg:col-span-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-semibold">일일 스코어링</div>
+              <div className="text-base font-semibold">일일 스코어링</div>
               <div className="flex flex-wrap gap-2 text-[11px] sm:gap-3">
                 <span className="text-emerald-500">● 좋음</span>
                 <span className="text-amber-500">● 경고</span>
@@ -82,7 +102,7 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="col-span-12 sm:col-span-6 lg:col-span-3">
-            <div className="text-sm font-semibold">오늘의 건강 점수</div>
+            <div className="text-base font-semibold">오늘의 건강 점수</div>
             <div className="mt-4 flex items-center justify-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-emerald-300 text-2xl font-bold">
                 0
@@ -119,7 +139,7 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="col-span-12 sm:col-span-6 lg:col-span-9">
-            <div className="text-sm font-semibold">주간 스코어링</div>
+            <div className="text-base font-semibold">주간 스코어링</div>
             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Stat label="평균 자세 시간" value="12h" color="text-rose-500" />
               <Stat label="스트레칭 횟수" value="12회" color="text-amber-500" />
@@ -138,7 +158,7 @@ export default function DashboardPage() {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100 sm:p-5 ${className}`}>
+    <div className={`rounded-2xl bg-white px-5 py-7 shadow-sm ring-1 ring-zinc-100 sm:px-7 sm:py-9 ${className}`}>
       {children}
     </div>
   );
@@ -147,8 +167,8 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div className="text-[11px] text-zinc-500">{label}</div>
-      <div className={`mt-1 text-xl font-bold sm:text-2xl ${color}`}>{value}</div>
+      <div className="text-xs text-zinc-500">{label}</div>
+      <div className={`mt-1.5 text-2xl font-bold sm:text-3xl ${color}`}>{value}</div>
     </div>
   );
 }
