@@ -112,14 +112,20 @@
   "hotPaths": [
     {
       "path": "anjava/app/settings/page.tsx",
-      "accessCount": 30,
-      "lastAccessed": 1775546566396,
+      "accessCount": 32,
+      "lastAccessed": 1775548994434,
       "type": "file"
     },
     {
       "path": "anjava/app/dashboard/page.tsx",
       "accessCount": 18,
       "lastAccessed": 1775548213477,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/webcam-guide/page.tsx",
+      "accessCount": 12,
+      "lastAccessed": 1775558006034,
       "type": "file"
     },
     {
@@ -246,6 +252,30 @@
       "path": "anjava\\app\\dashboard\\page.tsx",
       "accessCount": 1,
       "lastAccessed": 1775538195870,
+      "type": "file"
+    },
+    {
+      "path": "image/webcamguid1.png",
+      "accessCount": 1,
+      "lastAccessed": 1775548928237,
+      "type": "file"
+    },
+    {
+      "path": "image/webcamguide2.png",
+      "accessCount": 1,
+      "lastAccessed": 1775548928926,
+      "type": "file"
+    },
+    {
+      "path": "image/webcamguide3.png",
+      "accessCount": 1,
+      "lastAccessed": 1775548929377,
+      "type": "file"
+    },
+    {
+      "path": "image/webcamguide4.png",
+      "accessCount": 1,
+      "lastAccessed": 1775548929635,
       "type": "file"
     }
   ],

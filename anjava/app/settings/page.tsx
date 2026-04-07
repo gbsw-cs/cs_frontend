@@ -75,12 +75,12 @@ export default function SettingsPage() {
             <Row
               title="웹캠 설정 튜토리얼 다시 보기"
               desc="최초 설치 시 진행한 캘리브레이션 가이드를 다시 확인합니다."
-              action={<StartButton />}
+              action={<StartButton href="/webcam-guide" />}
             />
             <Row
               title="확장 프로그램 설정 다시 보기"
               desc="Plasmo 브라우저 확장 사용법을 다시 확인합니다."
-              action={<StartButton />}
+              action={<StartButton href="/extension-guide" />}
             />
           </Group>
 
@@ -165,12 +165,17 @@ function Row({
   );
 }
 
-function StartButton() {
-  return (
-    <button className="rounded-lg bg-zinc-100 px-5 py-2 text-[13px] font-medium text-zinc-600 transition hover:bg-zinc-200">
-      시작
-    </button>
-  );
+function StartButton({ href }: { href?: string }) {
+  const className =
+    "inline-block rounded-lg bg-zinc-100 px-5 py-2 text-[13px] font-medium text-zinc-600 transition hover:bg-[#2563EB] hover:text-white";
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        시작
+      </Link>
+    );
+  }
+  return <button className={className}>시작</button>;
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
