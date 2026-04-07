@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx plasmo:*)",
+      "Bash(npx next:*)",
+      "Bash(ls D:/cs-front/cs_backend/*.yml D:/cs-front/cs_backend/*.yaml)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)"
+    ]
+  }
+}

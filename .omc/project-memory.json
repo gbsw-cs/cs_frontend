@@ -1,0 +1,211 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775537974632,
+  "projectRoot": "D:\\cs-front",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "anjava": {
+      "path": "anjava",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1775537974562,
+      "keyFiles": [
+        "eslint.config.mjs",
+        "next-env.d.ts",
+        "next.config.ts",
+        "package-lock.json",
+        "package.json"
+      ]
+    },
+    "anjava-extend": {
+      "path": "anjava-extend",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1775537974563,
+      "keyFiles": [
+        "background.ts",
+        "package.json",
+        "pnpm-lock.yaml",
+        "popup.css",
+        "popup.tsx"
+      ]
+    },
+    "image": {
+      "path": "image",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775537974564,
+      "keyFiles": [
+        "image.png",
+        "login.png",
+        "main.png",
+        "register.png"
+      ]
+    },
+    "anjava\\app": {
+      "path": "anjava\\app",
+      "purpose": "Application code",
+      "fileCount": 4,
+      "lastAccessed": 1775537974566,
+      "keyFiles": [
+        "favicon.ico",
+        "globals.css",
+        "layout.tsx"
+      ]
+    },
+    "anjava\\node_modules": {
+      "path": "anjava\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775537974569,
+      "keyFiles": []
+    },
+    "anjava-extend\\assets": {
+      "path": "anjava-extend\\assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1775537974570,
+      "keyFiles": [
+        "icon.png"
+      ]
+    },
+    "anjava-extend\\build": {
+      "path": "anjava-extend\\build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1775537974571,
+      "keyFiles": []
+    },
+    "anjava-extend\\node_modules": {
+      "path": "anjava-extend\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 2,
+      "lastAccessed": 1775537974571,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "anjava\\app\\page.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1775538153149,
+      "type": "file"
+    },
+    {
+      "path": "anjava-extend\\popup.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775031762438,
+      "type": "file"
+    },
+    {
+      "path": "anjava-extend\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1775031773339,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1775538127079,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\globals.css",
+      "accessCount": 2,
+      "lastAccessed": 1775538196961,
+      "type": "file"
+    },
+    {
+      "path": "anjava-extend\\background.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775031703901,
+      "type": "file"
+    },
+    {
+      "path": "anjava-extend\\popup.css",
+      "accessCount": 1,
+      "lastAccessed": 1775031762874,
+      "type": "file"
+    },
+    {
+      "path": "image\\main.png",
+      "accessCount": 1,
+      "lastAccessed": 1775538115216,
+      "type": "file"
+    },
+    {
+      "path": "image\\login.png",
+      "accessCount": 1,
+      "lastAccessed": 1775538115295,
+      "type": "file"
+    },
+    {
+      "path": "image\\image.png",
+      "accessCount": 1,
+      "lastAccessed": 1775538115403,
+      "type": "file"
+    },
+    {
+      "path": "image\\register.png",
+      "accessCount": 1,
+      "lastAccessed": 1775538115706,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775538126383,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\components\\Logo.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775538158011,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\login\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775538164233,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\register\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775538173750,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\dashboard\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775538195870,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
