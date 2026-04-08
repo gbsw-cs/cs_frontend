@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775537974632,
-  "projectRoot": "D:\\cs-front",
+  "lastScanned": 1775631356193,
+  "projectRoot": "/Users/ihyeonseog/Desktop/vscode/26-1_capstone/cs_frontend",
   "techStack": {
     "languages": [],
     "frameworks": [],
-    "packageManager": null,
+    "packageManager": "npm",
     "runtime": null
   },
   "build": {
@@ -25,7 +25,10 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [],
-    "gitBranches": null
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
   },
   "customNotes": [],
   "directoryMap": {
@@ -33,87 +36,61 @@
       "path": "anjava",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1775537974562,
+      "lastAccessed": 1775631356181,
       "keyFiles": [
+        "README.md",
         "eslint.config.mjs",
         "next-env.d.ts",
         "next.config.ts",
-        "package-lock.json",
-        "package.json"
+        "package-lock.json"
       ]
     },
     "anjava-extend": {
       "path": "anjava-extend",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1775537974563,
+      "lastAccessed": 1775631356181,
       "keyFiles": [
+        "README.md",
         "background.ts",
         "package.json",
         "pnpm-lock.yaml",
-        "popup.css",
-        "popup.tsx"
+        "popup.css"
       ]
     },
-    "image": {
-      "path": "image",
-      "purpose": null,
-      "fileCount": 4,
-      "lastAccessed": 1775537974564,
-      "keyFiles": [
-        "image.png",
-        "login.png",
-        "main.png",
-        "register.png"
-      ]
-    },
-    "anjava\\app": {
-      "path": "anjava\\app",
+    "anjava/app": {
+      "path": "anjava/app",
       "purpose": "Application code",
       "fileCount": 4,
-      "lastAccessed": 1775537974566,
+      "lastAccessed": 1775631356181,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
         "layout.tsx"
       ]
     },
-    "anjava\\node_modules": {
-      "path": "anjava\\node_modules",
+    "anjava/node_modules": {
+      "path": "anjava/node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1775537974569,
+      "lastAccessed": 1775631356182,
       "keyFiles": []
     },
-    "anjava-extend\\assets": {
-      "path": "anjava-extend\\assets",
+    "anjava-extend/assets": {
+      "path": "anjava-extend/assets",
       "purpose": "Static assets",
       "fileCount": 1,
-      "lastAccessed": 1775537974570,
+      "lastAccessed": 1775631356182,
       "keyFiles": [
         "icon.png"
       ]
-    },
-    "anjava-extend\\build": {
-      "path": "anjava-extend\\build",
-      "purpose": "Build output",
-      "fileCount": 0,
-      "lastAccessed": 1775537974571,
-      "keyFiles": []
-    },
-    "anjava-extend\\node_modules": {
-      "path": "anjava-extend\\node_modules",
-      "purpose": "Dependencies",
-      "fileCount": 2,
-      "lastAccessed": 1775537974571,
-      "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "anjava/app/settings/page.tsx",
-      "accessCount": 32,
-      "lastAccessed": 1775548994434,
+      "accessCount": 34,
+      "lastAccessed": 1775634329347,
       "type": "file"
     },
     {
@@ -276,6 +253,12 @@
       "path": "image/webcamguide4.png",
       "accessCount": 1,
       "lastAccessed": 1775548929635,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/badges/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775634323511,
       "type": "file"
     }
   ],

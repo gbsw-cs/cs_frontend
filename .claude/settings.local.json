@@ -9,7 +9,8 @@
       "Bash(git merge:*)",
       "Bash(npx --yes next build)",
       "Bash(npm install:*)",
-      "Bash(node -e \"const l=require\\('lucide-react'\\); console.log\\(['Chrome','Camera','Monitor','Lightbulb','Play','Video','ChevronLeft','ChevronRight'].map\\(n=>n+':'+\\(n in l\\)\\).join\\('\\\\n'\\)\\)\")"
+      "Bash(node -e \"const l=require\\('lucide-react'\\); console.log\\(['Chrome','Camera','Monitor','Lightbulb','Play','Video','ChevronLeft','ChevronRight'].map\\(n=>n+':'+\\(n in l\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }

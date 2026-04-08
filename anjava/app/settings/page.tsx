@@ -60,7 +60,7 @@ export default function SettingsPage() {
             </div>
             <div className="mt-5 text-right">
               <Link
-                href="#"
+                href="/badges"
                 className="text-xs font-medium text-zinc-500 hover:text-[#2563EB]"
               >
                 뱃지 더 보기 →
