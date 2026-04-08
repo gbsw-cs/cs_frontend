@@ -1,0 +1,7 @@
+{
+  "tool_name": "WebFetch",
+  "tool_input_preview": "{\"url\":\"http://3.38.108.207:30080/api/v1/openapi.json\",\"prompt\":\"Return all paths, methods, request and response schemas as JSON.\"}",
+  "error": "ECONNREFUSED",
+  "timestamp": "2026-04-08T06:55:40.840Z",
+  "retry_count": 2
+}

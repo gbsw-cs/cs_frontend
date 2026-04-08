@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775537974632,
+  "lastScanned": 1775631253342,
   "projectRoot": "D:\\cs-front",
   "techStack": {
     "languages": [],
@@ -32,8 +32,8 @@
     "anjava": {
       "path": "anjava",
       "purpose": null,
-      "fileCount": 9,
-      "lastAccessed": 1775537974562,
+      "fileCount": 10,
+      "lastAccessed": 1775631253297,
       "keyFiles": [
         "eslint.config.mjs",
         "next-env.d.ts",
@@ -46,7 +46,7 @@
       "path": "anjava-extend",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1775537974563,
+      "lastAccessed": 1775631253297,
       "keyFiles": [
         "background.ts",
         "package.json",
@@ -58,20 +58,21 @@
     "image": {
       "path": "image",
       "purpose": null,
-      "fileCount": 4,
-      "lastAccessed": 1775537974564,
+      "fileCount": 5,
+      "lastAccessed": 1775631253298,
       "keyFiles": [
-        "image.png",
+        "dashboard.png",
         "login.png",
-        "main.png",
-        "register.png"
+        "logo.png",
+        "register.png",
+        "start.png"
       ]
     },
     "anjava\\app": {
       "path": "anjava\\app",
       "purpose": "Application code",
       "fileCount": 4,
-      "lastAccessed": 1775537974566,
+      "lastAccessed": 1775631253300,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -82,14 +83,14 @@
       "path": "anjava\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1775537974569,
+      "lastAccessed": 1775631253301,
       "keyFiles": []
     },
     "anjava-extend\\assets": {
       "path": "anjava-extend\\assets",
       "purpose": "Static assets",
       "fileCount": 1,
-      "lastAccessed": 1775537974570,
+      "lastAccessed": 1775631253302,
       "keyFiles": [
         "icon.png"
       ]
@@ -98,22 +99,22 @@
       "path": "anjava-extend\\build",
       "purpose": "Build output",
       "fileCount": 0,
-      "lastAccessed": 1775537974571,
+      "lastAccessed": 1775631253303,
       "keyFiles": []
     },
     "anjava-extend\\node_modules": {
       "path": "anjava-extend\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 2,
-      "lastAccessed": 1775537974571,
+      "lastAccessed": 1775631253304,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "anjava\\app\\page.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1775538153149,
+      "accessCount": 4,
+      "lastAccessed": 1775631481445,
       "type": "file"
     },
     {
@@ -204,6 +205,12 @@
       "path": "anjava\\app\\dashboard\\page.tsx",
       "accessCount": 1,
       "lastAccessed": 1775538195870,
+      "type": "file"
+    },
+    {
+      "path": "API.md",
+      "accessCount": 1,
+      "lastAccessed": 1775631481575,
       "type": "file"
     }
   ],

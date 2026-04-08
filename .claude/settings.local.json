@@ -5,7 +5,8 @@
       "Bash(npx next:*)",
       "Bash(ls D:/cs-front/cs_backend/*.yml D:/cs-front/cs_backend/*.yaml)",
       "Bash(npm install:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "WebFetch(domain:3.38.108.207)"
     ]
   }
 }
