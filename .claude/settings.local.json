@@ -1,9 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx plasmo:*)",
-      "Bash(npx next:*)",
-      "Bash(ls D:/cs-front/cs_backend/*.yml D:/cs-front/cs_backend/*.yaml)",
+      "Bash(git remote:*)",
+      "Bash(git pull:*)",
+      "Bash(mkdir -p /tmp/omc-backup)",
+      "Bash(mv .omc/project-memory.json .omc/state/hud-state.json .omc/state/hud-stdin-cache.json /tmp/omc-backup/)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(npx --yes next build)",
       "Bash(npm install:*)",
       "Bash(npx prisma:*)",
       "WebFetch(domain:3.38.108.207)"

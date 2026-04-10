@@ -28,8 +28,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-6">
-      <div className="w-full max-w-[400px] rounded-2xl bg-white p-10 shadow-[0_4px_24px_rgba(0,0,0,0.06)] ring-1 ring-zinc-100">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4 py-8 sm:px-6">
+      <div className="w-full max-w-[400px] rounded-2xl bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.06)] ring-1 ring-zinc-100 sm:p-10">
         <div className="flex justify-center">
           <Image src="/logo.png" alt="안자봐" width={170} height={70} priority />
         </div>
