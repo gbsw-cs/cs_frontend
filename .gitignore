@@ -2,3 +2,5 @@ image/
 trouble.md
 .omc/
 .claude/
+**/.omc/
+/*.png

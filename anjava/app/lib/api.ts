@@ -162,6 +162,84 @@ export function googleLoginUrl() {
   return `${API_URL}/auth/google`;
 }
 
+// ── Dashboard ──────────────────────────────────────────────
+
+export type TodayDashboard = {
+  date: string;
+  healthScore: number;
+  totalDetectionSec: number;
+  goodPostureRatio: number;
+  breakdown: {
+    turtleNeckSec: number;
+    shoulderIssueSec: number;
+    darkEnvSec: number;
+    turtleNeckCount: number;
+    shoulderIssueCount: number;
+    darkEnvCount: number;
+  };
+  darkDetectionMode: "ON" | "OFF";
+};
+
+export type WeeklyDashboard = {
+  from: string;
+  to: string;
+  days: {
+    date: string;
+    totalDetectionSec: number;
+    healthScore: number;
+    goodPostureSec: number;
+    turtleNeckSec: number;
+    shoulderIssueSec: number;
+    darkEnvSec: number;
+    goodPostureCount: number;
+    turtleNeckCount: number;
+    shoulderIssueCount: number;
+    darkEnvCount: number;
+  }[];
+  worstWeekday: string;
+  worstHour: number;
+};
+
+export type DailyDashboard = {
+  date: string;
+  hours: {
+    hour: number;
+    goodRatio: number;
+    turtleNeckRatio: number;
+    shoulderIssueRatio: number;
+    darkEnvRatio: number;
+    turtleNeckCount: number;
+    shoulderIssueCount: number;
+    darkEnvCount: number;
+  }[];
+};
+
+export type TimelineDashboard = {
+  date: string;
+  buckets: {
+    startHour: number;
+    startMin: number;
+    dominantState: "GOOD" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "DARK_ENV";
+    healthScore: number;
+  }[];
+};
+
+export function getDashboardToday() {
+  return request<TodayDashboard>("/dashboard/today", { method: "GET" }, true);
+}
+
+export function getDashboardWeekly(from: string) {
+  return request<WeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true);
+}
+
+export function getDashboardDaily(date: string) {
+  return request<DailyDashboard>(`/dashboard/daily?date=${date}`, { method: "GET" }, true);
+}
+
+export function getDashboardTimeline(date: string) {
+  return request<TimelineDashboard>(`/dashboard/timeline?date=${date}`, { method: "GET" }, true);
+}
+
 export async function uploadImageToCloudinary(file: File): Promise<string> {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const preset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
