@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
   ChevronLeft,
@@ -9,13 +10,23 @@ import {
   Lightbulb,
   Monitor,
   Play,
+  Square,
   Video,
 } from "lucide-react";
 
 const TOTAL = 4;
 
 export default function WebcamGuidePage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
+
+  function onNext() {
+    if (step < TOTAL) {
+      setStep((s) => s + 1);
+    } else {
+      router.push("/extension-guide");
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10 sm:px-8">
@@ -71,16 +82,14 @@ export default function WebcamGuidePage() {
             </div>
 
             <button
-              onClick={() => setStep((s) => Math.min(TOTAL, s + 1))}
-              disabled={step === TOTAL}
-              className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40"
+              onClick={onNext}
+              className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
             >
-              다음
+              {step === TOTAL ? "확장 프로그램 설치하기" : "다음"}
               <ChevronRight size={14} strokeWidth={2.4} />
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );
@@ -140,6 +149,58 @@ function FeatureChip({
 }
 
 function Slide2() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [active, setActive] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const stop = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setActive(false);
+  }, []);
+
+  const start = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("이 브라우저는 웹캠을 지원하지 않습니다.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setActive(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "웹캠 접근 실패";
+      if (/Permission|NotAllowed/i.test(msg)) {
+        setError(
+          "웹캠 접근 권한이 거부되었습니다. 브라우저 주소창 왼쪽의 자물쇠 아이콘에서 카메라 권한을 허용해 주세요.",
+        );
+      } else if (/NotFound|DevicesNotFound/i.test(msg)) {
+        setError("연결된 웹캠을 찾을 수 없습니다.");
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stop();
+  }, [stop]);
+
   return (
     <div className="flex flex-col items-center text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#2563EB]/10 text-[#2563EB]">
@@ -149,12 +210,54 @@ function Slide2() {
       <p className="mt-2 text-xs text-zinc-500 sm:text-sm">
         아래 영역을 통해 웹캠이 정상적으로 작동하는지 확인합니다.
       </p>
-      <div className="mt-6 flex aspect-video w-full max-w-[480px] items-center justify-center rounded-xl bg-zinc-100 text-xs text-zinc-400">
-        웹캠 미리보기 영역
+      <div className="relative mt-6 flex aspect-video w-full max-w-[480px] items-center justify-center overflow-hidden rounded-xl bg-zinc-900 text-xs text-zinc-400 ring-1 ring-zinc-100">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`h-full w-full object-cover transition-opacity ${
+            active ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        {!active && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-100 text-zinc-400">
+            <Camera size={26} className="text-zinc-300" />
+            <span>웹캠 미리보기 영역</span>
+          </div>
+        )}
+        {active && (
+          <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
+            LIVE
+          </div>
+        )}
       </div>
-      <button className="mt-5 flex w-full max-w-[480px] items-center justify-center gap-2 rounded-lg bg-[#2563EB] py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-        <Play size={14} fill="currentColor" />
-        웹캠 테스트 시작
+      {error && (
+        <p className="mt-3 w-full max-w-[480px] rounded-lg bg-rose-50 px-3 py-2 text-left text-[11px] text-rose-600 ring-1 ring-rose-100">
+          {error}
+        </p>
+      )}
+      <button
+        onClick={active ? stop : start}
+        disabled={busy}
+        className={`mt-5 flex w-full max-w-[480px] items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold shadow-sm transition disabled:opacity-60 ${
+          active
+            ? "bg-rose-500 text-white hover:opacity-90"
+            : "bg-[#2563EB] text-white hover:opacity-90"
+        }`}
+      >
+        {active ? (
+          <>
+            <Square size={14} fill="currentColor" />
+            웹캠 테스트 중지
+          </>
+        ) : (
+          <>
+            <Play size={14} fill="currentColor" />
+            {busy ? "카메라 여는 중..." : "웹캠 테스트 시작"}
+          </>
+        )}
       </button>
     </div>
   );
@@ -239,4 +342,3 @@ function Tip({
     </div>
   );
 }
-

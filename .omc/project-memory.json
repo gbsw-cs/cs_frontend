@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775818804268,
+  "lastScanned": 1776748062447,
   "projectRoot": "D:\\cs-front",
   "techStack": {
     "languages": [],
@@ -33,7 +33,7 @@
       "path": "anjava",
       "purpose": null,
       "fileCount": 11,
-      "lastAccessed": 1775818804230,
+      "lastAccessed": 1776748062412,
       "keyFiles": [
         "eslint.config.mjs",
         "next-env.d.ts",
@@ -46,7 +46,7 @@
       "path": "anjava-extend",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1775818804230,
+      "lastAccessed": 1776748062412,
       "keyFiles": [
         "background.ts",
         "package.json",
@@ -59,7 +59,7 @@
       "path": "anjava\\app",
       "purpose": "Application code",
       "fileCount": 4,
-      "lastAccessed": 1775818804231,
+      "lastAccessed": 1776748062413,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -70,14 +70,14 @@
       "path": "anjava\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1775818804232,
+      "lastAccessed": 1776748062417,
       "keyFiles": []
     },
     "anjava-extend\\assets": {
       "path": "anjava-extend\\assets",
       "purpose": "Static assets",
       "fileCount": 1,
-      "lastAccessed": 1775818804233,
+      "lastAccessed": 1776748062418,
       "keyFiles": [
         "icon.png"
       ]
@@ -86,52 +86,52 @@
       "path": "anjava-extend\\build",
       "purpose": "Build output",
       "fileCount": 0,
-      "lastAccessed": 1775818804233,
+      "lastAccessed": 1776748062419,
       "keyFiles": []
     },
     "anjava-extend\\node_modules": {
       "path": "anjava-extend\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 2,
-      "lastAccessed": 1775818804234,
+      "lastAccessed": 1776748062420,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "anjava\\app\\lib\\api.ts",
-      "accessCount": 5,
-      "lastAccessed": 1775823263796,
-      "type": "file"
-    },
-    {
-      "path": "anjava\\app\\dashboard\\page.tsx",
-      "accessCount": 5,
-      "lastAccessed": 1775823264691,
+      "accessCount": 7,
+      "lastAccessed": 1776748398866,
       "type": "file"
     },
     {
       "path": "anjava\\app\\register\\page.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1775823320238,
+      "accessCount": 7,
+      "lastAccessed": 1776748461462,
       "type": "file"
     },
     {
-      "path": "API.md",
-      "accessCount": 3,
-      "lastAccessed": 1775823249534,
+      "path": "anjava\\app\\dashboard\\page.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1776748272753,
       "type": "file"
     },
     {
       "path": "anjava\\app\\login\\page.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1775823319933,
+      "accessCount": 6,
+      "lastAccessed": 1776748450480,
+      "type": "file"
+    },
+    {
+      "path": "API.md",
+      "accessCount": 4,
+      "lastAccessed": 1776748236363,
       "type": "file"
     },
     {
       "path": "anjava\\app\\settings\\page.tsx",
-      "accessCount": 2,
-      "lastAccessed": 1775823320643,
+      "accessCount": 3,
+      "lastAccessed": 1776748273067,
       "type": "file"
     },
     {
@@ -156,6 +156,60 @@
       "path": "anjava\\app\\extension-guide\\page.tsx",
       "accessCount": 1,
       "lastAccessed": 1775823425395,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1776748236593,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\package.json",
+      "accessCount": 1,
+      "lastAccessed": 1776748244263,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\layout.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776748259630,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776748259701,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\next.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776748282393,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\tsconfig.json",
+      "accessCount": 1,
+      "lastAccessed": 1776748282703,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\.env.local",
+      "accessCount": 1,
+      "lastAccessed": 1776748289769,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\auth\\callback\\page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776748423708,
+      "type": "file"
+    },
+    {
+      "path": "anjava\\app\\components\\SocialLoginButtons.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1776748441786,
       "type": "file"
     }
   ],

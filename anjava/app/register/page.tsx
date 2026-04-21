@@ -3,7 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { saveTokens, sendEmailCode, signup, uploadImageToCloudinary, verifyEmailCode } from "../lib/api";
+import { resolvePostAuthPath, saveTokens, sendEmailCode, signup, uploadImageToCloudinary, verifyEmailCode } from "../lib/api";
+import { SocialLoginButtons } from "../components/SocialLoginButtons";
+import { validatePassword, validatePasswordConfirm } from "../lib/validation";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -55,6 +57,9 @@ export default function RegisterPage() {
     }
   }
 
+  const passwordError = validatePassword(password);
+  const passwordConfirmError = validatePasswordConfirm(password, passwordConfirm);
+
   function onNext(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -62,14 +67,8 @@ export default function RegisterPage() {
       setError("이메일 인증을 완료해 주세요.");
       return;
     }
-    if (password.length < 6) {
-      setError("비밀번호는 최소 6자 이상이어야 합니다.");
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
+    if (passwordError || passwordConfirmError) return;
+    if (!password || !passwordConfirm) return;
     setStep(2);
   }
 
@@ -102,7 +101,8 @@ export default function RegisterPage() {
       }
       const tokens = await signup(email, password, name, img);
       saveTokens(tokens);
-      router.push("/dashboard");
+      const path = await resolvePostAuthPath({ forceGuide: true });
+      router.push(path);
     } catch (err) {
       setError(err instanceof Error ? err.message : "회원가입 실패");
     } finally {
@@ -177,13 +177,30 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <PasswordField label="비밀번호" value={password} onChange={setPassword} />
-            <PasswordField label="비밀번호 확인" value={passwordConfirm} onChange={setPasswordConfirm} />
+            <PasswordField
+              label="비밀번호"
+              value={password}
+              onChange={setPassword}
+              error={passwordError}
+              hint={`${8}자 이상, 특수문자 중 < > " ' ; \` & | $ / ~ 및 공백은 사용할 수 없습니다.`}
+            />
+            <PasswordField
+              label="비밀번호 확인"
+              value={passwordConfirm}
+              onChange={setPasswordConfirm}
+              error={passwordConfirmError}
+            />
 
-            {error && <p className="text-xs text-rose-500">{error}</p>}
+            {error && <p className="text-[8px] text-rose-500">{error}</p>}
             <button
               type="submit"
-              className="mt-2 h-11 w-full rounded-lg bg-[#2563EB] text-sm font-semibold text-white transition hover:opacity-90"
+              disabled={
+                !!passwordError ||
+                !!passwordConfirmError ||
+                !password ||
+                !passwordConfirm
+              }
+              className="mt-2 h-11 w-full rounded-lg bg-[#2563EB] text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
             >
               다음
             </button>
@@ -222,6 +239,8 @@ export default function RegisterPage() {
             </button>
           </form>
         )}
+
+        {step === 1 && <SocialLoginButtons />}
 
         <p className="mt-6 text-center text-xs text-zinc-400">
           이미 회원이신가요?
@@ -264,12 +283,17 @@ function PasswordField({
   label,
   value,
   onChange,
+  error,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  error?: string | null;
+  hint?: string;
 }) {
   const [show, setShow] = useState(false);
+  const hasError = Boolean(error);
   return (
     <label className="block">
       <span className="text-[13px] font-semibold text-zinc-800">{label}</span>
@@ -279,7 +303,12 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required
-          className="mt-2 w-full border-0 border-b border-zinc-300 bg-transparent pb-2 pr-8 text-sm focus:border-[#2563EB] focus:outline-none focus:ring-0"
+          aria-invalid={hasError || undefined}
+          className={`mt-2 w-full border-0 border-b bg-transparent pb-2 pr-8 text-sm focus:outline-none focus:ring-0 ${
+            hasError
+              ? "border-rose-400 focus:border-rose-500"
+              : "border-zinc-300 focus:border-[#2563EB]"
+          }`}
         />
         <button
           type="button"
@@ -300,6 +329,11 @@ function PasswordField({
           )}
         </button>
       </div>
+      {hasError ? (
+        <p className="mt-1.5 text-[10px] font-medium text-rose-500">{error}</p>
+      ) : hint ? (
+        <p className="mt-1.5 text-[10px] leading-snug text-zinc-400">{hint}</p>
+      ) : null}
     </label>
   );
 }

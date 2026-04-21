@@ -10,7 +10,25 @@
       "Bash(npx --yes next build)",
       "Bash(npm install:*)",
       "Bash(npx prisma:*)",
-      "WebFetch(domain:3.38.108.207)"
+      "WebFetch(domain:3.38.108.207)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(curl -s -o /dev/null -w \"login %{http_code}\\\\n\" http://localhost:3000/login)",
+      "Bash(curl -s -o /dev/null -w \"register %{http_code}\\\\n\" http://localhost:3000/register)",
+      "Bash(curl -s -o /dev/null -w \"callback %{http_code}\\\\n\" http://localhost:3000/auth/callback)",
+      "Bash(curl -s -o /dev/null -w \"home %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/login)",
+      "Bash(curl -s \"http://localhost:3000/auth/callback?error=test%20error\")",
+      "Bash(curl -s http://localhost:3000/register)",
+      "Bash(curl -s -o /tmp/resp.json -w \"%{http_code}\\\\n\" -m 15 -X POST http://3.38.108.207:30080/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"nouser-test@example.com\",\"password\":\"wrong\"}')",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /tmp/google.json -w \"%{http_code}\\\\n\" -m 10 -L -I http://3.38.108.207:30080/api/auth/google)",
+      "Bash(curl -s -o /tmp/refresh.json -w \"%{http_code}\\\\n\" -m 15 -X POST http://3.38.108.207:30080/api/auth/refresh -H \"Content-Type: application/json\" -d '{\"refreshToken\":\"invalid\"}')",
+      "Bash(curl -s -o /tmp/me.json -w \"%{http_code}\\\\n\" -m 15 http://3.38.108.207:30080/api/users/me -H \"Authorization: Bearer invalid-token\")",
+      "Bash(taskkill //F //FI \"IMAGENAME eq node.exe\")",
+      "Bash(curl *)"
     ]
   }
 }
