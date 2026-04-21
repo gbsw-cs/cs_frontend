@@ -2,17 +2,48 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getMe, type Me } from "../lib/api";
+import {
+  getMe,
+  getMySettings,
+  setDarkDetection,
+  type Me,
+} from "../lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
+  const [darkDetection, setDarkDetectionState] = useState(false);
+  const [darkPending, setDarkPending] = useState(false);
+
   useEffect(() => {
     getMe()
       .then(setMe)
       .catch(() => router.push("/login"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    getMySettings()
+      .then((s) => setDarkDetectionState(s.darkDetectionEnabled))
+      .catch(() => {
+        /* 설정 GET 이 아직 없을 수 있음 — 기본 false 유지 */
+      });
+  }, []);
+
+  async function toggleDark() {
+    if (darkPending) return;
+    const next = !darkDetection;
+    setDarkDetectionState(next);
+    setDarkPending(true);
+    try {
+      const res = await setDarkDetection(next);
+      setDarkDetectionState(res.darkDetectionEnabled);
+    } catch {
+      setDarkDetectionState(!next);
+    } finally {
+      setDarkPending(false);
+    }
+  }
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 px-3 py-3 sm:px-6 sm:py-4 lg:h-screen lg:overflow-hidden">
       <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col">
@@ -149,9 +180,21 @@ export default function DashboardPage() {
             </ul>
             <div className="mt-2 flex items-center justify-between rounded-lg bg-zinc-50 p-1.5 text-[10px]">
               <span>어둠 속 코딩 감지 모드</span>
-              <div className="flex h-4 w-8 items-center rounded-full bg-[#2563EB] p-0.5">
-                <div className="ml-auto h-3 w-3 rounded-full bg-white" />
-              </div>
+              <button
+                type="button"
+                onClick={toggleDark}
+                aria-pressed={darkDetection}
+                disabled={darkPending}
+                className={`relative h-4 w-8 rounded-full p-0.5 transition disabled:opacity-60 ${
+                  darkDetection ? "bg-[#2563EB]" : "bg-zinc-300"
+                }`}
+              >
+                <span
+                  className={`block h-3 w-3 rounded-full bg-white shadow transition-all ${
+                    darkDetection ? "ml-auto" : "ml-0"
+                  }`}
+                />
+              </button>
             </div>
           </Card>
 
