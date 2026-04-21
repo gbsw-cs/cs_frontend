@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd D:/cs-front && grep -c \\\"<<<<<<\\\" .omc/project-memory.json && head -50 .omc/project-memory.json\",\"description\":\"Check project-memory.json conflict\"}",
-  "error": "Exit code 1\n0\n[rerun: b7]",
-  "timestamp": "2026-04-10T12:21:28.535Z",
+  "tool_input_preview": "{\"command\":\"git add .claude/settings.local.json .omc/project-memory.json .omc/state/hud-state.json .omc/state/hud-stdin-cache.json && git merge --continue --no-edit\",\"description\":\"Stage resolved file...",
+  "error": "Exit code 129\nfatal: --continue expects no arguments\n\nusage: git merge [<options>] [<commit>...]\n   or: git merge --abort\n   or: git merge --continue\n\n    -n                    do not show a diffstat at the end of the merge\n    --stat                show a diffstat at the end of the merge\n    --summary             (synonym to --stat)\n    --log[=<n>]           add (at most <n>) entries from shortlog to merge commit message\n    --squash              create a single commit instead of doing a merge\n...",
+  "timestamp": "2026-04-21T05:28:55.374Z",
   "retry_count": 1
 }

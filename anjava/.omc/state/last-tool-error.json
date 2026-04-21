@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"git add anjava/app/settings/page.tsx .gitignore .claude/settings.local.json && git commit -m \\\"feat: 개인설정페이지 퍼블리싱\\\"\",\"description\":\"Stage settings page and commit\"}",
+  "error": "Exit code 128\nfatal: pathspec 'anjava/app/settings/page.tsx' did not match any files",
+  "timestamp": "2026-04-21T06:06:17.677Z",
+  "retry_count": 1
+}

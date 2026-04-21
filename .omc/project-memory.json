@@ -89,8 +89,8 @@
   "hotPaths": [
     {
       "path": "anjava/app/settings/page.tsx",
-      "accessCount": 34,
-      "lastAccessed": 1775634329347,
+      "accessCount": 36,
+      "lastAccessed": 1776750993990,
       "type": "file"
     },
     {
@@ -101,8 +101,8 @@
     },
     {
       "path": "anjava/app/webcam-guide/page.tsx",
-      "accessCount": 12,
-      "lastAccessed": 1775558006034,
+      "accessCount": 13,
+      "lastAccessed": 1776750899221,
       "type": "file"
     },
     {
@@ -265,6 +265,24 @@
       "path": ".claude/settings.local.json",
       "accessCount": 1,
       "lastAccessed": 1776749328046,
+      "type": "file"
+    },
+    {
+      "path": "anjava/.env",
+      "accessCount": 1,
+      "lastAccessed": 1776750484373,
+      "type": "file"
+    },
+    {
+      "path": "개인설정페이지.png",
+      "accessCount": 1,
+      "lastAccessed": 1776750848075,
+      "type": "file"
+    },
+    {
+      "path": "anjava/app/lib/api.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776750866671,
       "type": "file"
     }
   ],
