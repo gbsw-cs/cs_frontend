@@ -260,6 +260,12 @@
       "accessCount": 1,
       "lastAccessed": 1775634323511,
       "type": "file"
+    },
+    {
+      "path": ".claude/settings.local.json",
+      "accessCount": 1,
+      "lastAccessed": 1776749328046,
+      "type": "file"
     }
   ],
   "userDirectives": []

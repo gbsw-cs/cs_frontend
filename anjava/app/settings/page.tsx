@@ -1,12 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getMe, logout, withdraw, type Me } from "../lib/api";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [reportConsent, setReportConsent] = useState(true);
   const [pushConsent, setPushConsent] = useState(true);
   const [pushSound, setPushSound] = useState(true);
+  const [me, setMe] = useState<Me | null>(null);
+
+  useEffect(() => {
+    getMe()
+      .then(setMe)
+      .catch(() => router.push("/login"));
+  }, [router]);
+
+  async function handleLogout() {
+    await logout();
+    router.push("/login");
+  }
+  async function handleWithdraw() {
+    if (!confirm("정말 회원탈퇴 하시겠습니까?")) return;
+    await withdraw();
+    router.push("/");
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-8 sm:px-8 sm:py-12">
@@ -46,8 +66,8 @@ export default function SettingsPage() {
               alt="프로필 사진"
               className="h-44 w-44 rounded-full object-cover ring-4 ring-white sm:h-52 sm:w-52"
             />
-            <h2 className="mt-7 text-2xl font-bold text-zinc-900">김나혜</h2>
-            <p className="mt-1.5 text-sm text-zinc-400">email@email.com</p>
+            <h2 className="mt-7 text-2xl font-bold text-zinc-900">{me?.name ?? "—"}</h2>
+            <p className="mt-1.5 text-sm text-zinc-400">{me?.email ?? ""}</p>
           </div>
 
           <div className="mt-10">
@@ -106,10 +126,10 @@ export default function SettingsPage() {
           </Group>
 
           <div className="mt-10 flex items-center justify-end gap-7 pt-2 text-sm">
-            <button className="text-zinc-400 transition hover:text-zinc-600">
+            <button onClick={handleLogout} className="text-zinc-400 transition hover:text-zinc-600">
               로그아웃
             </button>
-            <button className="font-semibold text-rose-500 transition hover:text-rose-600">
+            <button onClick={handleWithdraw} className="font-semibold text-rose-500 transition hover:text-rose-600">
               회원탈퇴
             </button>
           </div>

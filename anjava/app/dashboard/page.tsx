@@ -1,6 +1,18 @@
+"use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getMe, type Me } from "../lib/api";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [me, setMe] = useState<Me | null>(null);
+  useEffect(() => {
+    getMe()
+      .then(setMe)
+      .catch(() => router.push("/login"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-6 sm:px-8 sm:py-10">
       <div className="mx-auto w-full max-w-[1600px]">
@@ -15,9 +27,13 @@ export default function DashboardPage() {
           <Card className="col-span-12 sm:col-span-6 lg:col-span-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-emerald-100" />
+                {me?.profileImg ? (
+                  <img src={me.profileImg} className="h-12 w-12 rounded-full object-cover" alt="프로필" />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-emerald-100" />
+                )}
                 <div>
-                  <div className="text-sm font-bold">김00에</div>
+                  <div className="text-sm font-bold">{me?.name ?? "—"}</div>
                   <div className="text-[11px] text-zinc-500">교정 마스터</div>
                 </div>
               </div>
@@ -55,8 +71,8 @@ export default function DashboardPage() {
                 ["자세 교정 완료", "10:05"],
                 ["스탠딩 모드 시작", "09:50"],
                 ["오늘의 첫 자세 체크 완료", "09:30"],
-              ].map(([t, time]) => (
-                <li key={t} className="flex justify-between">
+              ].map(([t, time], i) => (
+                <li key={`${i}-${t}`} className="flex justify-between">
                   <span className="text-emerald-500">✓ <span className="text-zinc-700">{t}</span></span>
                   <span className="text-zinc-400">{time}</span>
                 </li>
