@@ -24,6 +24,20 @@ export type Me = {
   createdAt: string;
 };
 
+export type ReportPushWay = "EMAIL" | "NOTION";
+
+export type UserSettings = {
+  brightnessThreshold: number;
+  darkDetectionEnabled: boolean;
+  reportPushEnabled: boolean;
+  reportPushWay: ReportPushWay;
+  pushEnabled: boolean;
+  soundEnabled: boolean;
+  avatarHoodColor: string;
+};
+
+export type UserSettingsPatch = Partial<Omit<UserSettings, "darkDetectionEnabled">>;
+
 const ACCESS_KEY = "accessToken";
 const REFRESH_COOKIE = "refreshToken";
 const REFRESH_DAYS = 30;
@@ -78,8 +92,11 @@ export function clearTokens() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_COOKIE);
   localStorage.removeItem(USER_ID_KEY);
+  // 과거 버전에서 계정 구분 없이 저장되던 키 정리
+  localStorage.removeItem("mySettings");
   deleteRefreshCookie();
-  // 온보딩 플래그(`onboarding:<id>`)는 기기별로 유지 — 같은 계정이 재로그인하면 가이드 스킵
+  // 온보딩 플래그(`onboarding:<id>`)와 계정별 설정 캐시(`mySettings:<id>`)는
+  // 같은 계정이 재로그인할 때 즉시 복원되도록 기기에 유지.
 }
 
 export function cacheUserId(id: string) {
@@ -118,6 +135,8 @@ export async function resolvePostAuthPath(options: { forceGuide?: boolean } = {}
   }
 }
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function rawRequest<T>(
   path: string,
   init: RequestInit,
@@ -131,7 +150,35 @@ async function rawRequest<T>(
     const token = getAccessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+
+  const controller = new AbortController();
+  const externalSignal = init.signal as AbortSignal | undefined;
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort(externalSignal.reason);
+    else externalSignal.addEventListener("abort", () => controller.abort(externalSignal.reason));
+  }
+  const timeoutId = setTimeout(() => controller.abort(new Error("timeout")), REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const err = e as Error & { name?: string };
+    const networkError = new Error(
+      err.name === "AbortError" || /timeout/i.test(err.message ?? "")
+        ? "서버 응답이 없습니다. 네트워크 또는 서버 상태를 확인해 주세요."
+        : "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    ) as Error & { status?: number; cause?: unknown };
+    networkError.cause = e;
+    throw networkError;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
   const text = await res.text();
   let json: ApiSuccess<T> | ApiError | Record<string, unknown> = {};
   if (text) {
@@ -232,8 +279,10 @@ export async function withdraw() {
   }
 }
 
-export function getMe() {
-  return request<Me>("/users/me", { method: "GET" }, true);
+export async function getMe() {
+  const me = await request<Me>("/users/me", { method: "GET" }, true);
+  cacheUserId(me.id);
+  return me;
 }
 
 export function sendEmailCode(email: string) {
@@ -248,6 +297,37 @@ export function verifyEmailCode(email: string, code: string) {
     method: "POST",
     body: JSON.stringify({ email, code }),
   });
+}
+
+export function getMySettings() {
+  return request<UserSettings>("/users/me/settings", { method: "GET" }, true);
+}
+
+export function updateMySettings(patch: UserSettingsPatch) {
+  return request<UserSettings>(
+    "/users/me/settings",
+    { method: "PATCH", body: JSON.stringify(patch) },
+    true,
+  );
+}
+
+export function setDarkDetection(enabled: boolean) {
+  return request<{ darkDetectionEnabled: boolean }>(
+    "/users/me/dark-detection",
+    { method: "PATCH", body: JSON.stringify({ enabled }) },
+    true,
+  );
+}
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return request<null>(
+    "/users/me/password",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    },
+    true,
+  );
 }
 
 export function googleLoginUrl() {
