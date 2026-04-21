@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cp image/chrome.png anjava/public/chrome.png && ls anjava/public/chrome.png\",\"description\":\"Copy chrome.png to public\"}",
-  "error": "Exit code 1\ncp: image/chrome.png: No such file or directory\n[rerun: b32]",
-  "timestamp": "2026-04-07T10:47:35.710Z",
-  "retry_count": 1
-}
