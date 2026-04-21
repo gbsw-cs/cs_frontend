@@ -24,6 +24,7 @@ const WebcamView = dynamic(() => import("../components/WebcamView"), {
 
 import {
   getMe,
+  setDarkDetection,
   getDashboardToday,
   getDashboardWeekly,
   getDashboardDaily,
@@ -72,6 +73,22 @@ export default function DashboardPage() {
   const [daily, setDaily] = useState<DailyDashboard | null>(null);
   const [timeline, setTimeline] = useState<TimelineDashboard | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [darkPending, setDarkPending] = useState(false);
+
+  async function toggleDarkDetection(next: boolean) {
+    if (darkPending) return;
+    const prev = darkMode;
+    setDarkMode(next);
+    setDarkPending(true);
+    try {
+      const res = await setDarkDetection(next);
+      setDarkMode(res.darkDetectionEnabled);
+    } catch {
+      setDarkMode(prev);
+    } finally {
+      setDarkPending(false);
+    }
+  }
 
   useEffect(() => {
     const date = getKSTDate();
@@ -518,7 +535,7 @@ export default function DashboardPage() {
                   <div className="text-xs font-bold text-zinc-900">어둠 속 코딩 감지 모드</div>
                   <div className="text-[10px] text-zinc-400">어두운 환경에서 알림을 보내요.</div>
                 </div>
-                <Toggle on={darkMode} onChange={setDarkMode} />
+                <Toggle on={darkMode} onChange={toggleDarkDetection} disabled={darkPending} />
               </div>
             </Card>
           </div>
@@ -627,13 +644,14 @@ function DurationStat({ label, hour }: { label: string; hour: number }) {
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ on, onChange, disabled = false }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => onChange(!on)}
       aria-pressed={on}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-[#2563EB]" : "bg-zinc-300"}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-[#2563EB]" : "bg-zinc-300"} ${disabled ? "opacity-60" : ""}`}
     >
       <span
         className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${on ? "left-[22px]" : "left-0.5"}`}

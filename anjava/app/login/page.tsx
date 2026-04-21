@@ -3,7 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { login, saveTokens } from "../lib/api";
+import { login, resolvePostAuthPath, saveTokens } from "../lib/api";
+import { SocialLoginButtons } from "../components/SocialLoginButtons";
+import { validatePassword } from "../lib/validation";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,14 +14,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const passwordError = validatePassword(password);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (passwordError) return;
     setLoading(true);
     try {
       const tokens = await login(email, password);
       saveTokens(tokens);
-      router.push("/dashboard");
+      const path = await resolvePostAuthPath();
+      router.push(path);
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인 실패");
     } finally {
@@ -35,16 +41,22 @@ export default function LoginPage() {
         </div>
         <form className="mt-10 space-y-7" onSubmit={onSubmit}>
           <Field label="이메일" type="email" value={email} onChange={setEmail} />
-          <PasswordField label="비밀번호" value={password} onChange={setPassword} />
+          <PasswordField
+            label="비밀번호"
+            value={password}
+            onChange={setPassword}
+            error={passwordError}
+          />
           {error && <p className="text-xs text-rose-500">{error}</p>}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !!passwordError}
             className="mt-2 h-11 w-full rounded-lg bg-[#2563EB] text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           >
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
+        <SocialLoginButtons />
         <p className="mt-6 text-center text-xs text-zinc-400">
           계정이 없으신가요?
           <br />
@@ -86,12 +98,15 @@ function PasswordField({
   label,
   value,
   onChange,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  error?: string | null;
 }) {
   const [show, setShow] = useState(false);
+  const hasError = Boolean(error);
   return (
     <label className="block">
       <span className="text-[13px] font-semibold text-zinc-800">{label}</span>
@@ -101,7 +116,12 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required
-          className="mt-2 w-full border-0 border-b border-zinc-300 bg-transparent pb-2 pr-8 text-sm focus:border-[#2563EB] focus:outline-none focus:ring-0"
+          aria-invalid={hasError || undefined}
+          className={`mt-2 w-full border-0 border-b bg-transparent pb-2 pr-8 text-sm focus:outline-none focus:ring-0 ${
+            hasError
+              ? "border-rose-400 focus:border-rose-500"
+              : "border-zinc-300 focus:border-[#2563EB]"
+          }`}
         />
         <button
           type="button"
@@ -122,6 +142,9 @@ function PasswordField({
           )}
         </button>
       </div>
+      {hasError && (
+        <p className="mt-1.5 text-[11px] font-medium text-rose-500">{error}</p>
+      )}
     </label>
   );
 }

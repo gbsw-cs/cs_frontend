@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { markOnboardingComplete } from "../lib/api";
 import {
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +18,17 @@ import {
 const TOTAL = 3;
 
 export default function ExtensionGuidePage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
+
+  function onNext() {
+    if (step < TOTAL) {
+      setStep((s) => s + 1);
+    } else {
+      markOnboardingComplete();
+      router.push("/dashboard");
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10 sm:px-8">
@@ -70,12 +83,22 @@ export default function ExtensionGuidePage() {
             </div>
 
             <button
-              onClick={() => setStep((s) => Math.min(TOTAL, s + 1))}
-              disabled={step === TOTAL}
-              className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40"
+              onClick={onNext}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 ${
+                step === TOTAL ? "bg-emerald-500" : "bg-[#2563EB]"
+              }`}
             >
-              다음
-              <ChevronRight size={14} strokeWidth={2.4} />
+              {step === TOTAL ? (
+                <>
+                  <Check size={14} strokeWidth={2.6} />
+                  완료
+                </>
+              ) : (
+                <>
+                  다음
+                  <ChevronRight size={14} strokeWidth={2.4} />
+                </>
+              )}
             </button>
           </div>
         </div>
