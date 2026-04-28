@@ -1,33 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  getBadges,
+  getBadgesProgress,
+  type ApiBadge,
+  type BadgeProgressCategory,
+} from "../lib/api";
 
-type Badge = {
-  icon: string;
-  name: string;
-  desc: string;
-  bg: string;
-  earned: boolean;
-  date?: string;
+const CATEGORY_LABELS: Record<string, string> = {
+  POSTURE_TIME: "바른 자세 누적 시간",
+  STREAK: "연속 달성 일수",
 };
 
-const badges: Badge[] = [
-  { icon: "🍯", name: "꿀잠 지킴이", desc: "7일 연속 바른 자세 유지", bg: "bg-amber-100", earned: true, date: "2026.03.12" },
-  { icon: "🚶", name: "부지런한 걸음", desc: "하루 5회 스트레칭 완료", bg: "bg-orange-100", earned: true, date: "2026.03.18" },
-  { icon: "🥇", name: "자세 마스터", desc: "한 달간 경고 10회 이하", bg: "bg-rose-100", earned: true, date: "2026.03.25" },
-  { icon: "🌿", name: "새싹 회원", desc: "서비스 첫 가입 완료", bg: "bg-emerald-100", earned: true, date: "2026.02.01" },
-  { icon: "🔥", name: "열정 가득", desc: "30일 연속 접속", bg: "bg-red-100", earned: true, date: "2026.04.01" },
-  { icon: "⭐", name: "별점왕", desc: "누적 점수 1000점 달성", bg: "bg-yellow-100", earned: true, date: "2026.04.05" },
-  { icon: "💎", name: "다이아 등급", desc: "프리미엄 자세 점수 유지", bg: "bg-sky-100", earned: false },
-  { icon: "🏆", name: "챔피언", desc: "월간 랭킹 1위 달성", bg: "bg-indigo-100", earned: false },
-  { icon: "🎯", name: "정확도 100%", desc: "일주일간 완벽한 자세 유지", bg: "bg-fuchsia-100", earned: false },
-  { icon: "🌙", name: "야행성 지킴이", desc: "야간 작업 중에도 바른 자세", bg: "bg-violet-100", earned: false },
-  { icon: "🚀", name: "성장 로켓", desc: "자세 점수 50% 이상 향상", bg: "bg-cyan-100", earned: false },
-  { icon: "🧘", name: "명상의 달인", desc: "스트레칭 100회 완료", bg: "bg-lime-100", earned: false },
-];
-
 export default function BadgesPage() {
-  const earnedCount = badges.filter((b) => b.earned).length;
+  const [badges, setBadges] = useState<ApiBadge[]>([]);
+  const [progress, setProgress] = useState<BadgeProgressCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getBadges(), getBadgesProgress()])
+      .then(([b, p]) => {
+        setBadges(b);
+        setProgress(p.categories);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-8 sm:px-8 sm:py-12">
@@ -62,75 +62,127 @@ export default function BadgesPage() {
 
         {/* Summary */}
         <section className="mb-8 rounded-3xl bg-white px-8 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100 sm:px-10">
-          <div className="flex flex-wrap items-center justify-between gap-6">
+          {loading ? (
+            <div className="h-8 w-40 animate-pulse rounded bg-zinc-100" />
+          ) : (
             <div>
               <div className="text-xs font-semibold text-[#2563EB]">컬렉션 현황</div>
               <div className="mt-2 text-2xl font-bold text-zinc-900">
-                {earnedCount}
-                <span className="text-zinc-400"> / {badges.length}</span>
+                {badges.length}
+                <span className="text-zinc-400"> 개 획득</span>
               </div>
-              <p className="mt-1 text-xs text-zinc-400">
-                전체 뱃지 중 {Math.round((earnedCount / badges.length) * 100)}% 획득
-              </p>
             </div>
-            <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-zinc-100">
-              <div
-                className="h-full rounded-full bg-[#2563EB] transition-all"
-                style={{ width: `${(earnedCount / badges.length) * 100}%` }}
-              />
-            </div>
-          </div>
+          )}
         </section>
+
+        {/* Progress */}
+        {!loading && progress.length > 0 && (
+          <section className="mb-8 rounded-3xl bg-white px-8 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100 sm:px-10">
+            <div className="mb-5 text-sm font-semibold text-[#2563EB]">진행도</div>
+            <div className="space-y-5">
+              {progress.map((cat) => (
+                <ProgressRow key={cat.category} cat={cat} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Badge grid */}
         <section className="rounded-3xl bg-white px-8 py-10 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100 sm:px-12 sm:py-12">
-          <div className="mb-6 text-sm font-semibold text-[#2563EB]">
-            전체 뱃지
-          </div>
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
-            {badges.map((b) => (
-              <BadgeCard key={b.name} badge={b} />
-            ))}
-          </div>
+          <div className="mb-6 text-sm font-semibold text-[#2563EB]">획득한 뱃지</div>
+          {loading ? (
+            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col items-center rounded-2xl border border-zinc-100 px-4 py-6"
+                >
+                  <div className="h-20 w-20 animate-pulse rounded-full bg-zinc-100" />
+                  <div className="mt-4 h-4 w-20 animate-pulse rounded bg-zinc-100" />
+                  <div className="mt-3 h-3 w-16 animate-pulse rounded bg-zinc-100" />
+                </div>
+              ))}
+            </div>
+          ) : badges.length === 0 ? (
+            <div className="py-12 text-center text-sm text-zinc-400">
+              아직 획득한 뱃지가 없습니다.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
+              {badges.map((b) => (
+                <BadgeCard key={b.badgeId} badge={b} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>
   );
 }
 
-function BadgeCard({ badge }: { badge: Badge }) {
+function BadgeCard({ badge }: { badge: ApiBadge }) {
+  const dateStr = new Date(badge.earnedAt).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
   return (
-    <div
-      className={`group flex flex-col items-center rounded-2xl border border-zinc-100 px-4 py-6 transition hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] ${
-        badge.earned ? "bg-white" : "bg-zinc-50"
-      }`}
-    >
-      <div
-        className={`flex h-20 w-20 items-center justify-center rounded-full text-4xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] ${
-          badge.earned ? badge.bg : "bg-zinc-200"
-        } ${badge.earned ? "" : "grayscale opacity-40"}`}
-      >
-        {badge.icon}
+    <div className="group flex flex-col items-center rounded-2xl border border-zinc-100 bg-white px-4 py-6 transition hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)]">
+      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-amber-100 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+        {badge.iconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={badge.iconUrl}
+            alt={badge.name}
+            className="h-12 w-12 object-contain"
+          />
+        ) : (
+          <span className="text-3xl">🏅</span>
+        )}
       </div>
-      <div
-        className={`mt-4 text-sm font-bold ${
-          badge.earned ? "text-zinc-900" : "text-zinc-400"
-        }`}
-      >
+      <div className="mt-4 text-center text-sm font-bold text-zinc-900">
         {badge.name}
       </div>
-      <div className="mt-1.5 text-center text-[11px] leading-relaxed text-zinc-400">
-        {badge.desc}
+      <div className="mt-3 rounded-full bg-[#2563EB]/10 px-3 py-1 text-[10px] font-semibold text-[#2563EB]">
+        {dateStr} 획득
       </div>
-      {badge.earned ? (
-        <div className="mt-3 rounded-full bg-[#2563EB]/10 px-3 py-1 text-[10px] font-semibold text-[#2563EB]">
-          {badge.date} 획득
-        </div>
-      ) : (
-        <div className="mt-3 rounded-full bg-zinc-100 px-3 py-1 text-[10px] font-semibold text-zinc-400">
-          미획득
-        </div>
-      )}
+    </div>
+  );
+}
+
+function ProgressRow({ cat }: { cat: BadgeProgressCategory }) {
+  const label = CATEGORY_LABELS[cat.category] ?? cat.category;
+  const isTime = cat.category === "POSTURE_TIME";
+  const max = cat.next ? cat.next.requirementValue : cat.current;
+  const pct = max > 0 ? Math.min((cat.current / max) * 100, 100) : 100;
+
+  function fmt(val: number) {
+    return isTime ? `${Math.floor(val / 60)}분` : `${val}일`;
+  }
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-xs">
+        <span className="font-semibold text-zinc-700">{label}</span>
+        {cat.next ? (
+          <span className="text-zinc-400">
+            다음 배지까지 {fmt(cat.next.remaining)} 남음
+          </span>
+        ) : (
+          <span className="font-semibold text-emerald-500">최고 등급 달성!</span>
+        )}
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div
+          className="h-full rounded-full bg-[#2563EB] transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[10px] text-zinc-400">
+        {fmt(cat.current)}
+        {cat.next ? ` / ${fmt(cat.next.requirementValue)}` : ""}
+      </div>
     </div>
   );
 }

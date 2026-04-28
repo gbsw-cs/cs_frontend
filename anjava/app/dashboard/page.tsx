@@ -3,15 +3,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-const Avatar3D = dynamic(() => import("../components/Avatar3D"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-zinc-50 text-xs text-zinc-400">
-      로딩중...
-    </div>
-  ),
-});
+import AvatarColored from "../components/AvatarColored";
 
 const WebcamView = dynamic(() => import("../components/WebcamView"), {
   ssr: false,
@@ -23,8 +15,10 @@ const WebcamView = dynamic(() => import("../components/WebcamView"), {
 });
 
 import {
+  getBadges,
   getMe,
   setDarkDetection,
+  type ApiBadge,
   getDashboardToday,
   getDashboardWeekly,
   getDashboardDaily,
@@ -74,6 +68,7 @@ export default function DashboardPage() {
   const [timeline, setTimeline] = useState<TimelineDashboard | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [darkPending, setDarkPending] = useState(false);
+  const [badges, setBadges] = useState<ApiBadge[]>([]);
 
   async function toggleDarkDetection(next: boolean) {
     if (darkPending) return;
@@ -97,6 +92,10 @@ export default function DashboardPage() {
     getMe()
       .then(setMe)
       .catch(() => router.push("/login"));
+
+    getBadges()
+      .then((b) => setBadges(b.slice(0, 3)))
+      .catch(() => {});
 
     Promise.allSettled([
       getDashboardToday(),
@@ -175,14 +174,18 @@ export default function DashboardPage() {
                 </svg>
               </Link>
             </div>
-            <div className="mt-3">
-              <div className="text-sm font-semibold text-zinc-500">뱃지</div>
-              <div className="mt-2 flex gap-2">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-2xl">🏆</div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-100 text-2xl">🥇</div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-100 text-2xl">🎖</div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-100 text-2xl">🏅</div>
-              </div>
+            <div className="mt-2 text-[10px] text-zinc-500">뱃지</div>
+            <div className="mt-0.5 flex gap-1.5">
+              {badges.length === 0 ? (
+                <span className="text-[10px] text-zinc-400">없음</span>
+              ) : badges.map((b) =>
+                b.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={b.badgeId} src={b.iconUrl} alt={b.name} width={18} height={18} className="rounded-full object-contain" />
+                ) : (
+                  <span key={b.badgeId} className="text-base">🏅</span>
+                )
+              )}
             </div>
           </Card>
 
@@ -261,7 +264,11 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
             <div className="flex flex-col items-center">
               <div className="h-44 w-full overflow-hidden">
-                <Avatar3D color="#ffffff" />
+                <AvatarColored
+                  hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
+                  className="avatar-float h-full w-full"
+                  style={{ objectFit: "contain" }}
+                />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
                 today && today.goodPostureRatio >= 0.6
@@ -370,7 +377,7 @@ export default function DashboardPage() {
                   const size = 130;
                   const r = 48;
                   const circ = 2 * Math.PI * r;
-                  const gapDeg = 60; // 하단 갭
+                  const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
                   const good = today ? today.goodPostureRatio : 0;
                   const total = today ? today.totalDetectionSec : 0;
@@ -384,44 +391,13 @@ export default function DashboardPage() {
                   const warnLen = usable * warnRatio;
                   const dangerLen = usable * dangerRatio;
                   const gapLen = circ * (gapDeg / 360);
-                  // 시작 각도 = 90 + gapDeg/2 (하단 중앙 갭)
                   const rotation = 90 + gapDeg / 2;
                   return (
                     <svg width={size} height={size} viewBox="0 0 120 120">
-                      {/* 배경 트랙 */}
-                      <circle
-                        cx="60" cy="60" r={r} fill="none"
-                        stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round"
-                        strokeDasharray={`${usable} ${gapLen}`}
-                        transform={`rotate(${rotation} 60 60)`}
-                      />
-                      {/* 양호 */}
-                      {goodLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#4ade80" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`${goodLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
-                      {/* 경고 */}
-                      {warnLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#fbbf24" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`0 ${goodLen} ${warnLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
-                      {/* 위험 */}
-                      {dangerLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#f87171" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`0 ${goodLen + warnLen} ${dangerLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
+                      <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
+                      {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {warnLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#fbbf24" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${warnLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {dangerLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen + warnLen} ${dangerLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
                     </svg>
                   );
                 })()}

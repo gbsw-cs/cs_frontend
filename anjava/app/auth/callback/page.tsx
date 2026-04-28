@@ -67,7 +67,15 @@ function CallbackInner() {
             <div className="text-sm font-semibold text-rose-500">
               로그인 처리 중 오류가 발생했습니다.
             </div>
-            <p className="mt-3 text-xs text-zinc-500">{result.message}</p>
+            {result.message.includes("다른 방식") ? (
+              <p className="mt-3 text-xs text-zinc-500">
+                이 이메일은 이메일/비밀번호로 가입된 계정입니다.
+                <br />
+                일반 로그인을 이용해 주세요.
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-zinc-500">{result.message}</p>
+            )}
             <button
               type="button"
               onClick={() => router.replace("/login")}

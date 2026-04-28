@@ -6,30 +6,34 @@ import { useEffect, useRef, useState } from "react";
 import {
   changePassword,
   getCachedUserId,
+  getBadges,
   getMe,
-  getMySettings,
   logout,
+  type ApiBadge,
   type Me,
   type ReportPushWay,
   type UserSettings,
   type UserSettingsPatch,
   setDarkDetection,
   updateMySettings,
+  updateProfile,
+  uploadImageToCloudinary,
   withdraw,
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
+import AvatarColored from "../components/AvatarColored";
 
-type AvatarColor = { id: string; bg: string; hex: string };
+type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
 
 const AVATAR_COLORS: AvatarColor[] = [
-  { id: "default", bg: "bg-emerald-100", hex: "#d1fae5" },
-  { id: "sky", bg: "bg-sky-100", hex: "#e0f2fe" },
-  { id: "violet", bg: "bg-violet-100", hex: "#ede9fe" },
-  { id: "rose", bg: "bg-rose-100", hex: "#ffe4e6" },
-  { id: "amber", bg: "bg-amber-100", hex: "#fef3c7" },
-  { id: "orange", bg: "bg-orange-100", hex: "#ffedd5" },
-  { id: "pink", bg: "bg-pink-100", hex: "#fce7f3" },
-  { id: "zinc", bg: "bg-zinc-100", hex: "#f4f4f5" },
+  { id: "default", bg: "bg-emerald-100", hex: "#d1fae5", vivid: "#6ee7b7" },
+  { id: "sky",     bg: "bg-sky-100",     hex: "#e0f2fe", vivid: "#7dd3fc" },
+  { id: "violet",  bg: "bg-violet-100",  hex: "#ede9fe", vivid: "#c4b5fd" },
+  { id: "rose",    bg: "bg-rose-100",    hex: "#ffe4e6", vivid: "#fda4af" },
+  { id: "amber",   bg: "bg-amber-100",   hex: "#fef3c7", vivid: "#fcd34d" },
+  { id: "orange",  bg: "bg-orange-100",  hex: "#ffedd5", vivid: "#fdba74" },
+  { id: "pink",    bg: "bg-pink-100",    hex: "#fce7f3", vivid: "#f9a8d4" },
+  { id: "zinc",    bg: "bg-zinc-100",    hex: "#f4f4f5", vivid: "#d4d4d8" },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -52,6 +56,11 @@ export default function SettingsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [darkMode, setDarkModeState] = useState(false);
+  const [previewBadges, setPreviewBadges] = useState<ApiBadge[]>([]);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,42 +89,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     getMe()
-      .then(setMe)
+      .then((data) => {
+        setMe(data);
+        const s = data.settings ?? DEFAULT_SETTINGS;
+        setSettings(s);
+        cacheSettings(s);
+      })
       .catch(() => router.push("/login"));
   }, [router]);
 
   useEffect(() => {
-    // 과거 버전 호환: 계정 구분 없던 키는 즉시 제거
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("mySettings");
-    }
-    const userId = getCachedUserId();
-    // 1) localStorage 캐시 먼저 적용 — 같은 계정의 마지막 값 복원
-    if (typeof window !== "undefined" && userId) {
-      const cached = localStorage.getItem(`mySettings:${userId}`);
-      if (cached) {
-        try {
-          setSettings(JSON.parse(cached) as UserSettings);
-        } catch {
-          /* ignore */
-        }
-      } else {
-        // 해당 사용자 캐시가 없으면 다른 계정 잔여값이 섞이지 않도록 기본값
-        setSettings(DEFAULT_SETTINGS);
-      }
-    }
-    // 2) 서버 값으로 덮어쓰기 (있으면)
-    getMySettings()
-      .then((s) => {
-        setSettings(s);
-        const id = getCachedUserId();
-        if (typeof window !== "undefined" && id) {
-          localStorage.setItem(`mySettings:${id}`, JSON.stringify(s));
-        }
-      })
-      .catch(() => {
-        /* GET 미지원/타임아웃 — 캐시 또는 기본값 유지 */
-      });
+    getBadges()
+      .then((b) => setPreviewBadges(b.slice(0, 5)))
+      .catch(() => {});
   }, []);
 
   function flash(text: string) {
@@ -224,8 +210,45 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleProfileSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nameInput.trim()) return;
+    try {
+      const updated = await updateProfile({ name: nameInput.trim() });
+      setMe((prev) => prev ? { ...prev, name: updated.name } : prev);
+      setEditingProfile(false);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이름 변경 실패");
+    }
+  }
+
+  async function handleRemoveProfileImg() {
+    try {
+      await updateProfile({ profileImg: null });
+      setMe((prev) => prev ? { ...prev, profileImg: undefined } : prev);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이미지 삭제 실패");
+    }
+  }
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      const updated = await updateProfile({ profileImg: url });
+      setMe((prev) => prev ? { ...prev, profileImg: updated.profileImg || undefined } : prev);
+      flash("프로필 사진이 변경됐습니다.");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이미지 업로드 실패");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
   const avatarColorIdx = getColorIdx(settings.avatarHoodColor);
-  const badges = ["🥇", "🥇", "🥇", "🥇", ""];
 
   const newPwInlineError = validatePassword(newPw);
   const confirmInlineError =
@@ -269,10 +292,11 @@ export default function SettingsPage() {
           {/* Left: character + color + UI dark toggle */}
           <section className="flex flex-col rounded-3xl bg-white px-6 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100">
             <div className="flex flex-1 flex-col items-center">
-              <div
-                className={`flex h-36 w-36 items-center justify-center rounded-full text-6xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-colors duration-300 ${AVATAR_COLORS[avatarColorIdx].bg}`}
-              >
-                🌿
+              <div className="h-36 w-36 overflow-hidden rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
+                <AvatarColored
+                  hoodColorId={settings.avatarHoodColor}
+                  className="h-full w-full"
+                />
               </div>
 
               <div className="mt-6 w-full">
@@ -317,42 +341,102 @@ export default function SettingsPage() {
             {/* Profile + badges */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 pb-6">
               <div className="flex items-center gap-4">
-                <div
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-2xl transition-colors duration-300 ${AVATAR_COLORS[avatarColorIdx].bg}`}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white disabled:opacity-60"
+                  aria-label="프로필 사진 변경"
                 >
                   {me?.profileImg ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={me.profileImg}
-                      alt="프로필"
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={me.profileImg} alt="프로필" className="h-full w-full object-cover" />
                   ) : (
-                    "🌿"
+                    <AvatarColored
+                      hoodColorId={settings.avatarHoodColor}
+                      className="h-full w-full"
+                    />
                   )}
-                </div>
+                  {uploading ? (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition group-hover:opacity-100">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
                 <div>
-                  <div className="text-base font-bold text-zinc-900">
-                    {me?.name ?? "—"}
-                  </div>
-                  <div className="text-sm text-zinc-400">{me?.email ?? ""}</div>
+                  {editingProfile ? (
+                    <form onSubmit={handleProfileSave} className="space-y-2">
+                      <div>
+                        <label className="text-[11px] text-zinc-400">이름</label>
+                        <input
+                          autoFocus
+                          value={nameInput}
+                          onChange={(e) => setNameInput(e.target.value)}
+                          maxLength={30}
+                          className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 pt-0.5">
+                        <button type="submit" className="text-xs font-semibold text-[#2563EB]">저장</button>
+                        <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-zinc-400">취소</button>
+                        {me?.profileImg && (
+                          <button type="button" onClick={handleRemoveProfileImg} className="ml-auto text-xs text-rose-400 hover:text-rose-500">
+                            사진 삭제
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-base font-bold text-zinc-900">{me?.name ?? "—"}</div>
+                        <button
+                          type="button"
+                          onClick={() => { setNameInput(me?.name ?? ""); setEditingProfile(true); }}
+                          className="text-[11px] text-zinc-400 transition hover:text-[#2563EB]"
+                        >
+                          수정
+                        </button>
+                      </div>
+                      <div className="text-sm text-zinc-400">{me?.email ?? ""}</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="mr-1 text-xs font-semibold text-zinc-400">
+                <Link href="/badges" className="mr-1 text-xs font-semibold text-zinc-400 transition hover:text-[#2563EB]">
                   내 뱃지
-                </span>
-                {badges.map((badge, i) => (
-                  <div
-                    key={i}
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${
-                      badge ? "bg-amber-100" : "bg-zinc-100"
-                    }`}
-                  >
-                    {badge}
-                  </div>
-                ))}
+                </Link>
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const b = previewBadges[i];
+                  return (
+                    <div
+                      key={i}
+                      className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-lg ${b ? "bg-amber-100" : "bg-zinc-100"}`}
+                    >
+                      {b ? (
+                        b.iconUrl
+                          ? <img src={b.iconUrl} alt={b.name} className="h-7 w-7 object-contain" />
+                          : <span>🏅</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

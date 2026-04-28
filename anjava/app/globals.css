@@ -10,6 +10,14 @@ button:not(:disabled),
   cursor: pointer;
 }
 
+@keyframes avatar-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+.avatar-float {
+  animation: avatar-float 3s ease-in-out infinite;
+}
+
 html {
   /* Fluid base font: 14px on small laptops → 16px on large displays */
   font-size: clamp(14px, 0.75vw + 11px, 16px);

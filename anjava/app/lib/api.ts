@@ -22,6 +22,42 @@ export type Me = {
   name: string;
   profileImg?: string;
   createdAt: string;
+  settings: UserSettings;
+};
+
+export type ApiBadge = {
+  badgeId: string;
+  code: string;
+  name: string;
+  earnedAt: string;
+  iconUrl: string;
+};
+
+export type BadgeProgressNext = {
+  code: string;
+  requirementValue: number;
+  remaining: number;
+};
+
+export type BadgeProgressCategory = {
+  category: string;
+  current: number;
+  next: BadgeProgressNext | null;
+};
+
+export type AvatarSymptom = {
+  type: string;
+  severity: number;
+  durationSec: number;
+  count: number;
+};
+
+export type AvatarState = {
+  windowSec: number;
+  dominantSymptom: string | null;
+  severity: number;
+  symptoms: AvatarSymptom[];
+  avatarHoodColor: string;
 };
 
 export type ReportPushWay = "EMAIL" | "NOTION";
@@ -300,7 +336,7 @@ export function verifyEmailCode(email: string, code: string) {
 }
 
 export function getMySettings() {
-  return request<UserSettings>("/users/me/settings", { method: "GET" }, true);
+  return getMe().then((me) => me.settings);
 }
 
 export function updateMySettings(patch: UserSettingsPatch) {
@@ -332,6 +368,34 @@ export function changePassword(currentPassword: string, newPassword: string) {
 
 export function googleLoginUrl() {
   return `${API_URL}/auth/google`;
+}
+
+export function updateProfile(patch: { name?: string; profileImg?: string | null }) {
+  return request<{ id: string; name: string; profileImg: string }>(
+    "/users/me/profile",
+    { method: "PATCH", body: JSON.stringify(patch) },
+    true,
+  );
+}
+
+export function getAvatarState(windowSec = 60) {
+  return request<AvatarState>(
+    `/users/me/avatar-state?windowSec=${windowSec}`,
+    { method: "GET" },
+    true,
+  );
+}
+
+export function getBadges() {
+  return request<ApiBadge[]>("/users/me/badges", { method: "GET" }, true);
+}
+
+export function getBadgesProgress() {
+  return request<{ categories: BadgeProgressCategory[] }>(
+    "/users/me/badges/progress",
+    { method: "GET" },
+    true,
+  );
 }
 
 // ── Dashboard ──────────────────────────────────────────────
