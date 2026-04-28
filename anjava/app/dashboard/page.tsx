@@ -370,13 +370,6 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-<<<<<<< HEAD
-          {/* Row 3 */}
-          <Card className="col-span-12 sm:col-span-6 lg:col-span-3">
-            <div className="text-[10px] font-semibold text-zinc-500">실시간 안내 상태</div>
-            <div className="mt-1.5 rounded-lg bg-[#2563EB]/10 p-2 text-[10px] text-[#2563EB]">
-              {me?.name ?? "—"}님의 현재 모드입니다.
-=======
           {/* 오늘의 건강 점수 */}
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
             <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
@@ -388,7 +381,7 @@ export default function DashboardPage() {
                   const size = 130;
                   const r = 48;
                   const circ = 2 * Math.PI * r;
-                  const gapDeg = 60; // 하단 갭
+                  const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
                   const good = today ? today.goodPostureRatio : 0;
                   const total = today ? today.totalDetectionSec : 0;
@@ -402,44 +395,13 @@ export default function DashboardPage() {
                   const warnLen = usable * warnRatio;
                   const dangerLen = usable * dangerRatio;
                   const gapLen = circ * (gapDeg / 360);
-                  // 시작 각도 = 90 + gapDeg/2 (하단 중앙 갭)
                   const rotation = 90 + gapDeg / 2;
                   return (
                     <svg width={size} height={size} viewBox="0 0 120 120">
-                      {/* 배경 트랙 */}
-                      <circle
-                        cx="60" cy="60" r={r} fill="none"
-                        stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round"
-                        strokeDasharray={`${usable} ${gapLen}`}
-                        transform={`rotate(${rotation} 60 60)`}
-                      />
-                      {/* 양호 */}
-                      {goodLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#4ade80" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`${goodLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
-                      {/* 경고 */}
-                      {warnLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#fbbf24" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`0 ${goodLen} ${warnLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
-                      {/* 위험 */}
-                      {dangerLen > 0 && (
-                        <circle
-                          cx="60" cy="60" r={r} fill="none"
-                          stroke="#f87171" strokeWidth="14" strokeLinecap="round"
-                          strokeDasharray={`0 ${goodLen + warnLen} ${dangerLen} ${circ}`}
-                          transform={`rotate(${rotation} 60 60)`}
-                        />
-                      )}
+                      <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
+                      {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {warnLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#fbbf24" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${warnLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {dangerLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen + warnLen} ${dangerLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
                     </svg>
                   );
                 })()}
@@ -465,7 +427,6 @@ export default function DashboardPage() {
                   <span className="text-sm font-bold text-amber-500">{today?.breakdown?.darkEnvCount ?? 0}</span>
                 </div>
               </div>
->>>>>>> origin/main
             </div>
 
             {/* 비교 통계 */}
