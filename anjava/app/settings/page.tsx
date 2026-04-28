@@ -55,8 +55,9 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [darkMode, setDarkModeState] = useState(false);
   const [previewBadges, setPreviewBadges] = useState<ApiBadge[]>([]);
-  const [editingName, setEditingName] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [profileImgInput, setProfileImgInput] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -206,15 +207,26 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleNameSave(e: React.FormEvent) {
+  async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
     if (!nameInput.trim()) return;
+    const patch: { name?: string; profileImg?: string } = { name: nameInput.trim() };
+    if (profileImgInput.trim()) patch.profileImg = profileImgInput.trim();
     try {
-      const updated = await updateProfile({ name: nameInput.trim() });
-      setMe((prev) => (prev ? { ...prev, name: updated.name } : prev));
-      setEditingName(false);
+      const updated = await updateProfile(patch);
+      setMe((prev) => prev ? { ...prev, name: updated.name, profileImg: updated.profileImg || undefined } : prev);
+      setEditingProfile(false);
     } catch (err) {
-      flash(err instanceof Error ? err.message : "이름 변경 실패");
+      flash(err instanceof Error ? err.message : "프로필 변경 실패");
+    }
+  }
+
+  async function handleRemoveProfileImg() {
+    try {
+      await updateProfile({ profileImg: null });
+      setMe((prev) => prev ? { ...prev, profileImg: undefined } : prev);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이미지 삭제 실패");
     }
   }
 
@@ -313,7 +325,12 @@ export default function SettingsPage() {
             {/* Profile + badges */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 pb-6">
               <div className="flex items-center gap-4">
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white">
+                <button
+                  type="button"
+                  onClick={() => { setNameInput(me?.name ?? ""); setProfileImgInput(me?.profileImg ?? ""); setEditingProfile(true); }}
+                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white"
+                  aria-label="프로필 수정"
+                >
                   {me?.profileImg ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={me.profileImg} alt="프로필" className="h-full w-full object-cover" />
@@ -327,33 +344,60 @@ export default function SettingsPage() {
                       />
                     </>
                   )}
-                </div>
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition group-hover:opacity-100">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </div>
+                </button>
                 <div>
-                  {editingName ? (
-                    <form onSubmit={handleNameSave} className="flex items-center gap-2">
-                      <input
-                        autoFocus
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        maxLength={30}
-                        className="rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
-                      />
-                      <button type="submit" className="text-xs font-semibold text-[#2563EB]">저장</button>
-                      <button type="button" onClick={() => setEditingName(false)} className="text-xs text-zinc-400">취소</button>
+                  {editingProfile ? (
+                    <form onSubmit={handleProfileSave} className="space-y-2">
+                      <div>
+                        <label className="text-[11px] text-zinc-400">이름</label>
+                        <input
+                          autoFocus
+                          value={nameInput}
+                          onChange={(e) => setNameInput(e.target.value)}
+                          maxLength={30}
+                          className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-400">프로필 이미지 URL</label>
+                        <input
+                          value={profileImgInput}
+                          onChange={(e) => setProfileImgInput(e.target.value)}
+                          placeholder="https://..."
+                          className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 pt-0.5">
+                        <button type="submit" className="text-xs font-semibold text-[#2563EB]">저장</button>
+                        <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-zinc-400">취소</button>
+                        {me?.profileImg && (
+                          <button type="button" onClick={handleRemoveProfileImg} className="ml-auto text-xs text-rose-400 hover:text-rose-500">
+                            이미지 삭제
+                          </button>
+                        )}
+                      </div>
                     </form>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="text-base font-bold text-zinc-900">{me?.name ?? "—"}</div>
-                      <button
-                        type="button"
-                        onClick={() => { setNameInput(me?.name ?? ""); setEditingName(true); }}
-                        className="text-[11px] text-zinc-400 transition hover:text-[#2563EB]"
-                      >
-                        수정
-                      </button>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-base font-bold text-zinc-900">{me?.name ?? "—"}</div>
+                        <button
+                          type="button"
+                          onClick={() => { setNameInput(me?.name ?? ""); setProfileImgInput(me?.profileImg ?? ""); setEditingProfile(true); }}
+                          className="text-[11px] text-zinc-400 transition hover:text-[#2563EB]"
+                        >
+                          수정
+                        </button>
+                      </div>
+                      <div className="text-sm text-zinc-400">{me?.email ?? ""}</div>
                     </div>
                   )}
-                  <div className="text-sm text-zinc-400">{me?.email ?? ""}</div>
                 </div>
               </div>
 

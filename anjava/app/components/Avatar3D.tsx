@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
-import { Suspense, useRef } from "react";
+import { Suspense, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export const HOOD_COLOR_HEX: Record<string, string> = {
@@ -20,6 +20,13 @@ function HoodieSprite({ hoodHex }: { hoodHex: string }) {
   const texture = useTexture("/avatar.png");
   const groupRef = useRef<THREE.Group>(null);
 
+  // material.color acts as a multiplier on the texture — blends hoodie toward the chosen color
+  const tintColor = useMemo(() => {
+    const base = new THREE.Color(1, 1, 1);
+    const target = new THREE.Color(hoodHex);
+    return "#" + base.lerp(target, 0.5).getHexString();
+  }, [hoodHex]);
+
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.elapsedTime;
@@ -29,21 +36,9 @@ function HoodieSprite({ hoodHex }: { hoodHex: string }) {
 
   return (
     <group ref={groupRef}>
-      {/* avatar.png 스프라이트 */}
       <mesh>
         <planeGeometry args={[2.2, 2.8]} />
-        <meshBasicMaterial map={texture} />
-      </mesh>
-      {/* 후드 색상 오버레이 — multiply 블렌딩으로 회색 후드에 색상 적용 */}
-      <mesh position={[0, -0.55, 0.01]}>
-        <planeGeometry args={[2.2, 1.7]} />
-        <meshBasicMaterial
-          color={hoodHex}
-          transparent
-          opacity={0.5}
-          blending={THREE.MultiplyBlending}
-          depthWrite={false}
-        />
+        <meshBasicMaterial map={texture} color={tintColor} />
       </mesh>
     </group>
   );
