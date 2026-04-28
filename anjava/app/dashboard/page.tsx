@@ -140,8 +140,8 @@ export default function DashboardPage() {
     .reverse() ?? [];
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-50 px-3 py-3 sm:px-5 sm:py-4">
-      <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col">
+    <div className="min-h-screen bg-zinc-50 px-3 py-3 sm:px-5 sm:py-4">
+      <div className="mx-auto w-full max-w-[1600px]">
         {/* Top badge */}
         <div className="mb-3 flex shrink-0 justify-center">
           <span className="rounded-full bg-[#2563EB]/10 px-4 py-1 text-xs font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
@@ -149,7 +149,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 grid-rows-3 gap-3 auto-rows-fr">
+        <div className="grid grid-cols-12 gap-3">
 
           {/* ── Row 1 ── */}
 
@@ -190,7 +190,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex flex-col overflow-hidden sm:col-span-6 lg:col-span-5">
+          <Card className="col-span-12 flex min-h-[220px] flex-col overflow-hidden sm:col-span-6 lg:col-span-5">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
             </div>
 
             {recentActivity.length > 0 ? (
-              <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
                 {recentActivity.map((b, i) => {
                   const isGood = b.dominantState === "GOOD";
                   const timeStr = `${String(b.startHour).padStart(2, "0")}:${String(b.startMin).padStart(2, "0")}`;
@@ -253,7 +253,7 @@ export default function DashboardPage() {
                 <div className="mt-0.5 text-[10px] text-zinc-400">자세 감지가 진행 중입니다.</div>
               </div>
             </div>
-            <div className="mt-2 min-h-0 w-full flex-1 overflow-hidden rounded-xl">
+            <div className="mt-2 aspect-video w-full overflow-hidden rounded-xl">
               <WebcamView />
             </div>
           </Card>
@@ -262,8 +262,8 @@ export default function DashboardPage() {
 
           {/* 3D 아바타 */}
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
-            <div className="flex min-h-0 flex-1 flex-col items-center">
-              <div className="min-h-0 w-full flex-1 overflow-hidden">
+            <div className="flex flex-col items-center">
+              <div className="h-44 w-full overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-full"
@@ -304,7 +304,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-2 flex min-h-0 flex-1 items-stretch gap-3">
+            <div className="mt-2 flex items-stretch gap-3">
               {/* 좌측: 총 시간 */}
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
@@ -318,7 +318,7 @@ export default function DashboardPage() {
 
               {/* 우측: 스택 바 차트 */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex flex-1 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
+                <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {(() => {
                     const buckets: (typeof hourBars[0] & { label: string })[] = [];
                     for (let i = 0; i < 8; i++) {
@@ -370,7 +370,7 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
             <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
 
-            <div className="mt-3 flex min-h-0 flex-1 items-center gap-4">
+            <div className="mt-3 flex items-center gap-4">
               {/* 도넛 차트 */}
               <div className="relative shrink-0">
                 {(() => {
@@ -457,8 +457,8 @@ export default function DashboardPage() {
           {/* ── Row 3 ── */}
 
           {/* 실시간 감지 상태 + 어둠 감지 모드 */}
-          <div className="col-span-12 flex min-h-0 flex-col gap-2 sm:col-span-6 lg:col-span-3">
-            <Card className="flex min-h-0 flex-1 flex-col">
+          <div className="col-span-12 flex h-full flex-col gap-2 sm:col-span-6 lg:col-span-3">
+            <Card className="flex flex-1 flex-col">
               <div className="text-xs font-bold text-zinc-900">실시간 감지 상태</div>
 
               {/* 종합 상태 메시지 */}
@@ -567,7 +567,7 @@ export default function DashboardPage() {
             })()}
 
             {/* 선형 차트 */}
-            <div className="relative mt-2 flex min-h-0 flex-1 flex-col">
+            <div className="relative mt-2 flex flex-col">
               <div className="absolute left-0 top-0 text-[9px] leading-tight text-zinc-400">
                 비정상<br />자세 비율
               </div>
@@ -584,7 +584,7 @@ export default function DashboardPage() {
                 const dayLabels = weekly?.days.map((d) => DAY_KR[new Date(d.date).getDay()]) ?? ["월", "화", "수", "목", "금", "토", "일"];
                 return (
                   <>
-                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="min-h-0 w-full flex-1">
+                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-28 w-full">
                       <line x1="0" y1={H} x2={W} y2={H} stroke="#e4e4e7" strokeWidth="1" />
                       <path d={line} fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       {coords.map(([x, y], i) => (
