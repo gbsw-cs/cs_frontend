@@ -6,15 +6,17 @@ import { useEffect, useRef, useState } from "react";
 import {
   changePassword,
   getCachedUserId,
+  getBadges,
   getMe,
-  getMySettings,
   logout,
+  type ApiBadge,
   type Me,
   type ReportPushWay,
   type UserSettings,
   type UserSettingsPatch,
   setDarkDetection,
   updateMySettings,
+  updateProfile,
   withdraw,
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
@@ -52,6 +54,9 @@ export default function SettingsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [darkMode, setDarkModeState] = useState(false);
+  const [previewBadges, setPreviewBadges] = useState<ApiBadge[]>([]);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,42 +85,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     getMe()
-      .then(setMe)
+      .then((data) => {
+        setMe(data);
+        const s = data.settings ?? DEFAULT_SETTINGS;
+        setSettings(s);
+        cacheSettings(s);
+      })
       .catch(() => router.push("/login"));
   }, [router]);
 
   useEffect(() => {
-    // 과거 버전 호환: 계정 구분 없던 키는 즉시 제거
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("mySettings");
-    }
-    const userId = getCachedUserId();
-    // 1) localStorage 캐시 먼저 적용 — 같은 계정의 마지막 값 복원
-    if (typeof window !== "undefined" && userId) {
-      const cached = localStorage.getItem(`mySettings:${userId}`);
-      if (cached) {
-        try {
-          setSettings(JSON.parse(cached) as UserSettings);
-        } catch {
-          /* ignore */
-        }
-      } else {
-        // 해당 사용자 캐시가 없으면 다른 계정 잔여값이 섞이지 않도록 기본값
-        setSettings(DEFAULT_SETTINGS);
-      }
-    }
-    // 2) 서버 값으로 덮어쓰기 (있으면)
-    getMySettings()
-      .then((s) => {
-        setSettings(s);
-        const id = getCachedUserId();
-        if (typeof window !== "undefined" && id) {
-          localStorage.setItem(`mySettings:${id}`, JSON.stringify(s));
-        }
-      })
-      .catch(() => {
-        /* GET 미지원/타임아웃 — 캐시 또는 기본값 유지 */
-      });
+    getBadges()
+      .then((b) => setPreviewBadges(b.slice(0, 5)))
+      .catch(() => {});
   }, []);
 
   function flash(text: string) {
@@ -224,8 +206,19 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleNameSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nameInput.trim()) return;
+    try {
+      const updated = await updateProfile({ name: nameInput.trim() });
+      setMe((prev) => (prev ? { ...prev, name: updated.name } : prev));
+      setEditingName(false);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이름 변경 실패");
+    }
+  }
+
   const avatarColorIdx = getColorIdx(settings.avatarHoodColor);
-  const badges = ["🥇", "🥇", "🥇", "🥇", ""];
 
   const newPwInlineError = validatePassword(newPw);
   const confirmInlineError =
@@ -332,27 +325,53 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div>
-                  <div className="text-base font-bold text-zinc-900">
-                    {me?.name ?? "—"}
-                  </div>
+                  {editingName ? (
+                    <form onSubmit={handleNameSave} className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        maxLength={30}
+                        className="rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
+                      />
+                      <button type="submit" className="text-xs font-semibold text-[#2563EB]">저장</button>
+                      <button type="button" onClick={() => setEditingName(false)} className="text-xs text-zinc-400">취소</button>
+                    </form>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="text-base font-bold text-zinc-900">{me?.name ?? "—"}</div>
+                      <button
+                        type="button"
+                        onClick={() => { setNameInput(me?.name ?? ""); setEditingName(true); }}
+                        className="text-[11px] text-zinc-400 transition hover:text-[#2563EB]"
+                      >
+                        수정
+                      </button>
+                    </div>
+                  )}
                   <div className="text-sm text-zinc-400">{me?.email ?? ""}</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="mr-1 text-xs font-semibold text-zinc-400">
+                <Link href="/badges" className="mr-1 text-xs font-semibold text-zinc-400 transition hover:text-[#2563EB]">
                   내 뱃지
-                </span>
-                {badges.map((badge, i) => (
-                  <div
-                    key={i}
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-lg ${
-                      badge ? "bg-amber-100" : "bg-zinc-100"
-                    }`}
-                  >
-                    {badge}
-                  </div>
-                ))}
+                </Link>
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const b = previewBadges[i];
+                  return (
+                    <div
+                      key={i}
+                      className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-lg ${b ? "bg-amber-100" : "bg-zinc-100"}`}
+                    >
+                      {b ? (
+                        b.iconUrl
+                          ? <img src={b.iconUrl} alt={b.name} className="h-7 w-7 object-contain" />
+                          : <span>🏅</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

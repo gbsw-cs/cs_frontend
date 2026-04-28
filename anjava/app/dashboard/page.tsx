@@ -3,9 +3,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  getBadges,
   getMe,
-  getMySettings,
   setDarkDetection,
+  type ApiBadge,
   type Me,
 } from "../lib/api";
 
@@ -14,20 +15,19 @@ export default function DashboardPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [darkDetection, setDarkDetectionState] = useState(false);
   const [darkPending, setDarkPending] = useState(false);
+  const [badges, setBadges] = useState<ApiBadge[]>([]);
 
   useEffect(() => {
     getMe()
-      .then(setMe)
+      .then((data) => {
+        setMe(data);
+        setDarkDetectionState(data.settings?.darkDetectionEnabled ?? false);
+      })
       .catch(() => router.push("/login"));
+    getBadges()
+      .then((b) => setBadges(b.slice(0, 3)))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    getMySettings()
-      .then((s) => setDarkDetectionState(s.darkDetectionEnabled))
-      .catch(() => {
-        /* 설정 GET 이 아직 없을 수 있음 — 기본 false 유지 */
-      });
   }, []);
 
   async function toggleDark() {
@@ -90,7 +90,18 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="mt-2 text-[10px] text-zinc-500">뱃지</div>
-            <div className="mt-0.5 flex gap-1.5 text-base">🏆 🎖 🥇</div>
+            <div className="mt-0.5 flex gap-1.5">
+              {badges.length === 0 ? (
+                <span className="text-[10px] text-zinc-400">없음</span>
+              ) : badges.map((b) =>
+                b.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={b.badgeId} src={b.iconUrl} alt={b.name} width={18} height={18} className="rounded-full object-contain" />
+                ) : (
+                  <span key={b.badgeId} className="text-base">🏅</span>
+                )
+              )}
+            </div>
           </Card>
 
           <Card className="col-span-12 sm:col-span-6 lg:col-span-9">
@@ -171,7 +182,7 @@ export default function DashboardPage() {
           <Card className="col-span-12 sm:col-span-6 lg:col-span-3">
             <div className="text-[10px] font-semibold text-zinc-500">실시간 안내 상태</div>
             <div className="mt-1.5 rounded-lg bg-[#2563EB]/10 p-2 text-[10px] text-[#2563EB]">
-              김00에님의 현재의 모드입니다.
+              {me?.name ?? "—"}님의 현재 모드입니다.
             </div>
             <ul className="mt-2 space-y-1 text-[10px] text-zinc-600">
               <li className="flex justify-between"><span>• 자세 교정 알림</span><span className="text-[#2563EB]">설정</span></li>
