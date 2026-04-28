@@ -21,17 +21,17 @@ import {
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
 
-type AvatarColor = { id: string; bg: string; hex: string };
+type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
 
 const AVATAR_COLORS: AvatarColor[] = [
-  { id: "default", bg: "bg-emerald-100", hex: "#d1fae5" },
-  { id: "sky", bg: "bg-sky-100", hex: "#e0f2fe" },
-  { id: "violet", bg: "bg-violet-100", hex: "#ede9fe" },
-  { id: "rose", bg: "bg-rose-100", hex: "#ffe4e6" },
-  { id: "amber", bg: "bg-amber-100", hex: "#fef3c7" },
-  { id: "orange", bg: "bg-orange-100", hex: "#ffedd5" },
-  { id: "pink", bg: "bg-pink-100", hex: "#fce7f3" },
-  { id: "zinc", bg: "bg-zinc-100", hex: "#f4f4f5" },
+  { id: "default", bg: "bg-emerald-100", hex: "#d1fae5", vivid: "#6ee7b7" },
+  { id: "sky",     bg: "bg-sky-100",     hex: "#e0f2fe", vivid: "#7dd3fc" },
+  { id: "violet",  bg: "bg-violet-100",  hex: "#ede9fe", vivid: "#c4b5fd" },
+  { id: "rose",    bg: "bg-rose-100",    hex: "#ffe4e6", vivid: "#fda4af" },
+  { id: "amber",   bg: "bg-amber-100",   hex: "#fef3c7", vivid: "#fcd34d" },
+  { id: "orange",  bg: "bg-orange-100",  hex: "#ffedd5", vivid: "#fdba74" },
+  { id: "pink",    bg: "bg-pink-100",    hex: "#fce7f3", vivid: "#f9a8d4" },
+  { id: "zinc",    bg: "bg-zinc-100",    hex: "#f4f4f5", vivid: "#d4d4d8" },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -262,10 +262,13 @@ export default function SettingsPage() {
           {/* Left: character + color + UI dark toggle */}
           <section className="flex flex-col rounded-3xl bg-white px-6 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100">
             <div className="flex flex-1 flex-col items-center">
-              <div
-                className={`flex h-36 w-36 items-center justify-center rounded-full text-6xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-colors duration-300 ${AVATAR_COLORS[avatarColorIdx].bg}`}
-              >
-                🌿
+              <div className="relative h-36 w-36 overflow-hidden rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
+                <div
+                  className="absolute inset-x-0 bottom-0 mix-blend-multiply transition-colors duration-300"
+                  style={{ height: "62%", backgroundColor: AVATAR_COLORS[avatarColorIdx].vivid }}
+                />
               </div>
 
               <div className="mt-6 w-full">
@@ -310,18 +313,19 @@ export default function SettingsPage() {
             {/* Profile + badges */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 pb-6">
               <div className="flex items-center gap-4">
-                <div
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-2xl transition-colors duration-300 ${AVATAR_COLORS[avatarColorIdx].bg}`}
-                >
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white">
                   {me?.profileImg ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={me.profileImg}
-                      alt="프로필"
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={me.profileImg} alt="프로필" className="h-full w-full object-cover" />
                   ) : (
-                    "🌿"
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
+                      <div
+                        className="absolute inset-x-0 bottom-0 mix-blend-multiply transition-colors duration-300"
+                        style={{ height: "62%", backgroundColor: AVATAR_COLORS[avatarColorIdx].vivid }}
+                      />
+                    </>
                   )}
                 </div>
                 <div>

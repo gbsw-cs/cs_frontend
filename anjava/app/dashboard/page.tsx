@@ -272,7 +272,7 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
             <div className="flex min-h-0 flex-1 flex-col items-center">
               <div className="min-h-0 w-full flex-1 overflow-hidden">
-                <Avatar3D color="#ffffff" />
+                <Avatar3D hoodColorId={me?.settings?.avatarHoodColor ?? "default"} />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
                 today && today.goodPostureRatio >= 0.6
