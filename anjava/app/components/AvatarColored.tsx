@@ -21,8 +21,9 @@ function applyHoodColor(src: ImageData, rgb: [number, number, number]): ImageDat
     const r = out.data[i], g = out.data[i + 1], b = out.data[i + 2];
     const avg = (r + g + b) / 3;
     const chroma = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
-    // 회색 픽셀(후드/옷)만 색상 변경 — 흰색(얼굴/손/발)과 어두운 픽셀(눈)은 그대로
-    if (chroma < 20 && avg > 80 && avg < 215) {
+    // 흰색(얼굴/손/발/배경: avg≥224)과 검정(눈: avg≤55)은 제외
+    // 중간 밝기 + 낮은 채도 = 후드/옷 영역
+    if (chroma < 22 && avg > 55 && avg < 224) {
       const t = avg / 190;
       out.data[i]     = Math.min(255, Math.round(tr * t));
       out.data[i + 1] = Math.min(255, Math.round(tg * t));
