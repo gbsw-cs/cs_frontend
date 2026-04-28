@@ -292,14 +292,12 @@ export default function SettingsPage() {
           {/* Left: character + color + UI dark toggle */}
           <section className="flex flex-col rounded-3xl bg-white px-6 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100">
             <div className="flex flex-1 flex-col items-center">
-              <div className="h-36 w-36 overflow-hidden rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
-                <AvatarColored
-                  hoodColorId={settings.avatarHoodColor}
-                  className="h-full w-full"
-                />
-              </div>
+              <AvatarColored
+                hoodColorId={settings.avatarHoodColor}
+                style={{ height: "220px", width: "auto", display: "block" }}
+              />
 
-              <div className="mt-6 w-full">
+              <div className="mt-10 w-full">
                 <p className="mb-3 text-center text-xs font-semibold text-zinc-400">
                   아바타 색상
                 </p>
