@@ -1,8 +1,9 @@
 "use client";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { HOOD_CSS_FILTER } from "../components/Avatar3D";
+import AvatarColored from "../components/AvatarColored";
 
 const WebcamView = dynamic(() => import("../components/WebcamView"), {
   ssr: false,
@@ -263,12 +264,10 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
             <div className="flex min-h-0 flex-1 flex-col items-center">
               <div className="min-h-0 w-full flex-1 overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/avatar.png"
-                  alt="아바타"
-                  className="avatar-float h-full w-full object-contain"
-                  style={{ filter: HOOD_CSS_FILTER[me?.settings?.avatarHoodColor ?? "default"] ?? "none" }}
+                <AvatarColored
+                  hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
+                  className="avatar-float h-full w-full"
+                  style={{ objectFit: "contain" }}
                 />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
