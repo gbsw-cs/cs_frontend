@@ -127,10 +127,16 @@ export default function DashboardPage() {
     turtleNeckCount: 0, shoulderIssueCount: 0, darkEnvCount: 0,
   }));
 
-  // 최근 활동 (타임라인 버킷 → 최근 5개, 현재 시각 이전)
+  // 최근 활동 (타임라인 버킷 → 최근 5개, 현재 시각 이전, 실제 감지 데이터만)
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
   const recentActivity = timeline?.buckets
-    .filter((b) => b.startHour * 60 + b.startMin <= nowMin)
+    .filter(
+      (b) =>
+        b.startHour * 60 + b.startMin <= nowMin &&
+        b.dominantState !== null &&
+        b.dominantState !== undefined &&
+        STATE_LABEL[b.dominantState] !== undefined
+    )
     .slice(-5)
     .reverse() ?? [];
 
@@ -194,48 +200,46 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {(recentActivity.length > 0
-                ? recentActivity.map((b) => {
-                    const isGood = b.dominantState === "GOOD";
-                    const timeStr = `${String(b.startHour).padStart(2, "0")}:${String(b.startMin).padStart(2, "0")}`;
-                    const icon =
-                      b.dominantState === "GOOD"
-                        ? "✅"
-                        : b.dominantState === "TURTLE_NECK"
-                        ? "⚠️"
-                        : b.dominantState === "SHOULDER_ISSUE"
-                        ? "🚨"
-                        : "🌙";
-                    const dotColor =
-                      b.dominantState === "GOOD"
-                        ? "bg-emerald-400"
-                        : b.dominantState === "TURTLE_NECK"
-                        ? "bg-amber-400"
-                        : b.dominantState === "SHOULDER_ISSUE"
-                        ? "bg-rose-400"
-                        : "bg-zinc-400";
-                    const label = isGood
-                      ? `자세 교정 완료 ${icon}`
-                      : `${STATE_LABEL[b.dominantState]} ${icon}`;
-                    return { dot: dotColor, label, time: timeStr };
-                  })
-                : [
-                    { dot: "bg-emerald-400", label: "자세 교정 완료 ✅", time: "16:22" },
-                    { dot: "bg-amber-400", label: "거북목 감지 ⚠️", time: "16:22" },
-                    { dot: "bg-emerald-400", label: "자세 교정 완료 ✅", time: "16:22" },
-                    { dot: "bg-rose-400", label: "라운드 숄더 감지 🚨", time: "16:22" },
-                    { dot: "bg-sky-500", label: "“첫 3시간 자세 유지” 배지 획득!", time: "16:22" },
-                  ]
-              ).map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-[11px]">
-                  <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${item.dot}`} />
-                  <span className="shrink-0 text-zinc-700">{item.label}</span>
-                  <span className="flex-1 border-b border-dashed border-zinc-200" />
-                  <span className="shrink-0 text-zinc-400">{item.time}</span>
-                </li>
-              ))}
-            </ul>
+            {recentActivity.length > 0 ? (
+              <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                {recentActivity.map((b, i) => {
+                  const isGood = b.dominantState === "GOOD";
+                  const timeStr = `${String(b.startHour).padStart(2, "0")}:${String(b.startMin).padStart(2, "0")}`;
+                  const icon =
+                    b.dominantState === "GOOD"
+                      ? "✅"
+                      : b.dominantState === "TURTLE_NECK"
+                      ? "⚠️"
+                      : b.dominantState === "SHOULDER_ISSUE"
+                      ? "🚨"
+                      : "🌙";
+                  const dotColor =
+                    b.dominantState === "GOOD"
+                      ? "bg-emerald-400"
+                      : b.dominantState === "TURTLE_NECK"
+                      ? "bg-amber-400"
+                      : b.dominantState === "SHOULDER_ISSUE"
+                      ? "bg-rose-400"
+                      : "bg-zinc-400";
+                  const label = isGood
+                    ? `자세 교정 완료 ${icon}`
+                    : `${STATE_LABEL[b.dominantState]} ${icon}`;
+                  return (
+                    <li key={i} className="flex items-center gap-2 text-[11px]">
+                      <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
+                      <span className="shrink-0 text-zinc-700">{label}</span>
+                      <span className="flex-1 border-b border-dashed border-zinc-200" />
+                      <span className="shrink-0 text-zinc-400">{timeStr}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-center">
+                <div className="text-2xl">📭</div>
+                <div className="text-xs text-zinc-400">감지 이력이 없습니다</div>
+              </div>
+            )}
           </Card>
 
           {/* 웹캠 */}
@@ -298,7 +302,7 @@ export default function DashboardPage() {
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-zinc-900">
-                    {today ? Math.floor(today.totalDetectionSec / 3600) : 0}
+                    {today ? Math.floor((today.totalDetectionSec ?? 0) / 3600) : 0}
                   </span>
                   <span className="text-xs text-zinc-500">시간</span>
                 </div>
@@ -370,10 +374,10 @@ export default function DashboardPage() {
                   const usable = circ * (1 - gapDeg / 360);
                   const good = today ? today.goodPostureRatio : 0;
                   const total = today ? today.totalDetectionSec : 0;
-                  const warnRatio = total > 0 && today
+                  const warnRatio = total > 0 && today?.breakdown
                     ? (today.breakdown.turtleNeckSec + today.breakdown.darkEnvSec) / total
                     : 0;
-                  const dangerRatio = total > 0 && today
+                  const dangerRatio = total > 0 && today?.breakdown
                     ? today.breakdown.shoulderIssueSec / total
                     : 0;
                   const goodLen = usable * good;
@@ -435,12 +439,12 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />경고 횟수</span>
                   <span className="text-sm font-bold text-rose-500">
-                    {today ? today.breakdown.turtleNeckCount + today.breakdown.shoulderIssueCount : 0}
+                    {(today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />조명 환경</span>
-                  <span className="text-sm font-bold text-amber-500">{today?.breakdown.darkEnvCount ?? 0}</span>
+                  <span className="text-sm font-bold text-amber-500">{today?.breakdown?.darkEnvCount ?? 0}</span>
                 </div>
               </div>
             </div>
@@ -502,9 +506,9 @@ export default function DashboardPage() {
               {/* 감지 항목 리스트 */}
               <ul className="mt-2 space-y-1.5">
                 {[
-                  { label: "거북목 감지", count: today?.breakdown.turtleNeckCount },
-                  { label: "라운드 숄더 감지", count: today?.breakdown.shoulderIssueCount },
-                  { label: "어둠 속 코딩 감지", count: today?.breakdown.darkEnvCount },
+                  { label: "거북목 감지", count: today?.breakdown?.turtleNeckCount },
+                  { label: "라운드 숄더 감지", count: today?.breakdown?.shoulderIssueCount },
+                  { label: "어둠 속 코딩 감지", count: today?.breakdown?.darkEnvCount },
                   { label: "상태 표시", count: today?.healthScore !== undefined ? (today.healthScore >= 40 ? 0 : 10) : undefined },
                 ].map(({ label, count }) => {
                   const status =
@@ -593,12 +597,12 @@ export default function DashboardPage() {
               </div>
               {(() => {
                 const values = weekly?.days.map((d) => {
-                  if (d.totalDetectionSec === 0) return 0;
-                  return ((d.turtleNeckSec + d.shoulderIssueSec + d.darkEnvSec) / d.totalDetectionSec) * 100;
+                  if (!d.totalDetectionSec) return 0;
+                  return (((d.turtleNeckSec ?? 0) + (d.shoulderIssueSec ?? 0) + (d.darkEnvSec ?? 0)) / d.totalDetectionSec) * 100;
                 }) ?? [30, 55, 40, 30, 35, 50, 35];
                 const W = 700;
                 const H = 120;
-                const step = W / (values.length - 1);
+                const step = values.length > 1 ? W / (values.length - 1) : 0;
                 const coords = values.map((v, i) => [i * step, H - (v / 100) * H] as [number, number]);
                 const line = coords.map(([x, y], i) => (i === 0 ? `M${x},${y}` : `L${x},${y}`)).join(" ");
                 const dayLabels = weekly?.days.map((d) => DAY_KR[new Date(d.date).getDay()]) ?? ["월", "화", "수", "목", "금", "토", "일"];
