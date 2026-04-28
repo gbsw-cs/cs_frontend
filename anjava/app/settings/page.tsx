@@ -21,6 +21,7 @@ import {
   withdraw,
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
+import { HOOD_CSS_FILTER } from "../components/Avatar3D";
 
 type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
 
@@ -291,12 +292,13 @@ export default function SettingsPage() {
           {/* Left: character + color + UI dark toggle */}
           <section className="flex flex-col rounded-3xl bg-white px-6 py-8 shadow-[0_2px_20px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100">
             <div className="flex flex-1 flex-col items-center">
-              <div className="relative h-36 w-36 overflow-hidden rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
+              <div className="h-36 w-36 overflow-hidden rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
-                <div
-                  className="absolute inset-x-0 bottom-0 mix-blend-multiply transition-colors duration-300"
-                  style={{ height: "62%", backgroundColor: AVATAR_COLORS[avatarColorIdx].vivid }}
+                <img
+                  src="/avatar.png"
+                  alt="아바타"
+                  className="h-full w-full object-contain transition-all duration-500"
+                  style={{ filter: HOOD_CSS_FILTER[settings.avatarHoodColor] ?? "none" }}
                 />
               </div>
 
@@ -360,14 +362,13 @@ export default function SettingsPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={me.profileImg} alt="프로필" className="h-full w-full object-cover" />
                   ) : (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
-                      <div
-                        className="absolute inset-x-0 bottom-0 mix-blend-multiply transition-colors duration-300"
-                        style={{ height: "62%", backgroundColor: AVATAR_COLORS[avatarColorIdx].vivid }}
-                      />
-                    </>
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src="/avatar.png"
+                      alt="아바타"
+                      className="h-full w-full object-contain transition-all duration-500"
+                      style={{ filter: HOOD_CSS_FILTER[settings.avatarHoodColor] ?? "none" }}
+                    />
                   )}
                   {uploading ? (
                     <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">

@@ -16,6 +16,18 @@ export const HOOD_COLOR_HEX: Record<string, string> = {
   zinc:    "#d4d4d8",
 };
 
+// CSS filter 방식: sepia → saturate → hue-rotate 로 회색 후드를 원하는 색으로 변환
+export const HOOD_CSS_FILTER: Record<string, string> = {
+  default: "sepia(1) saturate(2) hue-rotate(100deg)",
+  sky:     "sepia(1) saturate(2) hue-rotate(185deg)",
+  violet:  "sepia(1) saturate(2) hue-rotate(240deg)",
+  rose:    "sepia(1) saturate(3) hue-rotate(310deg)",
+  amber:   "sepia(1) saturate(3) hue-rotate(10deg)",
+  orange:  "sepia(1) saturate(4) hue-rotate(0deg)",
+  pink:    "sepia(1) saturate(4) hue-rotate(300deg)",
+  zinc:    "none",
+};
+
 function HoodieSprite({ hoodHex }: { hoodHex: string }) {
   const texture = useTexture("/avatar.png");
   const groupRef = useRef<THREE.Group>(null);
