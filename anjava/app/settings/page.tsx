@@ -17,6 +17,7 @@ import {
   setDarkDetection,
   updateMySettings,
   updateProfile,
+  uploadImageToCloudinary,
   withdraw,
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
@@ -57,7 +58,8 @@ export default function SettingsPage() {
   const [previewBadges, setPreviewBadges] = useState<ApiBadge[]>([]);
   const [editingProfile, setEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [profileImgInput, setProfileImgInput] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -210,14 +212,12 @@ export default function SettingsPage() {
   async function handleProfileSave(e: React.FormEvent) {
     e.preventDefault();
     if (!nameInput.trim()) return;
-    const patch: { name?: string; profileImg?: string } = { name: nameInput.trim() };
-    if (profileImgInput.trim()) patch.profileImg = profileImgInput.trim();
     try {
-      const updated = await updateProfile(patch);
-      setMe((prev) => prev ? { ...prev, name: updated.name, profileImg: updated.profileImg || undefined } : prev);
+      const updated = await updateProfile({ name: nameInput.trim() });
+      setMe((prev) => prev ? { ...prev, name: updated.name } : prev);
       setEditingProfile(false);
     } catch (err) {
-      flash(err instanceof Error ? err.message : "프로필 변경 실패");
+      flash(err instanceof Error ? err.message : "이름 변경 실패");
     }
   }
 
@@ -227,6 +227,23 @@ export default function SettingsPage() {
       setMe((prev) => prev ? { ...prev, profileImg: undefined } : prev);
     } catch (err) {
       flash(err instanceof Error ? err.message : "이미지 삭제 실패");
+    }
+  }
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      const updated = await updateProfile({ profileImg: url });
+      setMe((prev) => prev ? { ...prev, profileImg: updated.profileImg || undefined } : prev);
+      flash("프로필 사진이 변경됐습니다.");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "이미지 업로드 실패");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
   }
 
@@ -325,11 +342,19 @@ export default function SettingsPage() {
             {/* Profile + badges */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 pb-6">
               <div className="flex items-center gap-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
                 <button
                   type="button"
-                  onClick={() => { setNameInput(me?.name ?? ""); setProfileImgInput(me?.profileImg ?? ""); setEditingProfile(true); }}
-                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white"
-                  aria-label="프로필 수정"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-white disabled:opacity-60"
+                  aria-label="프로필 사진 변경"
                 >
                   {me?.profileImg ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -344,12 +369,18 @@ export default function SettingsPage() {
                       />
                     </>
                   )}
-                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition group-hover:opacity-100">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </div>
+                  {uploading ? (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 transition group-hover:opacity-100">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
                 <div>
                   {editingProfile ? (
@@ -364,21 +395,12 @@ export default function SettingsPage() {
                           className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
                         />
                       </div>
-                      <div>
-                        <label className="text-[11px] text-zinc-400">프로필 이미지 URL</label>
-                        <input
-                          value={profileImgInput}
-                          onChange={(e) => setProfileImgInput(e.target.value)}
-                          placeholder="https://..."
-                          className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm focus:border-[#2563EB] focus:outline-none"
-                        />
-                      </div>
                       <div className="flex items-center gap-3 pt-0.5">
                         <button type="submit" className="text-xs font-semibold text-[#2563EB]">저장</button>
                         <button type="button" onClick={() => setEditingProfile(false)} className="text-xs text-zinc-400">취소</button>
                         {me?.profileImg && (
                           <button type="button" onClick={handleRemoveProfileImg} className="ml-auto text-xs text-rose-400 hover:text-rose-500">
-                            이미지 삭제
+                            사진 삭제
                           </button>
                         )}
                       </div>
@@ -389,7 +411,7 @@ export default function SettingsPage() {
                         <div className="text-base font-bold text-zinc-900">{me?.name ?? "—"}</div>
                         <button
                           type="button"
-                          onClick={() => { setNameInput(me?.name ?? ""); setProfileImgInput(me?.profileImg ?? ""); setEditingProfile(true); }}
+                          onClick={() => { setNameInput(me?.name ?? ""); setEditingProfile(true); }}
                           className="text-[11px] text-zinc-400 transition hover:text-[#2563EB]"
                         >
                           수정
