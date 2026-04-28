@@ -267,7 +267,6 @@ export default function DashboardPage() {
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-full"
-                  style={{ objectFit: "contain" }}
                 />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
