@@ -6,26 +6,28 @@ import { Suspense, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export const HOOD_COLOR_HEX: Record<string, string> = {
-  default: "#6ee7b7",
-  sky:     "#7dd3fc",
-  violet:  "#c4b5fd",
-  rose:    "#fda4af",
-  amber:   "#fcd34d",
-  orange:  "#fdba74",
-  pink:    "#f9a8d4",
-  zinc:    "#d4d4d8",
+  red:    "#ef4444",
+  orange: "#f97316",
+  yellow: "#eab308",
+  green:  "#22c55e",
+  blue:   "#3b82f6",
+  navy:   "#1e40af",
+  purple: "#a855f7",
+  gray:   "#9ca3af",
+  default: "#22c55e",
 };
 
 // CSS filter 방식: sepia → saturate → hue-rotate 로 회색 후드를 원하는 색으로 변환
 export const HOOD_CSS_FILTER: Record<string, string> = {
-  default: "sepia(1) saturate(2) hue-rotate(100deg)",
-  sky:     "sepia(1) saturate(2) hue-rotate(185deg)",
-  violet:  "sepia(1) saturate(2) hue-rotate(240deg)",
-  rose:    "sepia(1) saturate(3) hue-rotate(310deg)",
-  amber:   "sepia(1) saturate(3) hue-rotate(10deg)",
-  orange:  "sepia(1) saturate(4) hue-rotate(0deg)",
-  pink:    "sepia(1) saturate(4) hue-rotate(300deg)",
-  zinc:    "none",
+  red:    "sepia(1) saturate(5) hue-rotate(300deg)",
+  orange: "sepia(1) saturate(5) hue-rotate(0deg)",
+  yellow: "sepia(1) saturate(5) hue-rotate(25deg)",
+  green:  "sepia(1) saturate(3) hue-rotate(100deg)",
+  blue:   "sepia(1) saturate(3) hue-rotate(185deg)",
+  navy:   "sepia(1) saturate(6) hue-rotate(200deg) brightness(0.45)",
+  purple: "sepia(1) saturate(3) hue-rotate(240deg)",
+  gray:   "saturate(0)",
+  default: "sepia(1) saturate(3) hue-rotate(100deg)",
 };
 
 function HoodieSprite({ hoodHex }: { hoodHex: string }) {

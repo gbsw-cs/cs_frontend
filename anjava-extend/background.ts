@@ -1,3 +1,5 @@
+const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
+
 const POSTURE_TIPS = [
   "허리를 펴고 앉아주세요!",
   "모니터와 눈 높이를 맞춰주세요",
@@ -21,130 +23,294 @@ const BREAK_TIPS = [
 const POSTURE_ALARM = "posture-reminder"
 const BREAK_ALARM = "break-reminder"
 
-function getRandomTip(tips: string[]): string {
-  return tips[Math.floor(Math.random() * tips.length)]
+function rand<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function getTodayKey(): string {
-  return new Date().toISOString().slice(0, 10)
+// ─── API ────────────────────────────────────────────────────
+async function apiCall<T>(path: string, init: RequestInit, retry = true): Promise<T> {
+  const stored = await chrome.storage.local.get(["accessToken", "refreshToken"])
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (stored.accessToken) headers.Authorization = `Bearer ${stored.accessToken}`
+
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
+
+  if (res.status === 401 && retry && stored.refreshToken) {
+    const r = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: stored.refreshToken })
+    })
+    if (r.ok) {
+      const d = await r.json()
+      await chrome.storage.local.set({
+        accessToken: d.data.accessToken,
+        refreshToken: d.data.refreshToken
+      })
+      return apiCall<T>(path, init, false)
+    }
+    await chrome.storage.local.remove([
+      "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt"
+    ])
+    throw Object.assign(new Error("AUTH_FAILED"), { status: 401 })
+  }
+
+  const json = await res.json().catch(() => ({})) as any
+  if (!res.ok) throw new Error(json.message ?? `HTTP ${res.status}`)
+  return json.data as T
 }
 
-async function getStats(): Promise<Record<string, any>> {
-  const key = getTodayKey()
-  const result = await chrome.storage.local.get(key)
-  return result[key] || { postureAlerts: 0, breaksAlerts: 0, startTime: null }
+// ─── Session ─────────────────────────────────────────────────
+async function startSession(): Promise<void> {
+  const stored = await chrome.storage.local.get(["accessToken", "currentSessionId", "baselineDone"])
+  if (!stored.accessToken || stored.currentSessionId || !stored.baselineDone) return
+  try {
+    const startedAt = new Date().toISOString()
+    const data = await apiCall<{ sessionId: string; startedAt: string }>(
+      "/sessions/start",
+      { method: "POST", body: JSON.stringify({ startedAt }) }
+    )
+    await chrome.storage.local.set({
+      currentSessionId: data.sessionId,
+      sessionStartedAt: data.startedAt
+    })
+  } catch {
+    try {
+      const data = await apiCall<{ sessionId: string; startedAt: string }>(
+        "/sessions/current",
+        { method: "GET" }
+      )
+      if (data?.sessionId) {
+        await chrome.storage.local.set({
+          currentSessionId: data.sessionId,
+          sessionStartedAt: data.startedAt
+        })
+      }
+    } catch (e) {
+      console.error("[session] start:", e)
+    }
+  }
 }
 
-async function incrementStat(field: "postureAlerts" | "breaksAlerts") {
-  const key = getTodayKey()
-  const stats = await getStats()
-  stats[field] = (stats[field] || 0) + 1
-  await chrome.storage.local.set({ [key]: stats })
+async function endSession(): Promise<void> {
+  const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
+  if (!currentSessionId) return
+  try {
+    await apiCall(`/sessions/${currentSessionId}/end`, {
+      method: "POST",
+      body: JSON.stringify({ endedAt: new Date().toISOString() })
+    })
+  } catch (e) {
+    console.error("[session] end:", e)
+  } finally {
+    await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt"])
+  }
 }
 
-async function showNotification(type: "posture" | "break") {
+// ─── Notifications ───────────────────────────────────────────
+async function showNotification(type: "posture" | "break"): Promise<void> {
+  const { settings } = await chrome.storage.local.get("settings")
+  const s = settings || {}
+  if (s.pushEnabled === false) return
+
   const isPosture = type === "posture"
-  const tip = isPosture ? getRandomTip(POSTURE_TIPS) : getRandomTip(BREAK_TIPS)
-
-  chrome.notifications.create({
+  await chrome.notifications.create({
     type: "basic",
     iconUrl: "assets/icon.png",
     title: isPosture ? "자세 교정 알림" : "휴식 알림",
-    message: tip,
-    priority: 2
+    message: isPosture ? rand(POSTURE_TIPS) : rand(BREAK_TIPS),
+    priority: 2,
+    silent: s.soundEnabled === false
   })
-
-  await incrementStat(isPosture ? "postureAlerts" : "breaksAlerts")
 }
 
-async function startAlarms() {
-  const result = await chrome.storage.local.get("settings")
-  const settings = result.settings || { postureInterval: 30, breakInterval: 60 }
-
+// ─── Alarms ──────────────────────────────────────────────────
+async function stopAlarms(): Promise<void> {
   await chrome.alarms.clearAll()
+}
 
+async function restartAlarms(): Promise<void> {
+  const { settings } = await chrome.storage.local.get("settings")
+  const s = settings || { postureInterval: 30, breakInterval: 60 }
+  await chrome.alarms.clearAll()
   chrome.alarms.create(POSTURE_ALARM, {
-    delayInMinutes: settings.postureInterval,
-    periodInMinutes: settings.postureInterval
+    delayInMinutes: s.postureInterval,
+    periodInMinutes: s.postureInterval
   })
-
   chrome.alarms.create(BREAK_ALARM, {
-    delayInMinutes: settings.breakInterval,
-    periodInMinutes: settings.breakInterval
+    delayInMinutes: s.breakInterval,
+    periodInMinutes: s.breakInterval
   })
 }
 
-async function stopAlarms() {
-  await chrome.alarms.clearAll()
-}
-
-// Alarm handler
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === POSTURE_ALARM) {
-    showNotification("posture")
-  } else if (alarm.name === BREAK_ALARM) {
-    showNotification("break")
-  }
-})
-
-// Message handler from popup
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === "START_MONITORING") {
-    const now = Date.now()
-    chrome.storage.local.get(getTodayKey(), (result) => {
-      const stats = result[getTodayKey()] || { postureAlerts: 0, breaksAlerts: 0 }
-      stats.startTime = now
-      chrome.storage.local.set({
-        [getTodayKey()]: stats,
-        isMonitoring: true,
-        monitoringStartTime: now
-      }, () => {
-        startAlarms().then(() => sendResponse({ success: true }))
-      })
-    })
-    return true
-  }
-
-  if (message.type === "STOP_MONITORING") {
-    chrome.storage.local.get(["monitoringStartTime", getTodayKey()], (result) => {
-      const stats = result[getTodayKey()] || { postureAlerts: 0, breaksAlerts: 0 }
-      const startTime = result.monitoringStartTime
-      if (startTime) {
-        stats.totalMs = (stats.totalMs || 0) + (Date.now() - startTime)
+// ─── Lifecycle ───────────────────────────────────────────────
+chrome.runtime.onInstalled.addListener(async () => {
+  const { settings } = await chrome.storage.local.get("settings")
+  if (!settings) {
+    await chrome.storage.local.set({
+      settings: {
+        postureInterval: 30,
+        breakInterval: 60,
+        pushEnabled: true,
+        soundEnabled: true,
+        darkDetectionEnabled: false
       }
-      stats.startTime = null
-      chrome.storage.local.set({
-        [getTodayKey()]: stats,
-        isMonitoring: false,
-        monitoringStartTime: null
-      }, () => {
-        stopAlarms().then(() => sendResponse({ success: true }))
+    })
+  }
+  await startSession()
+  await restartAlarms()
+})
+
+chrome.runtime.onStartup.addListener(async () => {
+  await chrome.storage.local.set({ baselineDone: false, baselineData: null })
+  await startSession()
+  await restartAlarms()
+})
+
+chrome.runtime.onSuspend.addListener(async () => {
+  await endSession()
+})
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === POSTURE_ALARM) showNotification("posture")
+  else if (alarm.name === BREAK_ALARM) showNotification("break")
+})
+
+// ─── Messages ────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "GET_STATUS") {
+    chrome.storage.local
+      .get(["accessToken", "currentSessionId", "sessionStartedAt", "settings",
+            "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
+            "profileImg", "userName"])
+      .then(sendResponse)
+    return true
+  }
+
+  if (msg.type === "PAUSE_SESSION") {
+    chrome.storage.local.get("pausedTotalMs")
+      .then(({ pausedTotalMs }) =>
+        chrome.storage.local.set({
+          isPaused: true,
+          pausedAt: Date.now(),
+          pausedTotalMs: pausedTotalMs ?? 0
+        })
+      )
+      .then(() => stopAlarms())
+      .then(() => sendResponse({ success: true }))
+      .catch(() => sendResponse({ success: false }))
+    return true
+  }
+
+  if (msg.type === "RESUME_SESSION") {
+    chrome.storage.local.get(["pausedAt", "pausedTotalMs"])
+      .then(({ pausedAt, pausedTotalMs }) => {
+        const added = pausedAt ? Date.now() - pausedAt : 0
+        const total = (pausedTotalMs ?? 0) + added
+        return chrome.storage.local
+          .set({ isPaused: false, pausedAt: null, pausedTotalMs: total })
+          .then(() => restartAlarms())
+          .then(() => total)
       })
+      .then((total) => sendResponse({ success: true, pausedTotalMs: total }))
+      .catch(() => sendResponse({ success: false }))
+    return true
+  }
+
+  if (msg.type === "END_SESSION") {
+    endSession()
+      .then(() => chrome.storage.local.set({ isPaused: false, pausedAt: null, pausedTotalMs: 0 }))
+      .then(() => stopAlarms())
+      .then(() => sendResponse({ success: true }))
+      .catch(() => sendResponse({ success: false }))
+    return true
+  }
+
+  if (msg.type === "LOGIN") {
+    chrome.storage.local
+      .set({ accessToken: msg.accessToken, refreshToken: msg.refreshToken })
+      .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
+      .then(sendResponse)
+    return true
+  }
+
+  if (msg.type === "START_SESSION") {
+    startSession()
+      .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
+      .then(sendResponse)
+    return true
+  }
+
+  if (msg.type === "LOGOUT") {
+    endSession()
+      .then(() =>
+        chrome.storage.local.remove([
+          "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt"
+        ])
+      )
+      .then(() =>
+        chrome.storage.local.set({ isPaused: false, pausedAt: null, pausedTotalMs: 0 })
+      )
+      .then(() => stopAlarms())
+      .then(() => sendResponse({ success: true }))
+    return true
+  }
+
+  if (msg.type === "UPDATE_SETTINGS") {
+    const next = msg.settings
+    chrome.storage.local.set({ settings: next }).then(async () => {
+      await restartAlarms()
+      try {
+        await apiCall("/users/me/settings", {
+          method: "PATCH",
+          body: JSON.stringify({
+            pushEnabled: next.pushEnabled,
+            soundEnabled: next.soundEnabled
+          })
+        })
+        if (next.darkDetectionEnabled !== undefined) {
+          await apiCall("/users/me/dark-detection", {
+            method: "PATCH",
+            body: JSON.stringify({ enabled: next.darkDetectionEnabled })
+          })
+        }
+      } catch (e) {
+        console.error("[settings] sync:", e)
+      }
+      sendResponse({ success: true })
     })
     return true
   }
 
-  if (message.type === "UPDATE_SETTINGS") {
-    chrome.storage.local.set({ settings: message.settings }, () => {
-      chrome.storage.local.get("isMonitoring", (result) => {
-        if (result.isMonitoring) {
-          startAlarms().then(() => sendResponse({ success: true }))
-        } else {
-          sendResponse({ success: true })
-        }
-      })
-    })
+  if (msg.type === "FETCH_USER_SETTINGS") {
+    apiCall<any>("/users/me", { method: "GET" })
+      .then((me) =>
+        chrome.storage.local.get("settings").then(({ settings: local }) => {
+          const merged = {
+            postureInterval: local?.postureInterval ?? 30,
+            breakInterval: local?.breakInterval ?? 60,
+            pushEnabled: me.settings.pushEnabled ?? true,
+            soundEnabled: me.settings.soundEnabled ?? true,
+            darkDetectionEnabled: me.settings.darkDetectionEnabled ?? false
+          }
+          chrome.storage.local.set({ settings: merged, userId: me.id, profileImg: me.profileImg ?? "", userName: me.name ?? "" })
+          sendResponse({ settings: merged, name: me.name, profileImg: me.profileImg ?? "" })
+        })
+      )
+      .catch((e) => sendResponse({ error: e.message }))
     return true
   }
 })
 
-// Initialize on install
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({
-    settings: { postureInterval: 30, breakInterval: 60 },
-    isMonitoring: false,
-    monitoringStartTime: null
-  })
+// ─── External messages (web page → extension) ────────────
+chrome.runtime.onMessageExternal.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "BASELINE_DONE") {
+    chrome.storage.local.set({ baselineDone: true, baselineData: msg.baselineData })
+      .then(() => startSession())
+      .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
+      .then(sendResponse)
+    return true
+  }
 })
 
 export {}

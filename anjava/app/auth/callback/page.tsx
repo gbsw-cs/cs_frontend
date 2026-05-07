@@ -64,17 +64,19 @@ function CallbackInner() {
       <div className="w-full max-w-[380px] rounded-2xl bg-white p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.06)] ring-1 ring-zinc-100">
         {result.kind === "error" ? (
           <>
-            <div className="text-sm font-semibold text-rose-500">
-              로그인 처리 중 오류가 발생했습니다.
-            </div>
             {result.message.includes("다른 방식") ? (
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="text-sm text-zinc-700">
                 이 이메일은 이메일/비밀번호로 가입된 계정입니다.
                 <br />
                 일반 로그인을 이용해 주세요.
               </p>
             ) : (
-              <p className="mt-3 text-xs text-zinc-500">{result.message}</p>
+              <>
+                <div className="text-sm font-semibold text-rose-500">
+                  로그인 처리 중 오류가 발생했습니다.
+                </div>
+                <p className="mt-3 text-xs text-zinc-500">{result.message}</p>
+              </>
             )}
             <button
               type="button"

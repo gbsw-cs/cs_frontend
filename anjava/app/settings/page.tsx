@@ -26,14 +26,14 @@ import AvatarColored from "../components/AvatarColored";
 type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
 
 const AVATAR_COLORS: AvatarColor[] = [
-  { id: "default", bg: "bg-emerald-100", hex: "#d1fae5", vivid: "#6ee7b7" },
-  { id: "sky",     bg: "bg-sky-100",     hex: "#e0f2fe", vivid: "#7dd3fc" },
-  { id: "violet",  bg: "bg-violet-100",  hex: "#ede9fe", vivid: "#c4b5fd" },
-  { id: "rose",    bg: "bg-rose-100",    hex: "#ffe4e6", vivid: "#fda4af" },
-  { id: "amber",   bg: "bg-amber-100",   hex: "#fef3c7", vivid: "#fcd34d" },
-  { id: "orange",  bg: "bg-orange-100",  hex: "#ffedd5", vivid: "#fdba74" },
-  { id: "pink",    bg: "bg-pink-100",    hex: "#fce7f3", vivid: "#f9a8d4" },
-  { id: "zinc",    bg: "bg-zinc-100",    hex: "#f4f4f5", vivid: "#d4d4d8" },
+  { id: "red",    bg: "bg-red-100",    hex: "#ef4444", vivid: "#ef4444" },
+  { id: "orange", bg: "bg-orange-100", hex: "#f97316", vivid: "#f97316" },
+  { id: "yellow", bg: "bg-yellow-100", hex: "#eab308", vivid: "#eab308" },
+  { id: "green",  bg: "bg-green-100",  hex: "#22c55e", vivid: "#22c55e" },
+  { id: "blue",   bg: "bg-blue-100",   hex: "#3b82f6", vivid: "#3b82f6" },
+  { id: "navy",   bg: "bg-blue-900",   hex: "#1e3a8a", vivid: "#1e40af" },
+  { id: "purple", bg: "bg-purple-100", hex: "#a855f7", vivid: "#a855f7" },
+  { id: "gray",   bg: "bg-zinc-100",   hex: "#9ca3af", vivid: "#9ca3af" },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -43,7 +43,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   reportPushWay: "EMAIL",
   pushEnabled: true,
   soundEnabled: true,
-  avatarHoodColor: "default",
+  avatarHoodColor: "green",
 };
 
 function getColorIdx(id: string) {

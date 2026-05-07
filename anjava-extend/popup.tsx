@@ -1,242 +1,613 @@
-import { useEffect, useState } from "react"
-
+import { useEffect, useRef, useState } from "react"
+import { toast, ToastContainer } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
+import logoUrl from "url:./assets/logo.png"
 import "./popup.css"
 
-interface Settings {
+const API_BASE    = process.env.PLASMO_PUBLIC_API_BASE!
+const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
+const WEB_URL     = process.env.PLASMO_PUBLIC_WEB_URL!
+
+interface ExtSettings {
   postureInterval: number
   breakInterval: number
+  pushEnabled: boolean
+  soundEnabled: boolean
+  darkDetectionEnabled: boolean
 }
 
-interface Stats {
-  postureAlerts: number
-  breaksAlerts: number
-  totalMs: number
-  startTime: number | null
+interface Landmark { x: number; y: number; z: number }
+interface Frame {
+  timestamp:      string
+  visibility:     number
+  nose:           Landmark
+  left_ear:       Landmark
+  right_ear:      Landmark
+  left_shoulder:  Landmark
+  right_shoulder: Landmark
+  brightness:     number
 }
 
-const INTERVAL_OPTIONS = [
-  { value: 15, label: "15분" },
-  { value: 30, label: "30분" },
-  { value: 45, label: "45분" },
-  { value: 60, label: "1시간" },
-  { value: 90, label: "1시간 30분" },
+const DEFAULT_SETTINGS: ExtSettings = {
+  postureInterval: 30,
+  breakInterval: 60,
+  pushEnabled: true,
+  soundEnabled: true,
+  darkDetectionEnabled: false
+}
+
+const INTERVALS = [
+  { value: 15,  label: "15분" },
+  { value: 30,  label: "30분" },
+  { value: 45,  label: "45분" },
+  { value: 60,  label: "1시간" },
+  { value: 90,  label: "1시간 30분" },
   { value: 120, label: "2시간" }
 ]
 
-function formatDuration(ms: number): string {
-  const totalMin = Math.floor(ms / 60000)
-  const hours = Math.floor(totalMin / 60)
-  const mins = totalMin % 60
-  if (hours > 0) return `${hours}시간 ${mins}분`
-  return `${mins}분`
+const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
+
+function lm(arr: any[] | undefined, i: number): Landmark {
+  return arr?.[i] ? { x: arr[i].x, y: arr[i].y, z: arr[i].z } : EMPTY
 }
 
-function IndexPopup() {
-  const [isMonitoring, setIsMonitoring] = useState(false)
-  const [settings, setSettings] = useState<Settings>({
-    postureInterval: 30,
-    breakInterval: 60
-  })
-  const [stats, setStats] = useState<Stats>({
-    postureAlerts: 0,
-    breaksAlerts: 0,
-    totalMs: 0,
-    startTime: null
-  })
-  const [elapsed, setElapsed] = useState(0)
-  const [activeTab, setActiveTab] = useState<"home" | "settings">("home")
+function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
+  const d = ctx.getImageData(0, 0, w, h).data
+  let sum = 0
+  for (let i = 0; i < d.length; i += 4)
+    sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+  return Math.round(sum / (d.length / 4))
+}
 
-  const todayKey = new Date().toISOString().slice(0, 10)
+function fmtDuration(ms: number) {
+  const s = Math.floor(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}시간 ${m}분`
+  if (m > 0) return `${m}분 ${sec}초`
+  return `${sec}초`
+}
 
-  // Load state from storage
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className={`toggle ${on ? "toggle-on" : "toggle-off"}`}>
+      <span className="toggle-thumb" />
+    </button>
+  )
+}
+
+export default function IndexPopup() {
+  const [phase, setPhase]         = useState<"loading" | "login" | "main">("loading")
+  const [tab, setTab]             = useState<"home" | "settings">("home")
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionStart, setStart]  = useState<Date | null>(null)
+  const [elapsed, setElapsed]     = useState(0)
+  const [settings, setSettings]   = useState<ExtSettings>(DEFAULT_SETTINGS)
+  const [userName, setUserName]   = useState("")
+  const [profileImg, setProfileImg] = useState("")
+  const [email, setEmail]         = useState("")
+  const [password, setPassword]   = useState("")
+  const [baselineDone, setBaselineDone]   = useState(true)
+  const [isPaused, setIsPaused]           = useState(false)
+  const [pausedTotalMs, setPausedTotalMs] = useState(0)
+  const [loginLoading, setLLoading]       = useState(false)
+  const [loginError, setLError]           = useState("")
+  const emailRef = useRef<HTMLInputElement>(null)
+
+  const detVideoRef    = useRef<HTMLVideoElement>(null)
+  const detCanvasRef   = useRef<HTMLCanvasElement>(null)
+  const detStreamRef   = useRef<MediaStream | null>(null)
+  const detDetectorRef = useRef<any>(null)
+  const recentFramesRef = useRef<Frame[]>([])
+  const lastToastMs    = useRef(0)
+  const darkModeRef    = useRef(false)
+
+  // ── Init ─────────────────────────────────────────────────
   useEffect(() => {
-    chrome.storage.local.get(
-      ["isMonitoring", "monitoringStartTime", "settings", todayKey],
-      (result) => {
-        setIsMonitoring(result.isMonitoring || false)
-        if (result.settings) setSettings(result.settings)
-        const dayStats = result[todayKey] || {}
-        setStats({
-          postureAlerts: dayStats.postureAlerts || 0,
-          breaksAlerts: dayStats.breaksAlerts || 0,
-          totalMs: dayStats.totalMs || 0,
-          startTime: dayStats.startTime || null
-        })
+    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res: any) => {
+      if (!res?.accessToken) {
+        setPhase("login")
+        return
       }
-    )
+      if (res.currentSessionId) {
+        setSessionId(res.currentSessionId)
+        setStart(new Date(res.sessionStartedAt))
+      }
+      if (res.settings)  setSettings({ ...DEFAULT_SETTINGS, ...res.settings })
+      if (res.userName)  setUserName(res.userName)
+      if (res.profileImg) setProfileImg(res.profileImg)
+      setBaselineDone(res.baselineDone === true)
+      setIsPaused(res.isPaused === true)
+      setPausedTotalMs(res.pausedTotalMs ?? 0)
+      setPhase("main")
+
+      chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: any) => {
+        if (r?.settings)  setSettings(s => ({ ...s, ...r.settings }))
+        if (r?.name)      setUserName(r.name)
+        if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
+      })
+    })
   }, [])
 
-  // Elapsed time ticker
   useEffect(() => {
-    if (!isMonitoring || !stats.startTime) {
-      setElapsed(0)
-      return
-    }
-    const tick = () => setElapsed(Date.now() - stats.startTime!)
+    if (phase === "login") setTimeout(() => emailRef.current?.focus(), 50)
+  }, [phase])
+
+  // ── Elapsed timer ─────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionStart) { setElapsed(0); return }
+    if (isPaused) return
+    const tick = () =>
+      setElapsed(Date.now() - sessionStart.getTime() - pausedTotalMs)
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [isMonitoring, stats.startTime])
+  }, [sessionStart, isPaused, pausedTotalMs])
 
-  const toggleMonitoring = () => {
-    const type = isMonitoring ? "STOP_MONITORING" : "START_MONITORING"
-    chrome.runtime.sendMessage({ type }, () => {
-      setIsMonitoring(!isMonitoring)
-      if (!isMonitoring) {
-        setStats((s) => ({ ...s, startTime: Date.now() }))
-      } else {
-        setStats((s) => ({
-          ...s,
-          totalMs: s.totalMs + elapsed,
-          startTime: null
-        }))
-        setElapsed(0)
+  // ── darkMode ref sync ─────────────────────────────────────
+  useEffect(() => {
+    darkModeRef.current = settings.darkDetectionEnabled
+  }, [settings.darkDetectionEnabled])
+
+  // ── Posture detection loop ────────────────────────────────
+  useEffect(() => {
+    if (phase !== "main" || !baselineDone || !sessionId) {
+      detStreamRef.current?.getTracks().forEach(t => t.stop())
+      detStreamRef.current = null
+      return
+    }
+
+    let cancelled = false
+
+    const run = async () => {
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: "user" }
+        })
+      } catch {
+        return // 웹캠 권한 없으면 무시
+      }
+      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
+      detStreamRef.current = stream
+
+      const vid = detVideoRef.current
+      if (!vid) return
+      vid.srcObject = stream
+      await new Promise<void>(r => { vid.onloadedmetadata = () => r() })
+      vid.play()
+
+      // MediaPipe 초기화 시도 (GPU → CPU 폴백)
+      try {
+        const { PoseLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision")
+        const wasmPath = chrome.runtime.getURL("assets/mediapipe-wasm")
+        const vision = await FilesetResolver.forVisionTasks(wasmPath)
+        const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+        const opts = (delegate: "GPU" | "CPU") => ({
+          baseOptions: { modelAssetPath: MODEL, delegate },
+          runningMode: "VIDEO" as const,
+          numPoses: 1
+        })
+        try {
+          detDetectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("GPU"))
+        } catch {
+          detDetectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("CPU"))
+        }
+      } catch (e) {
+        console.warn("[detect] MediaPipe init failed, brightness only", e)
+      }
+
+      const tick = async () => {
+        if (cancelled) return
+
+        const v = detVideoRef.current
+        const c = detCanvasRef.current
+        if (!v || !c) { setTimeout(tick, 5000); return }
+
+        const ctx = c.getContext("2d", { willReadFrequently: true })!
+        c.width  = v.videoWidth  || 640
+        c.height = v.videoHeight || 480
+        ctx.drawImage(v, 0, 0)
+
+        let pts: any[] | undefined
+        try {
+          if (detDetectorRef.current)
+            pts = detDetectorRef.current.detectForVideo(v, performance.now()).landmarks?.[0]
+        } catch {}
+
+        const frame: Frame = {
+          timestamp:      new Date().toISOString(),
+          visibility:     pts?.[0]?.visibility ?? 0,
+          nose:           lm(pts, 0),
+          left_ear:       lm(pts, 7),
+          right_ear:      lm(pts, 8),
+          left_shoulder:  lm(pts, 11),
+          right_shoulder: lm(pts, 12),
+          brightness:     calcBrightness(ctx, c.width, c.height)
+        }
+        recentFramesRef.current = [...recentFramesRef.current.slice(-9), frame]
+
+        const { accessToken, userId, baselineData } =
+          await chrome.storage.local.get(["accessToken", "userId", "baselineData"])
+
+        if (baselineData && accessToken && !cancelled) {
+          try {
+            const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                id: userId ?? "unknown",
+                frame,
+                baseline: baselineData,
+                frames: recentFramesRef.current,
+                z_threshold: 0.07,
+                shoulder_threshold: 0.05,
+                round_shoulder_ratio: 0.12,
+                round_shoulder_z_threshold: 0.05,
+                dark_mode: darkModeRef.current,
+                dark_abs_threshold: 60,
+                dark_relative_ratio: 0.5
+              })
+            })
+            if (res.ok && !cancelled) {
+              const data = await res.json()
+              const state: string =
+                typeof data === "string"
+                  ? data
+                  : (data?.dominant_state ?? data?.state ?? data?.result ?? "")
+              if (state && !["GOOD", "good", "OK", "ok", ""].includes(state)) {
+                const now = Date.now()
+                if (now - lastToastMs.current > 30_000) {
+                  lastToastMs.current = now
+                  const msgs: Record<string, string> = {
+                    TURTLE_NECK:    "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+                    SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                    DARK_ENV:       "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
+                  }
+                  toast.warning(msgs[state] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요.", {
+                    position: "top-center",
+                    autoClose: 5000,
+                    toastId: "posture-warn"
+                  })
+                }
+              }
+            }
+          } catch { /* silent */ }
+        }
+
+        setTimeout(tick, 5000)
+      }
+
+      tick()
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+      detStreamRef.current?.getTracks().forEach(t => t.stop())
+      detStreamRef.current = null
+      detDetectorRef.current = null
+    }
+  }, [phase, baselineDone, sessionId])
+
+  // ── Pause / Resume / Stop ─────────────────────────────────
+  const handlePause = () => {
+    setIsPaused(true)
+    chrome.runtime.sendMessage({ type: "PAUSE_SESSION" })
+  }
+
+  const handleResume = () => {
+    setIsPaused(false)
+    chrome.runtime.sendMessage({ type: "RESUME_SESSION" }, (r: any) => {
+      if (chrome.runtime.lastError) return
+      if (r?.pausedTotalMs !== undefined) setPausedTotalMs(r.pausedTotalMs)
+    })
+  }
+
+  const handleStop = () => {
+    setSessionId(null)
+    setStart(null)
+    setIsPaused(false)
+    setPausedTotalMs(0)
+    setElapsed(0)
+    chrome.runtime.sendMessage({ type: "END_SESSION" })
+  }
+
+  const handleStartSession = () => {
+    chrome.runtime.sendMessage({ type: "START_SESSION" }, (r: any) => {
+      if (!chrome.runtime.lastError && r?.currentSessionId) {
+        setSessionId(r.currentSessionId)
+        setStart(new Date(r.sessionStartedAt))
       }
     })
   }
 
-  const updateSetting = (key: keyof Settings, value: number) => {
-    const newSettings = { ...settings, [key]: value }
-    setSettings(newSettings)
-    chrome.runtime.sendMessage({
-      type: "UPDATE_SETTINGS",
-      settings: newSettings
+  // ── Login ─────────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!email || !password) return
+    setLLoading(true)
+    setLError("")
+    try {
+      const res  = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(typeof json.message === "string" ? json.message : JSON.stringify(json.message) || "로그인에 실패했습니다.")
+
+      chrome.runtime.sendMessage(
+        { type: "LOGIN", accessToken: json.data.accessToken, refreshToken: json.data.refreshToken },
+        () => {
+          setPhase("main")
+          chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (info: any) => {
+            if (info?.settings)  setSettings(s => ({ ...s, ...info.settings }))
+            if (info?.name)      setUserName(info.name)
+            if (info?.profileImg !== undefined) setProfileImg(info.profileImg)
+          })
+        }
+      )
+    } catch (e) {
+      setLError((e as Error).message || "로그인에 실패했습니다.")
+      setLLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    chrome.runtime.sendMessage({ type: "LOGOUT" }, () => {
+      setPhase("login")
+      setSessionId(null)
+      setStart(null)
+      setEmail("")
+      setPassword("")
     })
   }
 
-  const totalMonitoringMs = stats.totalMs + (isMonitoring ? elapsed : 0)
+  const updateSetting = <K extends keyof ExtSettings>(key: K, value: ExtSettings[K]) => {
+    const next = { ...settings, [key]: value }
+    setSettings(next)
+    chrome.runtime.sendMessage({ type: "UPDATE_SETTINGS", settings: next })
+  }
 
+  // ── Loading ───────────────────────────────────────────────
+  if (phase === "loading") {
+    return (
+      <div className="popup center">
+        <div className="spin" />
+      </div>
+    )
+  }
+
+  // ── Login ─────────────────────────────────────────────────
+  if (phase === "login") {
+    return (
+      <div className="popup">
+        <header className="header">
+          <img src={logoUrl} alt="Anjava" className="logo-img" />
+          <div>
+            <h1 className="header-title">Anjava</h1>
+            <p className="header-sub">자세 교정 도우미</p>
+          </div>
+        </header>
+
+        <div className="content">
+          <div className="card">
+            <p className="card-label">로그인</p>
+            <div className="field-group">
+              <input
+                ref={emailRef}
+                className="field"
+                type="email"
+                placeholder="이메일"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+              />
+              <input
+                className="field"
+                type="password"
+                placeholder="비밀번호"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+              />
+              {loginError && <p className="error-text">{loginError}</p>}
+              <button
+                className="btn-primary"
+                onClick={handleLogin}
+                disabled={loginLoading || !email || !password}>
+                {loginLoading ? "로그인 중…" : "로그인"}
+              </button>
+            </div>
+            <p className="hint-text" style={{ marginTop: 12 }}>
+              계정이 없으신가요?{" "}
+              <span
+                className="link"
+                onClick={() => chrome.tabs.create({ url: WEB_URL })}>
+                웹사이트에서 가입
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main ──────────────────────────────────────────────────
   return (
     <div className="popup">
-      {/* Header */}
+      {/* 자세 감지용 숨겨진 요소 */}
+      <video ref={detVideoRef} autoPlay playsInline muted style={{ display: "none" }} />
+      <canvas ref={detCanvasRef} style={{ display: "none" }} />
+      <ToastContainer />
+
       <header className="header">
-        <div className="header-icon">🪑</div>
-        <div>
-          <h1 className="header-title">Anjava</h1>
-          <p className="header-subtitle">자세 교정 도우미</p>
+        <img src={logoUrl} alt="Anjava" className="logo-img"/>
+        <div className="header-right">
+          {sessionId && baselineDone && (
+            <span className="det-dot" title="자세 감지 중">●</span>
+          )}
+          {profileImg
+            ? <img src={profileImg} alt={userName} className="avatar-sm" />
+            : <div className="avatar-sm avatar-placeholder">{userName?.[0]?.toUpperCase() ?? "A"}</div>
+          }
+          {userName && <span className="header-username">{userName}</span>}
         </div>
       </header>
 
-      {/* Tabs */}
       <div className="tabs">
         <button
-          className={`tab ${activeTab === "home" ? "tab-active" : ""}`}
-          onClick={() => setActiveTab("home")}>
+          className={`tab ${tab === "home" ? "tab-on" : ""}`}
+          onClick={() => setTab("home")}>
           홈
         </button>
         <button
-          className={`tab ${activeTab === "settings" ? "tab-active" : ""}`}
-          onClick={() => setActiveTab("settings")}>
+          className={`tab ${tab === "settings" ? "tab-on" : ""}`}
+          onClick={() => setTab("settings")}>
           설정
         </button>
       </div>
 
-      {activeTab === "home" ? (
+      {tab === "home" ? (
         <div className="content">
-          {/* Status Card */}
-          <div className={`status-card ${isMonitoring ? "status-active" : "status-inactive"}`}>
-            <div className="status-indicator">
-              <span className={`status-dot ${isMonitoring ? "dot-active" : "dot-inactive"}`} />
-              <span className="status-text">
-                {isMonitoring ? "모니터링 중" : "모니터링 꺼짐"}
+          {!baselineDone && (
+            <div className="baseline-card">
+              <p className="baseline-title">베이스라인 측정 필요</p>
+              <p className="baseline-desc">
+                정확한 자세 감지를 위해 초기 측정이 필요합니다.
+              </p>
+              <button
+                className="btn-primary"
+                style={{ marginTop: 10 }}
+                onClick={() => chrome.tabs.create({ url: `${WEB_URL}/webcam-test?extId=${chrome.runtime.id}` })}>
+                지금 측정하기
+              </button>
+            </div>
+          )}
+
+          <div className={`session-card ${sessionId ? (isPaused ? "session-paused" : "session-active") : "session-idle"}`}>
+            <div className="session-row">
+              <span className={`dot ${sessionId && !isPaused ? "dot-on" : "dot-off"}`} />
+              <span className="session-label">
+                {!sessionId ? "세션 없음" : isPaused ? "일시정지됨" : "감지 세션 진행 중"}
               </span>
             </div>
-            {isMonitoring && elapsed > 0 && (
-              <p className="elapsed-time">
-                ⏱ {formatDuration(elapsed)}
-              </p>
+            {sessionId && elapsed > 0 && (
+              <p className="session-time">{fmtDuration(elapsed)}</p>
             )}
+            {sessionId ? (
+              <div className="session-btns">
+                {isPaused ? (
+                  <button className="sess-btn sess-resume" onClick={handleResume}>▶ 재개</button>
+                ) : (
+                  <button className="sess-btn sess-pause" onClick={handlePause}>⏸ 일시정지</button>
+                )}
+                <button className="sess-btn sess-stop" onClick={handleStop}>⏹ 종료</button>
+              </div>
+            ) : baselineDone ? (
+              <button className="btn-primary" style={{ marginTop: 10 }} onClick={handleStartSession}>
+                세션 시작하기
+              </button>
+            ) : null}
+          </div>
+
+          <div className="card">
+            <p className="card-label">대시보드</p>
+            <p className="hint-text" style={{ margin: "4px 0 12px" }}>
+              자세한 통계와 건강 점수를 확인하세요
+            </p>
             <button
-              className={`toggle-btn ${isMonitoring ? "btn-stop" : "btn-start"}`}
-              onClick={toggleMonitoring}>
-              {isMonitoring ? "중지하기" : "시작하기"}
+              className="btn-outline"
+              onClick={() => chrome.tabs.create({ url: `${WEB_URL}/dashboard` })}>
+              대시보드 열기
             </button>
           </div>
 
-          {/* Today Stats */}
-          <div className="stats-section">
-            <h2 className="section-title">오늘의 통계</h2>
-            <div className="stats-grid">
-              <div className="stat-item">
-                <span className="stat-icon">🔔</span>
-                <div>
-                  <p className="stat-value">{stats.postureAlerts}회</p>
-                  <p className="stat-label">자세 알림</p>
-                </div>
-              </div>
-              <div className="stat-item">
-                <span className="stat-icon">☕</span>
-                <div>
-                  <p className="stat-value">{stats.breaksAlerts}회</p>
-                  <p className="stat-label">휴식 알림</p>
-                </div>
-              </div>
-              <div className="stat-item stat-item-wide">
-                <span className="stat-icon">⏰</span>
-                <div>
-                  <p className="stat-value">{formatDuration(totalMonitoringMs)}</p>
-                  <p className="stat-label">총 모니터링 시간</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <button className="btn-ghost" onClick={handleLogout}>
+            로그아웃
+          </button>
         </div>
       ) : (
         <div className="content">
-          {/* Settings */}
-          <div className="settings-section">
-            <div className="setting-item">
-              <label className="setting-label">
-                <span className="setting-icon">🔔</span>
-                자세 알림 간격
-              </label>
-              <select
-                className="setting-select"
-                value={settings.postureInterval}
-                onChange={(e) =>
-                  updateSetting("postureInterval", Number(e.target.value))
-                }>
-                {INTERVAL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+          <div className="card">
+            <p className="card-label">알림 설정</p>
+
+            <div className="setting-row">
+              <div className="setting-info">
+                <p className="setting-name">푸시 알림 수신</p>
+                <p className="setting-desc">경고 상태 시 브라우저 알림을 받습니다</p>
+              </div>
+              <Toggle
+                on={settings.pushEnabled}
+                onChange={v => updateSetting("pushEnabled", v)}
+              />
             </div>
 
-            <div className="setting-item">
-              <label className="setting-label">
-                <span className="setting-icon">☕</span>
-                휴식 알림 간격
-              </label>
-              <select
-                className="setting-select"
-                value={settings.breakInterval}
-                onChange={(e) =>
-                  updateSetting("breakInterval", Number(e.target.value))
-                }>
-                {INTERVAL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+            <div className="divider" />
+
+            <div className="setting-row">
+              <div className="setting-info">
+                <p className="setting-name">알림 소리</p>
+                <p className="setting-desc">알림과 함께 효과음을 재생합니다</p>
+              </div>
+              <Toggle
+                on={settings.soundEnabled}
+                onChange={v => updateSetting("soundEnabled", v)}
+              />
             </div>
           </div>
 
-          <div className="info-card">
-            <p className="info-title">사용법</p>
-            <ul className="info-list">
-              <li>시작하기를 눌러 모니터링을 시작하세요</li>
-              <li>설정한 간격마다 자세 교정 알림을 보내드려요</li>
-              <li>휴식 알림으로 스트레칭 타이밍도 챙겨드려요</li>
-              <li>알림이 오면 잠시 자세를 바르게 고쳐주세요</li>
-            </ul>
+          <div className="card">
+            <p className="card-label">감지 설정</p>
+            <div className="setting-row">
+              <div className="setting-info">
+                <p className="setting-name">어둠 속 코딩 감지</p>
+                <p className="setting-desc">카메라 밝기로 어두운 환경을 감지합니다</p>
+              </div>
+              <Toggle
+                on={settings.darkDetectionEnabled}
+                onChange={v => updateSetting("darkDetectionEnabled", v)}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            <p className="card-label">알림 간격</p>
+            <div className="setting-row">
+              <p className="setting-name">자세 교정 알림</p>
+              <select
+                className="sel"
+                value={settings.postureInterval}
+                onChange={e => updateSetting("postureInterval", Number(e.target.value))}>
+                {INTERVALS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="divider" />
+            <div className="setting-row">
+              <p className="setting-name">휴식 알림</p>
+              <select
+                className="sel"
+                value={settings.breakInterval}
+                onChange={e => updateSetting("breakInterval", Number(e.target.value))}>
+                {INTERVALS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       )}
     </div>
   )
 }
-
-export default IndexPopup

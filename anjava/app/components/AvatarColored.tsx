@@ -1,14 +1,15 @@
 "use client";
 
 export const HOOD_CSS_FILTER: Record<string, string> = {
+  red:    "sepia(1) saturate(5) hue-rotate(300deg)",
+  orange: "sepia(1) saturate(5) hue-rotate(0deg)",
+  yellow: "sepia(1) saturate(5) hue-rotate(25deg)",
+  green:  "sepia(1) saturate(3) hue-rotate(100deg)",
+  blue:   "sepia(1) saturate(3) hue-rotate(185deg)",
+  navy:   "sepia(1) saturate(6) hue-rotate(200deg) brightness(0.45)",
+  purple: "sepia(1) saturate(3) hue-rotate(240deg)",
+  gray:   "saturate(0)",
   default: "sepia(1) saturate(3) hue-rotate(100deg)",
-  sky:     "sepia(1) saturate(3) hue-rotate(185deg)",
-  violet:  "sepia(1) saturate(3) hue-rotate(240deg)",
-  rose:    "sepia(1) saturate(4) hue-rotate(310deg)",
-  amber:   "sepia(1) saturate(4) hue-rotate(10deg)",
-  orange:  "sepia(1) saturate(5) hue-rotate(0deg)",
-  pink:    "sepia(1) saturate(5) hue-rotate(300deg)",
-  zinc:    "saturate(0)",
 };
 
 type Props = {
