@@ -1,3 +1,5 @@
+declare module "react-toastify/dist/ReactToastify.css";
+
 import { useEffect, useRef, useState } from "react"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
@@ -258,7 +260,7 @@ export default function IndexPopup() {
               })
             })
             if (res.ok && !cancelled) {
-              const data = await res.json()
+              const data = await res.json().catch(() => null)
               const state: string =
                 typeof data === "string"
                   ? data
@@ -342,8 +344,12 @@ export default function IndexPopup() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       })
-      const json = await res.json()
-      if (!json.success) throw new Error(typeof json.message === "string" ? json.message : JSON.stringify(json.message) || "로그인에 실패했습니다.")
+      const text = await res.text()
+      let json: any = {}
+      try { json = JSON.parse(text) } catch {
+        throw new Error(`서버 응답 오류 (${res.status}): 서버가 올바른 응답을 반환하지 않았습니다.`)
+      }
+      if (!json.success) throw new Error(typeof json.message === "string" ? json.message : `로그인 실패 (${res.status})`)
 
       chrome.runtime.sendMessage(
         { type: "LOGIN", accessToken: json.data.accessToken, refreshToken: json.data.refreshToken },
@@ -367,9 +373,24 @@ export default function IndexPopup() {
       setPhase("login")
       setSessionId(null)
       setStart(null)
+      setBaselineDone(false)
+      setUserName("")
+      setProfileImg("")
       setEmail("")
       setPassword("")
     })
+  }
+
+  const handleRebaseline = async () => {
+    await chrome.storage.local.set({ baselineDone: false, baselineData: null })
+    setBaselineDone(false)
+    chrome.runtime.sendMessage({ type: "END_SESSION" })
+    setSessionId(null)
+    setStart(null)
+    setElapsed(0)
+    setIsPaused(false)
+    setPausedTotalMs(0)
+    chrome.tabs.create({ url: `${WEB_URL}/webcam-test?extId=${chrome.runtime.id}` })
   }
 
   const updateSetting = <K extends keyof ExtSettings>(key: K, value: ExtSettings[K]) => {
@@ -532,6 +553,9 @@ export default function IndexPopup() {
             </button>
           </div>
 
+          <button className="btn-ghost" style={{ color: "#a1a1aa" }} onClick={handleRebaseline}>
+            자세 다시측정하기
+          </button>
           <button className="btn-ghost" onClick={handleLogout}>
             로그아웃
           </button>

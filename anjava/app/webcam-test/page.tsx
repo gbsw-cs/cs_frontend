@@ -114,14 +114,30 @@ function WebcamTest() {
 
       ctx.drawImage(video, 0, 0)
       let pts: any[] | undefined
+      let ptsNorm: any[] | undefined
       try {
-        if (detectorRef.current)
-          pts = detectorRef.current.detectForVideo(video, performance.now()).landmarks?.[0]
+        if (detectorRef.current) {
+          const result = detectorRef.current.detectForVideo(video, performance.now())
+          pts      = result.worldLandmarks?.[0]   // 미터 단위 실좌표
+          ptsNorm  = result.landmarks?.[0]         // 정규화 좌표 (fallback)
+          if (!pts) pts = ptsNorm
+        }
       } catch {}
+
+      // 첫 5프레임에 z값 비교 로그
+      if (framesRef.current.length < 5 && pts) {
+        const noseZ       = pts[0]?.z?.toFixed(4)
+        const lShoulderZ  = pts[11]?.z?.toFixed(4)
+        const rShoulderZ  = pts[12]?.z?.toFixed(4)
+        const noseZNorm   = ptsNorm?.[0]?.z?.toFixed(4)
+        const lSNorm      = ptsNorm?.[11]?.z?.toFixed(4)
+        console.log(`[frame ${framesRef.current.length}] world z → nose:${noseZ} lShoulder:${lShoulderZ} rShoulder:${rShoulderZ}`)
+        console.log(`[frame ${framesRef.current.length}] norm  z → nose:${noseZNorm} lShoulder:${lSNorm}`)
+      }
 
       framesRef.current.push({
         timestamp:      new Date().toISOString(),
-        visibility:     pts?.[0]?.visibility ?? 0,
+        visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
         nose:           lm(pts, 0),
         left_ear:       lm(pts, 7),
         right_ear:      lm(pts, 8),

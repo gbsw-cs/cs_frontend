@@ -64,8 +64,8 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
 async function startSession(): Promise<void> {
   const stored = await chrome.storage.local.get(["accessToken", "currentSessionId", "baselineDone"])
   if (!stored.accessToken || stored.currentSessionId || !stored.baselineDone) return
+  const startedAt = new Date().toISOString()
   try {
-    const startedAt = new Date().toISOString()
     const data = await apiCall<{ sessionId: string; startedAt: string }>(
       "/sessions/start",
       { method: "POST", body: JSON.stringify({ startedAt }) }
@@ -74,37 +74,35 @@ async function startSession(): Promise<void> {
       currentSessionId: data.sessionId,
       sessionStartedAt: data.startedAt
     })
-  } catch {
-    try {
-      const data = await apiCall<{ sessionId: string; startedAt: string }>(
-        "/sessions/current",
-        { method: "GET" }
-      )
-      if (data?.sessionId) {
-        await chrome.storage.local.set({
-          currentSessionId: data.sessionId,
-          sessionStartedAt: data.startedAt
-        })
-      }
-    } catch (e) {
-      console.error("[session] start:", e)
+  } catch (apiErr: any) {
+    // 세션 API 미구현(404) 또는 실패 시 로컬 세션으로 폴백
+    if (apiErr?.status === 404 || String(apiErr?.message).includes("404")) {
+      console.warn("[session] API 없음 → 로컬 세션 생성")
+    } else {
+      console.error("[session] start 실패:", apiErr)
     }
+    await chrome.storage.local.set({
+      currentSessionId: `local-${Date.now()}`,
+      sessionStartedAt: startedAt
+    })
   }
 }
 
 async function endSession(): Promise<void> {
   const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
   if (!currentSessionId) return
-  try {
-    await apiCall(`/sessions/${currentSessionId}/end`, {
-      method: "POST",
-      body: JSON.stringify({ endedAt: new Date().toISOString() })
-    })
-  } catch (e) {
-    console.error("[session] end:", e)
-  } finally {
-    await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt"])
+  // 로컬 세션이 아닐 때만 API 호출
+  if (!String(currentSessionId).startsWith("local-")) {
+    try {
+      await apiCall(`/sessions/${currentSessionId}/end`, {
+        method: "POST",
+        body: JSON.stringify({ endedAt: new Date().toISOString() })
+      })
+    } catch (e) {
+      console.error("[session] end:", e)
+    }
   }
+  await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt"])
 }
 
 // ─── Notifications ───────────────────────────────────────────
@@ -245,7 +243,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     endSession()
       .then(() =>
         chrome.storage.local.remove([
-          "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt"
+          "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt",
+          "baselineDone", "baselineData", "userId", "profileImg", "userName"
         ])
       )
       .then(() =>
