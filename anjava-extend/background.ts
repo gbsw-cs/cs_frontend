@@ -106,20 +106,35 @@ async function endSession(): Promise<void> {
 }
 
 // ─── Notifications ───────────────────────────────────────────
+async function sendToActiveTab(msg: object): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (tab?.id) {
+    chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
+  }
+}
+
 async function showNotification(type: "posture" | "break"): Promise<void> {
   const { settings } = await chrome.storage.local.get("settings")
   const s = settings || {}
   if (s.pushEnabled === false) return
 
   const isPosture = type === "posture"
+  const message = isPosture ? rand(POSTURE_TIPS) : rand(BREAK_TIPS)
+
+  // 시스템 알림
   await chrome.notifications.create({
     type: "basic",
     iconUrl: "assets/icon.png",
     title: isPosture ? "자세 교정 알림" : "휴식 알림",
-    message: isPosture ? rand(POSTURE_TIPS) : rand(BREAK_TIPS),
+    message,
     priority: 2,
     silent: s.soundEnabled === false
   })
+
+  // 활성 탭 content script toast
+  if (isPosture) {
+    await sendToActiveTab({ type: "POSTURE_ALERT", state: "POSTURE_REMINDER", message })
+  }
 }
 
 // ─── Alarms ──────────────────────────────────────────────────
@@ -278,6 +293,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
       sendResponse({ success: true })
     })
+    return true
+  }
+
+  if (msg.type === "POSTURE_ALERT") {
+    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+      .then(() => sendResponse({ success: true }))
     return true
   }
 

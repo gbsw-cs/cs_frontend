@@ -274,11 +274,14 @@ export default function IndexPopup() {
                     SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                     DARK_ENV:       "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
                   }
-                  toast.warning(msgs[state] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요.", {
+                  const alertMsg = msgs[state] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
+                  toast.warning(alertMsg, {
                     position: "top-center",
                     autoClose: 5000,
                     toastId: "posture-warn"
                   })
+                  // 활성 탭 content script에도 전달
+                  chrome.runtime.sendMessage({ type: "POSTURE_ALERT", state, message: alertMsg })
                 }
               }
             }
