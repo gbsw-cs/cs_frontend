@@ -23,6 +23,11 @@ const BREAK_TIPS = [
 const POSTURE_ALARM = "posture-reminder"
 const BREAK_ALARM = "break-reminder"
 
+let pendingOffscreenData: {
+  accessToken: string; userId: string; baselineData: any
+  settings: { darkDetectionEnabled: boolean }
+} | null = null
+
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
@@ -86,9 +91,11 @@ async function startSession(): Promise<void> {
       sessionStartedAt: startedAt
     })
   }
+  try { await startOffscreenDetection() } catch {}
 }
 
 async function endSession(): Promise<void> {
+  try { await stopOffscreenDetection() } catch {}
   const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
   if (!currentSessionId) return
   // 로컬 세션이 아닐 때만 API 호출
@@ -105,11 +112,94 @@ async function endSession(): Promise<void> {
   await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt"])
 }
 
+// ─── Offscreen ───────────────────────────────────────────────
+async function ensureOffscreen(): Promise<void> {
+  if (await chrome.offscreen.hasDocument()) return
+  console.log("[offscreen] creating document...")
+  await chrome.offscreen.createDocument({
+    url: chrome.runtime.getURL("tabs/offscreen.html"),
+    reasons: ["USER_MEDIA" as any],
+    justification: "Webcam access for background posture detection"
+  })
+  console.log("[offscreen] document created")
+}
+
+async function closeOffscreen(): Promise<void> {
+  if (await chrome.offscreen.hasDocument()) {
+    await chrome.offscreen.closeDocument()
+    console.log("[offscreen] document closed")
+  }
+}
+
+async function startOffscreenDetection(): Promise<void> {
+  const { accessToken, userId, baselineData, settings } =
+    await chrome.storage.local.get(["accessToken", "userId", "baselineData", "settings"])
+  console.log("[offscreen] startOffscreenDetection:", {
+    hasToken: !!accessToken, hasUserId: !!userId, hasBaseline: !!baselineData
+  })
+  if (!accessToken || !baselineData) {
+    console.warn("[offscreen] 시작 불가 - accessToken 또는 baselineData 없음")
+    return
+  }
+  let resolvedUserId = userId
+  if (!resolvedUserId && accessToken) {
+    try {
+      const meRes = await fetch(`${API_BASE}/users/me`, {
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }
+      })
+      if (meRes.ok) {
+        const meJson = await meRes.json()
+        resolvedUserId = meJson.data?.id
+        if (resolvedUserId) await chrome.storage.local.set({ userId: resolvedUserId })
+      }
+    } catch {}
+  }
+  if (!resolvedUserId) {
+    console.warn("[offscreen] 시작 불가 - userId 없음")
+    return
+  }
+  pendingOffscreenData = {
+    accessToken, userId: resolvedUserId, baselineData,
+    settings: { darkDetectionEnabled: settings?.darkDetectionEnabled ?? false }
+  }
+  try {
+    await ensureOffscreen()
+  } catch (e) {
+    console.error("[offscreen] createDocument 실패:", e)
+    pendingOffscreenData = null
+    return
+  }
+  // fallback: if OFFSCREEN_READY not received in 3s, send START_DETECTION directly
+  setTimeout(() => {
+    if (!pendingOffscreenData) return
+    console.warn("[offscreen] OFFSCREEN_READY 미수신 → 강제 START_DETECTION")
+    const data = pendingOffscreenData
+    pendingOffscreenData = null
+    chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
+      .then(() => console.log("[offscreen] 강제 START_DETECTION 완료"))
+      .catch(e => console.error("[offscreen] 강제 START_DETECTION 실패:", e))
+  }, 3000)
+}
+
+async function stopOffscreenDetection(): Promise<void> {
+  const has = await chrome.offscreen.hasDocument()
+  if (!has) {
+    chrome.storage.local.set({ offscreenActive: false })
+    return
+  }
+  chrome.runtime.sendMessage({ type: "STOP_DETECTION" }).catch(() => {})
+  await new Promise<void>(r => setTimeout(r, 200))
+  chrome.storage.local.set({ offscreenActive: false })
+  await closeOffscreen()
+}
+
 // ─── Notifications ───────────────────────────────────────────
 async function sendToActiveTab(msg: object): Promise<void> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  if (tab?.id) {
-    chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  for (const tab of tabs) {
+    if (tab?.id && tab.url?.match(/^https?:\/\//)) {
+      chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
+    }
   }
 }
 
@@ -191,12 +281,34 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ─── Messages ────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // These types are sent FROM background TO offscreen — ignore if echoed back
+  if (["START_DETECTION", "STOP_DETECTION"].includes(msg.type)) return
+
   if (msg.type === "GET_STATUS") {
     chrome.storage.local
       .get(["accessToken", "currentSessionId", "sessionStartedAt", "settings",
             "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
-            "profileImg", "userName"])
+            "profileImg", "userName", "offscreenActive"])
       .then(sendResponse)
+    return true
+  }
+
+  if (msg.type === "OFFSCREEN_READY") {
+    console.log("[offscreen] OFFSCREEN_READY 수신")
+    if (pendingOffscreenData) {
+      const data = pendingOffscreenData
+      pendingOffscreenData = null
+      chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
+        .then(() => console.log("[offscreen] START_DETECTION 전송 완료"))
+        .catch(e => console.error("[offscreen] START_DETECTION 전송 실패:", e))
+    }
+    sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "DETECTION_ACTIVE") {
+    chrome.storage.local.set({ offscreenActive: true })
+    sendResponse({ ok: true })
     return true
   }
 
@@ -256,6 +368,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "LOGOUT") {
     Promise.resolve()
+      .then(() => stopOffscreenDetection().catch(() => {}))
       .then(() => endSession())
       .then(() =>
         chrome.storage.local.remove([
@@ -293,6 +406,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         console.error("[settings] sync:", e)
       }
       sendResponse({ success: true })
+      chrome.offscreen.hasDocument().then(has => {
+        if (has) chrome.runtime.sendMessage({
+          type: "UPDATE_SETTINGS",
+          settings: { darkDetectionEnabled: next.darkDetectionEnabled ?? false }
+        }).catch(() => {})
+      })
     })
     return true
   }
@@ -302,6 +421,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.get("settings").then(({ settings: s }) => {
       if (s?.pushEnabled !== false) {
         chrome.notifications.create("posture-detect", {
+          type: "basic",
+          iconUrl: "assets/icon.png",
+          title: "자세 경고",
+          message: msg.message,
+          priority: 2,
+          silent: s?.soundEnabled === false
+        })
+      }
+    })
+    sendResponse({ success: true })
+    return true
+  }
+
+  if (msg.type === "POSTURE_ALERT_OFFSCREEN") {
+    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+    chrome.storage.local.get("settings").then(({ settings: s }) => {
+      if (s?.pushEnabled !== false) {
+        chrome.notifications.create("posture-offscreen", {
           type: "basic",
           iconUrl: "assets/icon.png",
           title: "자세 경고",

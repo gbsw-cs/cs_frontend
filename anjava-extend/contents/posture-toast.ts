@@ -60,17 +60,29 @@ function showToast(message: string, icon = "⚠️") {
 
   el = document.createElement("div")
   el.id = TOAST_ID
-  el.innerHTML = `
-    <span style="font-size:20px;flex-shrink:0;margin-top:1px">${icon}</span>
-    <div>
-      <div style="font-weight:700;margin-bottom:2px;color:#fbbf24">자세 교정 알림</div>
-      <div style="opacity:0.85;font-size:12px">${message}</div>
-    </div>
-    <button onclick="this.parentElement.remove()" style="
-      margin-left:auto;background:none;border:none;color:#71717a;
-      cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0
-    ">✕</button>
-  `
+
+  const iconEl = document.createElement("span")
+  iconEl.style.cssText = "font-size:20px;flex-shrink:0;margin-top:1px"
+  iconEl.textContent = icon
+
+  const bodyEl = document.createElement("div")
+  const titleEl = document.createElement("div")
+  titleEl.style.cssText = "font-weight:700;margin-bottom:2px;color:#fbbf24"
+  titleEl.textContent = "자세 교정 알림"
+  const msgEl = document.createElement("div")
+  msgEl.style.cssText = "opacity:0.85;font-size:12px"
+  msgEl.textContent = message
+  bodyEl.appendChild(titleEl)
+  bodyEl.appendChild(msgEl)
+
+  const closeBtn = document.createElement("button")
+  closeBtn.style.cssText = "margin-left:auto;background:none;border:none;color:#71717a;cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0"
+  closeBtn.textContent = "✕"
+  closeBtn.onclick = () => el?.remove()
+
+  el.appendChild(iconEl)
+  el.appendChild(bodyEl)
+  el.appendChild(closeBtn)
   document.body.appendChild(el)
 
   dismissTimer = setTimeout(() => {

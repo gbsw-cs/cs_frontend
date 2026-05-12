@@ -83,6 +83,16 @@
   flex-shrink: 0;
 }
 
+.webcam-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: #16a34a;
+  background: #dcfce7;
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 /* ── Tabs ────────────────────────────────────────────────── */
 .tabs {
   display: flex;

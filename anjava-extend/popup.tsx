@@ -8,7 +8,6 @@ import "./popup.css"
 
 const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
 const WEB_URL  = process.env.PLASMO_PUBLIC_WEB_URL!
-const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
 
 interface ExtSettings {
   postureInterval: number
@@ -34,33 +33,6 @@ const INTERVALS = [
   { value: 90,  label: "1시간 30분" },
   { value: 120, label: "2시간" }
 ]
-
-interface Landmark { x: number; y: number; z: number }
-interface Frame {
-  timestamp:      string
-  visibility:     number
-  nose:           Landmark
-  left_ear:       Landmark
-  right_ear:      Landmark
-  left_shoulder:  Landmark
-  right_shoulder: Landmark
-  brightness:     number
-}
-
-const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
-
-function lm(arr: any[] | undefined, i: number): Landmark {
-  if (!arr?.[i]) return EMPTY
-  return { x: arr[i].x, y: arr[i].y, z: Math.max(-2, arr[i].z) }
-}
-
-function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
-  const d = ctx.getImageData(0, 0, w, h).data
-  let sum = 0
-  for (let i = 0; i < d.length; i += 4)
-    sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-  return Math.round(sum / (d.length / 4))
-}
 
 function fmtDuration(ms: number) {
   const s = Math.floor(ms / 1000)
@@ -100,15 +72,8 @@ export default function IndexPopup() {
   const [pausedTotalMs, setPausedTotalMs] = useState(0)
   const [loginLoading, setLLoading]       = useState(false)
   const [loginError, setLError]           = useState("")
+  const [offscreenActive, setOffscreenActive] = useState(false)
   const emailRef = useRef<HTMLInputElement>(null)
-
-  const detVideoRef    = useRef<HTMLVideoElement>(null)
-  const detCanvasRef   = useRef<HTMLCanvasElement>(null)
-  const detStreamRef   = useRef<MediaStream | null>(null)
-  const detDetectorRef = useRef<any>(null)
-  const recentFramesRef = useRef<Frame[]>([])
-  const lastToastMs    = useRef(0)
-  const darkModeRef    = useRef(false)
 
   // ── Init ─────────────────────────────────────────────────
   useEffect(() => {
@@ -127,6 +92,7 @@ export default function IndexPopup() {
       setBaselineDone(res.baselineDone === true)
       setIsPaused(res.isPaused === true)
       setPausedTotalMs(res.pausedTotalMs ?? 0)
+      setOffscreenActive(res.offscreenActive === true)
       setPhase("main")
 
       chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: any) => {
@@ -151,210 +117,6 @@ export default function IndexPopup() {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [sessionStart, isPaused, pausedTotalMs])
-
-  // ── darkMode ref sync ─────────────────────────────────────
-  useEffect(() => {
-    darkModeRef.current = settings.darkDetectionEnabled
-  }, [settings.darkDetectionEnabled])
-
-  // ── Posture detection loop ────────────────────────────────
-  useEffect(() => {
-    if (phase !== "main" || !baselineDone || !sessionId) {
-      detStreamRef.current?.getTracks().forEach(t => t.stop())
-      detStreamRef.current = null
-      return
-    }
-
-    let cancelled = false
-
-    const run = async () => {
-      let stream: MediaStream
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: "user" }
-        })
-      } catch {
-        return
-      }
-      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
-      detStreamRef.current = stream
-
-      const vid = detVideoRef.current
-      if (!vid) return
-      vid.srcObject = stream
-      await new Promise<void>(r => { vid.onloadedmetadata = () => r() })
-      vid.play()
-
-      try {
-        const { PoseLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision")
-        const wasmPath = chrome.runtime.getURL("assets/mediapipe-wasm")
-        const vision = await FilesetResolver.forVisionTasks(wasmPath)
-        const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
-        const opts = (delegate: "GPU" | "CPU") => ({
-          baseOptions: { modelAssetPath: MODEL, delegate },
-          runningMode: "VIDEO" as const,
-          numPoses: 1
-        })
-        try {
-          detDetectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("GPU"))
-        } catch {
-          detDetectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("CPU"))
-        }
-      } catch (e) {
-        console.error("[detect] MediaPipe 초기화 실패:", e)
-      }
-
-      let brightnessOffset = 0
-      let calibrated = false
-
-      const tick = async () => {
-        if (cancelled) return
-
-        const v = detVideoRef.current
-        const c = detCanvasRef.current
-        if (!v || !c) { setTimeout(tick, 5000); return }
-
-        const ctx = c.getContext("2d", { willReadFrequently: true })!
-        c.width  = v.videoWidth  || 640
-        c.height = v.videoHeight || 480
-        ctx.drawImage(v, 0, 0)
-
-        const rawBrightness = calcBrightness(ctx, c.width, c.height)
-        if (!calibrated) {
-          const { baselineData } = await chrome.storage.local.get(["baselineData"])
-          const storedBrightness: number | null = baselineData?.data?.baseline?.brightness ?? null
-          if (storedBrightness !== null && rawBrightness > 0) {
-            brightnessOffset = rawBrightness - storedBrightness
-            console.log(`[posture] 밝기 캘리브레이션: offset=${brightnessOffset.toFixed(1)} (popup=${rawBrightness}, baseline=${storedBrightness})`)
-          }
-          calibrated = true
-        }
-
-        let pts: any[] | undefined
-        let ptsNorm: any[] | undefined
-        try {
-          if (detDetectorRef.current) {
-            const result = detDetectorRef.current.detectForVideo(v, performance.now())
-            pts     = result.worldLandmarks?.[0]
-            ptsNorm = result.landmarks?.[0]
-            if (!pts) pts = ptsNorm
-          }
-        } catch {}
-
-        const frame: Frame = {
-          timestamp:      new Date().toISOString(),
-          visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
-          nose:           lm(pts, 0),
-          left_ear:       lm(pts, 7),
-          right_ear:      lm(pts, 8),
-          left_shoulder:  lm(pts, 11),
-          right_shoulder: lm(pts, 12),
-          brightness:     Math.max(0, Math.round(rawBrightness - brightnessOffset))
-        }
-
-        if (frame.visibility < 0.5) {
-          setTimeout(tick, 5000)
-          return
-        }
-
-        recentFramesRef.current = [...recentFramesRef.current.slice(-9), frame]
-
-        const { accessToken, userId } =
-          await chrome.storage.local.get(["accessToken", "userId"])
-
-        console.log("[posture] tick", {
-          accessToken: accessToken ? "있음" : "없음",
-          userId,
-          framesCount: recentFramesRef.current.length,
-          cancelled
-        })
-
-        if (accessToken && !cancelled) {
-          try {
-            console.log("[posture] POST 요청 시작 →", `${AI_API_BASE}/v1/posture/detect/batch`)
-            const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`
-              },
-              body: JSON.stringify({
-                id: userId ?? "unknown",
-                frames: recentFramesRef.current,
-                z_threshold: 0.02,
-                shoulder_threshold: 0.05,
-                round_shoulder_ratio: 0.12,
-                round_shoulder_z_threshold: 0.05,
-                dark_mode: darkModeRef.current,
-                dark_abs_threshold: 60,
-                dark_relative_ratio: 0.5
-              })
-            })
-            console.log("[posture] 응답 status:", res.status, res.ok ? "OK" : "FAIL")
-            if (!res.ok) {
-              const errBody = await res.text().catch(() => "")
-              console.error("[posture] 400 에러 body:", errBody)
-              try {
-                const errJson = JSON.parse(errBody)
-                if (errJson?.error?.code === "E_ENVIRONMENT_DRIFT") {
-                  calibrated = false
-                  brightnessOffset = 0
-                  const now = Date.now()
-                  if (now - lastToastMs.current > 30_000) {
-                    lastToastMs.current = now
-                    toast.warning("조명이 변경되어 밝기를 재조정합니다.", {
-                      position: "top-center",
-                      autoClose: 4000,
-                      toastId: "env-drift"
-                    })
-                  }
-                }
-              } catch {}
-            }
-            if (res.ok && !cancelled) {
-              const data = await res.json().catch(() => null)
-              console.log("[posture] 응답 data:", data)
-              const state: string =
-                typeof data === "string"
-                  ? data
-                  : (data?.dominant_state ?? data?.state ?? data?.result ?? "")
-              if (state && !["GOOD", "good", "OK", "ok", ""].includes(state)) {
-                const now = Date.now()
-                if (now - lastToastMs.current > 30_000) {
-                  lastToastMs.current = now
-                  const msgs: Record<string, string> = {
-                    TURTLE_NECK:    "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
-                    SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-                    DARK_ENV:       "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
-                  }
-                  const alertMsg = msgs[state] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
-                  toast.warning(alertMsg, {
-                    position: "top-center",
-                    autoClose: 5000,
-                    toastId: "posture-warn"
-                  })
-                  chrome.runtime.sendMessage({ type: "POSTURE_ALERT", state, message: alertMsg })
-                }
-              }
-            }
-          } catch { /* silent */ }
-        }
-
-        setTimeout(tick, 5000)
-      }
-
-      tick()
-    }
-
-    run()
-
-    return () => {
-      cancelled = true
-      detStreamRef.current?.getTracks().forEach(t => t.stop())
-      detStreamRef.current = null
-      detDetectorRef.current = null
-    }
-  }, [phase, baselineDone, sessionId])
 
   // ── Pause / Resume / Stop ─────────────────────────────────
   const handlePause = () => {
@@ -521,8 +283,6 @@ export default function IndexPopup() {
   // ── Main ──────────────────────────────────────────────────
   return (
     <div className="popup">
-      <video ref={detVideoRef} autoPlay playsInline muted style={{ display: "none" }} />
-      <canvas ref={detCanvasRef} style={{ display: "none" }} />
       <ToastContainer />
 
       <header className="header">
@@ -583,6 +343,9 @@ export default function IndexPopup() {
               <span className="session-label">
                 {!sessionId ? "세션 없음" : isPaused ? "일시정지됨" : "감지 세션 진행 중"}
               </span>
+              {sessionId && !isPaused && offscreenActive && (
+                <span className="webcam-badge">웹캠 작동 중</span>
+              )}
             </div>
             {sessionId && elapsed > 0 && (
               <p className="session-time">{fmtDuration(elapsed)}</p>
