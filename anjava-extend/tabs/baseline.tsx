@@ -121,16 +121,19 @@ export default function BaselinePage() {
       ctx.drawImage(video, 0, 0)
 
       let pts: any[] | undefined
+      let ptsNorm: any[] | undefined
       try {
         if (detectorRef.current) {
           const result = detectorRef.current.detectForVideo(video, performance.now())
-          pts = result.landmarks?.[0]
+          pts     = result.worldLandmarks?.[0]
+          ptsNorm = result.landmarks?.[0]
+          if (!pts) pts = ptsNorm
         }
       } catch {}
 
       const frame: Frame = {
         timestamp:      new Date().toISOString(),
-        visibility:     pts?.[0]?.visibility ?? 0,
+        visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
         nose:           lm(pts, 0),
         left_ear:       lm(pts, 7),
         right_ear:      lm(pts, 8),
