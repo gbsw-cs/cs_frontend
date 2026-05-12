@@ -6,9 +6,9 @@ import "react-toastify/dist/ReactToastify.css"
 import logoUrl from "url:./assets/logo.png"
 import "./popup.css"
 
-const API_BASE    = process.env.PLASMO_PUBLIC_API_BASE!
+const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
+const WEB_URL  = process.env.PLASMO_PUBLIC_WEB_URL!
 const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
-const WEB_URL     = process.env.PLASMO_PUBLIC_WEB_URL!
 
 interface ExtSettings {
   postureInterval: number
@@ -16,18 +16,6 @@ interface ExtSettings {
   pushEnabled: boolean
   soundEnabled: boolean
   darkDetectionEnabled: boolean
-}
-
-interface Landmark { x: number; y: number; z: number }
-interface Frame {
-  timestamp:      string
-  visibility:     number
-  nose:           Landmark
-  left_ear:       Landmark
-  right_ear:      Landmark
-  left_shoulder:  Landmark
-  right_shoulder: Landmark
-  brightness:     number
 }
 
 const DEFAULT_SETTINGS: ExtSettings = {
@@ -47,10 +35,23 @@ const INTERVALS = [
   { value: 120, label: "2시간" }
 ]
 
+interface Landmark { x: number; y: number; z: number }
+interface Frame {
+  timestamp:      string
+  visibility:     number
+  nose:           Landmark
+  left_ear:       Landmark
+  right_ear:      Landmark
+  left_shoulder:  Landmark
+  right_shoulder: Landmark
+  brightness:     number
+}
+
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
 function lm(arr: any[] | undefined, i: number): Landmark {
-  return arr?.[i] ? { x: arr[i].x, y: arr[i].y, z: arr[i].z } : EMPTY
+  if (!arr?.[i]) return EMPTY
+  return { x: arr[i].x, y: arr[i].y, z: Math.max(-2, arr[i].z) }
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -173,7 +174,7 @@ export default function IndexPopup() {
           video: { width: 640, height: 480, facingMode: "user" }
         })
       } catch {
-        return // 웹캠 권한 없으면 무시
+        return
       }
       if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
       detStreamRef.current = stream
@@ -184,7 +185,6 @@ export default function IndexPopup() {
       await new Promise<void>(r => { vid.onloadedmetadata = () => r() })
       vid.play()
 
-      // MediaPipe 초기화 시도 (GPU → CPU 폴백)
       try {
         const { PoseLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision")
         const wasmPath = chrome.runtime.getURL("assets/mediapipe-wasm")
@@ -201,8 +201,11 @@ export default function IndexPopup() {
           detDetectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("CPU"))
         }
       } catch (e) {
-        console.warn("[detect] MediaPipe init failed, brightness only", e)
+        console.error("[detect] MediaPipe 초기화 실패:", e)
       }
+
+      let brightnessOffset = 0
+      let calibrated = false
 
       const tick = async () => {
         if (cancelled) return
@@ -216,22 +219,44 @@ export default function IndexPopup() {
         c.height = v.videoHeight || 480
         ctx.drawImage(v, 0, 0)
 
+        const rawBrightness = calcBrightness(ctx, c.width, c.height)
+        if (!calibrated) {
+          const { baselineData } = await chrome.storage.local.get(["baselineData"])
+          const storedBrightness: number | null = baselineData?.data?.baseline?.brightness ?? null
+          if (storedBrightness !== null && rawBrightness > 0) {
+            brightnessOffset = rawBrightness - storedBrightness
+            console.log(`[posture] 밝기 캘리브레이션: offset=${brightnessOffset.toFixed(1)} (popup=${rawBrightness}, baseline=${storedBrightness})`)
+          }
+          calibrated = true
+        }
+
         let pts: any[] | undefined
+        let ptsNorm: any[] | undefined
         try {
-          if (detDetectorRef.current)
-            pts = detDetectorRef.current.detectForVideo(v, performance.now()).landmarks?.[0]
+          if (detDetectorRef.current) {
+            const result = detDetectorRef.current.detectForVideo(v, performance.now())
+            pts     = result.worldLandmarks?.[0]
+            ptsNorm = result.landmarks?.[0]
+            if (!pts) pts = ptsNorm
+          }
         } catch {}
 
         const frame: Frame = {
           timestamp:      new Date().toISOString(),
-          visibility:     pts?.[0]?.visibility ?? 0,
+          visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
           nose:           lm(pts, 0),
           left_ear:       lm(pts, 7),
           right_ear:      lm(pts, 8),
           left_shoulder:  lm(pts, 11),
           right_shoulder: lm(pts, 12),
-          brightness:     calcBrightness(ctx, c.width, c.height)
+          brightness:     Math.max(0, Math.round(rawBrightness - brightnessOffset))
         }
+
+        if (frame.visibility < 0.5) {
+          setTimeout(tick, 5000)
+          return
+        }
+
         recentFramesRef.current = [...recentFramesRef.current.slice(-9), frame]
 
         const { accessToken, userId } =
@@ -257,6 +282,26 @@ export default function IndexPopup() {
                 dark_relative_ratio: 0.5
               })
             })
+            if (!res.ok) {
+              const errBody = await res.text().catch(() => "")
+              console.error("[posture] 400 에러 body:", errBody)
+              try {
+                const errJson = JSON.parse(errBody)
+                if (errJson?.error?.code === "E_ENVIRONMENT_DRIFT") {
+                  calibrated = false
+                  brightnessOffset = 0
+                  const now = Date.now()
+                  if (now - lastToastMs.current > 30_000) {
+                    lastToastMs.current = now
+                    toast.warning("조명이 변경되어 밝기를 재조정합니다.", {
+                      position: "top-center",
+                      autoClose: 4000,
+                      toastId: "env-drift"
+                    })
+                  }
+                }
+              } catch {}
+            }
             if (res.ok && !cancelled) {
               const data = await res.json().catch(() => null)
               const state: string =
@@ -278,7 +323,6 @@ export default function IndexPopup() {
                     autoClose: 5000,
                     toastId: "posture-warn"
                   })
-                  // 활성 탭 content script에도 전달
                   chrome.runtime.sendMessage({ type: "POSTURE_ALERT", state, message: alertMsg })
                 }
               }
@@ -467,7 +511,6 @@ export default function IndexPopup() {
   // ── Main ──────────────────────────────────────────────────
   return (
     <div className="popup">
-      {/* 자세 감지용 숨겨진 요소 */}
       <video ref={detVideoRef} autoPlay playsInline muted style={{ display: "none" }} />
       <canvas ref={detCanvasRef} style={{ display: "none" }} />
       <ToastContainer />
@@ -475,14 +518,22 @@ export default function IndexPopup() {
       <header className="header">
         <img src={logoUrl} alt="Anjava" className="logo-img"/>
         <div className="header-right">
-          {sessionId && baselineDone && (
-            <span className="det-dot" title="자세 감지 중">●</span>
-          )}
-          {profileImg
-            ? <img src={profileImg} alt={userName} className="avatar-sm" />
-            : <div className="avatar-sm avatar-placeholder">{userName?.[0]?.toUpperCase() ?? "A"}</div>
-          }
-          {userName && <span className="header-username">{userName}</span>}
+          <div className="user-info-stack">
+            <div className="traffic-lights">
+              <button className="tl-btn tl-red"    title="닫기"     onClick={() => window.close()} />
+              <button className="tl-btn tl-yellow" title="세션 종료" onClick={handleStop} />
+            </div>
+            <div className="user-info-row">
+              {sessionId && baselineDone && (
+                <span className="det-dot" title="자세 감지 중">●</span>
+              )}
+              {profileImg
+                ? <img src={profileImg} alt={userName} className="avatar-sm" />
+                : <div className="avatar-sm avatar-placeholder">{userName?.[0]?.toUpperCase() ?? "A"}</div>
+              }
+              {userName && <span className="header-username">{userName}</span>}
+            </div>
+          </div>
         </div>
       </header>
 

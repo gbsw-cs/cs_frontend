@@ -255,7 +255,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "LOGOUT") {
-    endSession()
+    Promise.resolve()
+      .then(() => endSession())
       .then(() =>
         chrome.storage.local.remove([
           "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt",
@@ -298,7 +299,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "POSTURE_ALERT") {
     sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
-      .then(() => sendResponse({ success: true }))
+    chrome.storage.local.get("settings").then(({ settings: s }) => {
+      if (s?.pushEnabled !== false) {
+        chrome.notifications.create("posture-detect", {
+          type: "basic",
+          iconUrl: "assets/icon.png",
+          title: "자세 경고",
+          message: msg.message,
+          priority: 2,
+          silent: s?.soundEnabled === false
+        })
+      }
+    })
+    sendResponse({ success: true })
     return true
   }
 
