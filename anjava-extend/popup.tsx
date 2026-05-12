@@ -234,10 +234,10 @@ export default function IndexPopup() {
         }
         recentFramesRef.current = [...recentFramesRef.current.slice(-9), frame]
 
-        const { accessToken, userId, baselineData } =
-          await chrome.storage.local.get(["accessToken", "userId", "baselineData"])
+        const { accessToken, userId } =
+          await chrome.storage.local.get(["accessToken", "userId"])
 
-        if (baselineData && accessToken && !cancelled) {
+        if (accessToken && !cancelled) {
           try {
             const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
               method: "POST",
@@ -247,10 +247,8 @@ export default function IndexPopup() {
               },
               body: JSON.stringify({
                 id: userId ?? "unknown",
-                frame,
-                baseline: baselineData,
                 frames: recentFramesRef.current,
-                z_threshold: 0.07,
+                z_threshold: 0.02,
                 shoulder_threshold: 0.05,
                 round_shoulder_ratio: 0.12,
                 round_shoulder_z_threshold: 0.05,
