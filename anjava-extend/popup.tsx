@@ -262,8 +262,16 @@ export default function IndexPopup() {
         const { accessToken, userId } =
           await chrome.storage.local.get(["accessToken", "userId"])
 
+        console.log("[posture] tick", {
+          accessToken: accessToken ? "있음" : "없음",
+          userId,
+          framesCount: recentFramesRef.current.length,
+          cancelled
+        })
+
         if (accessToken && !cancelled) {
           try {
+            console.log("[posture] POST 요청 시작 →", `${AI_API_BASE}/v1/posture/detect/batch`)
             const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
               method: "POST",
               headers: {
@@ -282,6 +290,7 @@ export default function IndexPopup() {
                 dark_relative_ratio: 0.5
               })
             })
+            console.log("[posture] 응답 status:", res.status, res.ok ? "OK" : "FAIL")
             if (!res.ok) {
               const errBody = await res.text().catch(() => "")
               console.error("[posture] 400 에러 body:", errBody)
@@ -304,6 +313,7 @@ export default function IndexPopup() {
             }
             if (res.ok && !cancelled) {
               const data = await res.json().catch(() => null)
+              console.log("[posture] 응답 data:", data)
               const state: string =
                 typeof data === "string"
                   ? data
