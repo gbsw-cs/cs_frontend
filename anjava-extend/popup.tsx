@@ -397,7 +397,7 @@ export default function IndexPopup() {
             ) : null}
           </div>
 
-          {sessionId && !isPaused && offscreenActive && <WebcamCircle />}
+          <WebcamCircle />
 
           <div className="card">
             <p className="card-label">대시보드</p>
