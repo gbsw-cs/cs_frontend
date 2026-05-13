@@ -47,30 +47,38 @@ function fmtDuration(ms: number) {
 function WebcamCircle() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [active, setActive] = useState(false)
+  const [error, setError] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
       .then(stream => {
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          videoRef.current.play()
-          setActive(true)
+        const v = videoRef.current
+        if (v) {
+          v.srcObject = stream
+          v.onloadedmetadata = () => { v.play().catch(() => {}); setActive(true) }
         }
       })
-      .catch(() => {})
+      .catch(() => setError(true))
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [])
 
   return (
     <div className="webcam-circle-wrap">
       <div className={`webcam-circle ${active ? "webcam-circle-on" : "webcam-circle-off"}`}>
-        {active
-          ? <video ref={videoRef} muted playsInline className="webcam-circle-video" style={{ transform: "scaleX(-1)" }} />
-          : <span className="webcam-circle-icon">📷</span>}
+        {/* 항상 렌더링, active 아닐 때 숨김 */}
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          className="webcam-circle-video"
+          style={{ transform: "scaleX(-1)", display: active ? "block" : "none" }}
+        />
+        {!active && !error && <span className="webcam-circle-icon" style={{ fontSize: 24 }}>⏳</span>}
+        {error && <span className="webcam-circle-icon">🚫</span>}
       </div>
-      {active && <span className="webcam-circle-label">● 감지 중</span>}
+      <span className="webcam-circle-label">{active ? "● 라이브" : error ? "카메라 오류" : "연결 중..."}</span>
     </div>
   )
 }
