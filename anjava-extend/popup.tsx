@@ -44,6 +44,37 @@ function fmtDuration(ms: number) {
   return `${sec}초`
 }
 
+function WebcamCircle() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [active, setActive] = useState(false)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
+      .then(stream => {
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+          setActive(true)
+        }
+      })
+      .catch(() => {})
+    return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
+  }, [])
+
+  return (
+    <div className="webcam-circle-wrap">
+      <div className={`webcam-circle ${active ? "webcam-circle-on" : "webcam-circle-off"}`}>
+        {active
+          ? <video ref={videoRef} muted playsInline className="webcam-circle-video" style={{ transform: "scaleX(-1)" }} />
+          : <span className="webcam-circle-icon">📷</span>}
+      </div>
+      {active && <span className="webcam-circle-label">● 감지 중</span>}
+    </div>
+  )
+}
+
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -365,6 +396,8 @@ export default function IndexPopup() {
               </button>
             ) : null}
           </div>
+
+          {sessionId && !isPaused && offscreenActive && <WebcamCircle />}
 
           <div className="card">
             <p className="card-label">대시보드</p>
