@@ -9,6 +9,17 @@ function getBaselineUrl() {
   return `${base.replace(/\/$/, "")}/v1/baseline/cal`;
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   if (!payload?.id || !Array.isArray(payload.frames)) {
