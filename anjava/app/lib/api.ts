@@ -583,7 +583,8 @@ export function getDashboardTimeline(date: string) {
 
 // ── AI API ──────────────────────────────────────────────
 
-const AI_URL = process.env.NEXT_PUBLIC_AI_API_URL ?? "";
+// 프록시 라우트 사용 (API 키는 서버사이드에서 관리)
+const AI_URL = "/api/ai";
 
 export type AIHealthScoreRequest = {
   id: string;
@@ -626,11 +627,10 @@ export type AIHealthScoreResult = {
 export async function postAIHealthScore(
   body: AIHealthScoreRequest,
 ): Promise<AIHealthScoreResult> {
-  if (!AI_URL) throw new Error("AI API URL이 설정되지 않았습니다.");
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(`${AI_URL}/v1/health/score`, {
+    const res = await fetch(`${AI_URL}/health/score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

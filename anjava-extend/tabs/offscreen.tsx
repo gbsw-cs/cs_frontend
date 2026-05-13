@@ -150,6 +150,7 @@ export default function OffscreenPage() {
     // 로컬 세션(local-xxx)은 백엔드에 전송 불가 → 스킵
     if (!currentSessionId || !accessToken || String(currentSessionId).startsWith("local-")) return
     const events = eventQueueRef.current.splice(0)
+    console.log(`[offscreen] flush: ${events.length}개 이벤트 전송`, events.map(e => `${e.type}(${e.durationSec}s)`))
     try {
       const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/events`, {
         method: "POST",
@@ -328,8 +329,11 @@ export default function OffscreenPage() {
               ? "GOOD_POSTURE"
               : rawState
 
+            console.log(`[offscreen] 감지: ${rawState || "(없음)"} → ${normalizedState}`)
+
             // 상태 변경 감지 → 이벤트 큐에 추가
             if (normalizedState !== currentStateRef.current) {
+              console.log(`[offscreen] 상태 변경: ${currentStateRef.current} → ${normalizedState}`)
               recordStateChange(normalizedState)
             }
 

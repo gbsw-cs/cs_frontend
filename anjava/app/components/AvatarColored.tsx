@@ -1,15 +1,22 @@
 "use client";
 
-export const HOOD_CSS_FILTER: Record<string, string> = {
-  red:    "sepia(1) saturate(5) hue-rotate(300deg)",
-  orange: "sepia(1) saturate(5) hue-rotate(0deg)",
-  yellow: "sepia(1) saturate(5) hue-rotate(25deg)",
-  green:  "sepia(1) saturate(3) hue-rotate(100deg)",
-  blue:   "sepia(1) saturate(3) hue-rotate(185deg)",
-  navy:   "sepia(1) saturate(6) hue-rotate(200deg) brightness(0.45)",
-  purple: "sepia(1) saturate(3) hue-rotate(240deg)",
-  gray:   "saturate(0)",
-  default: "sepia(1) saturate(3) hue-rotate(100deg)",
+export const HOOD_COLOR_HEX: Record<string, string> = {
+  default: "#6ee7b7",
+  sky: "#7dd3fc",
+  violet: "#c4b5fd",
+  rose: "#fda4af",
+  amber: "#fcd34d",
+  orange: "#fdba74",
+  pink: "#f9a8d4",
+  zinc: "#d4d4d8",
+  // 기존 호환 색상
+  red:    "#f87171",
+  yellow: "#fde68a",
+  green:  "#6ee7b7",
+  blue:   "#93c5fd",
+  navy:   "#1e3a8a",
+  purple: "#c4b5fd",
+  gray:   "#d4d4d8",
 };
 
 type Props = {
@@ -18,19 +25,43 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export default function AvatarColored({ hoodColorId = "default", className = "", style }: Props) {
-  const filter = HOOD_CSS_FILTER[hoodColorId] ?? "none";
+export default function AvatarColored({
+  hoodColorId = "default",
+  className = "",
+  style,
+}: Props) {
+  const hoodHex = HOOD_COLOR_HEX[hoodColorId] ?? HOOD_COLOR_HEX.default;
+
   return (
-    <div className={`relative ${className}`} style={style}>
+    <div
+      className={`relative ${className}`}
+      style={{ aspectRatio: "1023 / 1537", ...style }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
+      <img src="/avatar-base.png" alt="아바타" className="block h-full w-full" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full"
+        style={{
+          backgroundColor: hoodHex,
+          maskImage: "url('/avatar-clothes-mask.png')",
+          WebkitMaskImage: "url('/avatar-clothes-mask.png')",
+          maskPosition: "0 0",
+          WebkitMaskPosition: "0 0",
+          maskRepeat: "no-repeat",
+          WebkitMaskRepeat: "no-repeat",
+          maskSize: "100% 100%",
+          WebkitMaskSize: "100% 100%",
+          transition: "background-color 0.25s ease",
+        }}
+      />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/avatar-hood.png"
+        src="/avatar-clothes-shading.png"
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-contain"
-        style={{ filter, transition: "filter 0.4s ease" }}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ mixBlendMode: "multiply" }}
       />
     </div>
   );
