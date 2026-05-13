@@ -18,7 +18,7 @@ function getPostureResult(data: unknown) {
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
-  if (!payload?.id || !payload?.frame || !payload?.baseline || !Array.isArray(payload.frames)) {
+  if (!payload?.id || !Array.isArray(payload.frames)) {
     return NextResponse.json(
       { message: "posture batch 요청 데이터가 올바르지 않습니다." },
       { status: 400 },

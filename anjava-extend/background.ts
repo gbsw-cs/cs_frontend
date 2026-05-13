@@ -369,6 +369,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true
   }
 
+  if (msg.type === "BASELINE_REQUIRED") {
+    console.warn("[detection] ⚠️ baseline 재측정 필요 - 팝업에서 베이스라인 측정을 다시 실행하세요")
+    chrome.storage.local.set({ baselineDone: false, baselineData: null })
+    sendResponse({ ok: true })
+    return true
+  }
+
   if (msg.type === "DETECTION_ACTIVE") {
     chrome.storage.local.set({ offscreenActive: true })
     console.log("[detection] ✅ offscreen 감지 시작됨")

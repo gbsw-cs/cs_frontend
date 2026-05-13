@@ -314,8 +314,13 @@ export default function OffscreenPage() {
             const errBody = await res.text().catch(() => "")
             try {
               const errJson = JSON.parse(errBody)
-              if (errJson?.error?.code === "E_ENVIRONMENT_DRIFT") {
+              const code = errJson?.error?.code
+              if (code === "E_ENVIRONMENT_DRIFT") {
                 calibrated = false; brightnessOffset = 0
+                console.log("[offscreen] 환경 변화 감지 → 재보정")
+              } else if (code === "E_INVALID_BASELINE") {
+                console.warn("[offscreen] baseline 없음 → 베이스라인 재측정 필요")
+                chrome.runtime.sendMessage({ type: "BASELINE_REQUIRED" }).catch(() => {})
               }
             } catch {}
           }
@@ -353,7 +358,9 @@ export default function OffscreenPage() {
                   TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
                   turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
                   SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                  ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                   round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
                   shoulder_tilted: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
                   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
                   dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
