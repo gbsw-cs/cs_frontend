@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 
-const AI_URL = process.env.NEXT_PUBLIC_AI_API_URL!
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 const WASM_CDN = "/mediapipe-wasm"
 const MODEL_URL =
@@ -175,7 +174,7 @@ function WebcamTest() {
       const validCount = frames.filter(f => f.visibility >= 0.8).length
       console.log(`[webcam-test] 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%)`)
 
-      const res = await fetch(`${AI_URL}/v1/baseline/cal`, {
+      const res = await fetch(`/v1/baseline/cal`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ id: userId, frames }),
