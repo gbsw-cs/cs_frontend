@@ -73,24 +73,27 @@ const POSTURE_MESSAGES: Record<string, string> = {
 
 const TOAST_STYLE = `
   #anjava-web-toast {
-    position: fixed; bottom: 24px; right: 24px;
-    background: #18181b; color: #fff;
-    padding: 12px 16px 12px 14px; border-radius: 14px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px; line-height: 1.4; z-index: 2147483647;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-    display: flex; align-items: flex-start; gap: 10px;
-    max-width: 300px; min-width: 220px;
-    border-left: 4px solid #f59e0b;
-    animation: anjava-web-in 0.28s cubic-bezier(0.16,1,0.3,1);
+    position: fixed; top: 20px; right: 20px;
+    background: #fff; color: #18181b;
+    border-radius: 16px; z-index: 2147483647;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+    width: 300px; overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.07);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
+    animation: anjava-web-in 0.32s cubic-bezier(0.16,1,0.3,1);
+    pointer-events: auto;
   }
-  #anjava-web-toast.out { animation: anjava-web-out 0.22s ease forwards; }
+  #anjava-web-toast.out { animation: anjava-web-out 0.24s ease forwards; }
   @keyframes anjava-web-in {
-    from { opacity: 0; transform: translateY(16px) scale(0.95); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateX(60px) scale(0.95); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
   }
   @keyframes anjava-web-out {
-    to { opacity: 0; transform: translateY(12px) scale(0.95); }
+    to { opacity: 0; transform: translateX(60px) scale(0.95); }
+  }
+  @keyframes anjava-web-progress {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
   }
 `;
 
@@ -107,18 +110,23 @@ function showPostureToast(message: string) {
   if (webToastTimer) { clearTimeout(webToastTimer); webToastTimer = null; }
   const old = document.getElementById("anjava-web-toast");
   if (old) old.remove();
+
   const el = document.createElement("div");
   el.id = "anjava-web-toast";
-  el.innerHTML = `<span style="font-size:20px;flex-shrink:0;margin-top:1px">⚠️</span>
-    <div>
-      <div style="font-weight:700;margin-bottom:2px;color:#fbbf24">자세 교정 알림</div>
-      <div style="opacity:0.85;font-size:12px">${message}</div>
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid #f4f4f5;">
+      <span style="font-size:18px;flex-shrink:0">⚠️</span>
+      <span style="font-weight:700;font-size:13px;color:#2563eb;flex:1">자세 교정 알림</span>
+      <button onclick="this.closest('#anjava-web-toast').remove()"
+        style="background:none;border:none;color:#a1a1aa;cursor:pointer;font-size:16px;padding:0;line-height:1">✕</button>
     </div>
-    <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#71717a;cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0">✕</button>`;
+    <div style="padding:10px 14px 12px;font-size:12.5px;color:#3f3f46;line-height:1.55">${message}</div>
+    <div style="height:3px;background:#2563eb;animation:anjava-web-progress 6s linear forwards;transform-origin:left"></div>
+  `;
   document.body.appendChild(el);
   webToastTimer = setTimeout(() => {
     el.classList.add("out");
-    setTimeout(() => el.remove(), 220);
+    setTimeout(() => el.remove(), 240);
   }, 6000);
 }
 
