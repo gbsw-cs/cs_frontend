@@ -191,7 +191,7 @@ async function rawRequest<T>(
   const externalSignal = init.signal as AbortSignal | undefined;
   if (externalSignal) {
     if (externalSignal.aborted) controller.abort(externalSignal.reason);
-    else externalSignal.addEventListener("abort", () => controller.abort(externalSignal.reason));
+    else externalSignal.addEventListener("abort", () => controller.abort(externalSignal.reason), { once: true });
   }
   const timeoutId = setTimeout(() => controller.abort(new Error("timeout")), REQUEST_TIMEOUT_MS);
 
@@ -398,22 +398,132 @@ export function getBadgesProgress() {
   );
 }
 
+export type MasterBadge = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  category: "POSTURE_TIME" | "STREAK" | "SPECIAL";
+  iconUrl: string | null;
+  requirementValue: number;
+};
+
+export type ReportStatus = "PENDING" | "SENT" | "FAILED";
+
+export type ReportListItem = {
+  id: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  deliveryWay: "EMAIL" | "NOTION";
+  status: ReportStatus;
+  sentAt: string | null;
+};
+
+export type ReportTopIssue = {
+  type: string;
+  durationSec: number;
+  count: number;
+  rank: number;
+};
+
+export type ReportDetail = ReportListItem & {
+  session: {
+    firstStartedAt: string;
+    lastEndedAt: string;
+    totalDetectionSec: number;
+  } | null;
+  healthScore: {
+    weekly: number | null;
+    daily: (number | null)[];
+  } | null;
+  timeline: {
+    date: string;
+    startHour: number;
+    startMin: number;
+    dominantState: string;
+    healthScore: number;
+  }[];
+  topIssues: ReportTopIssue[];
+  aiSolution: string | null;
+};
+
+export function getAllBadges() {
+  return request<MasterBadge[]>("/badges", { method: "GET" }, true);
+}
+
+export type CurrentReport = {
+  weekStartDate: string;
+  weekEndDate: string;
+  session: {
+    firstStartedAt: string;
+    lastEndedAt: string;
+    totalDetectionSec: number;
+  } | null;
+  healthScore: {
+    weekly: number | null;
+    daily: (number | null)[];
+  } | null;
+  timeline: {
+    date: string;
+    startHour: number;
+    startMin: number;
+    dominantState: string;
+    healthScore: number;
+  }[];
+  topIssues: ReportTopIssue[];
+  aiSolution: string | null;
+};
+
+export function getCurrentReport() {
+  return request<CurrentReport>("/users/me/reports/current", { method: "GET" }, true);
+}
+
+export function getReports(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return request<{ items: ReportListItem[] }>(
+    `/users/me/reports${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+    true,
+  );
+}
+
+export function getReport(id: string) {
+  return request<ReportDetail>(`/users/me/reports/${id}`, { method: "GET" }, true);
+}
+
+export function resendReport(id: string) {
+  return request<{ id: string; status: ReportStatus }>(
+    `/users/me/reports/${id}/resend`,
+    { method: "POST" },
+    true,
+  );
+}
+
 // ── Dashboard ──────────────────────────────────────────────
 
 export type TodayDashboard = {
   date: string;
-  healthScore: number;
-  totalDetectionSec: number;
-  goodPostureRatio: number;
-  breakdown: {
-    turtleNeckSec: number;
-    shoulderIssueSec: number;
-    darkEnvSec: number;
-    turtleNeckCount: number;
-    shoulderIssueCount: number;
-    darkEnvCount: number;
+  // 신 API: postureScore / 구 API: healthScore — 둘 다 허용
+  postureScore?: number;
+  healthScore?: number;
+  warningCount?: number;
+  vsYesterday?: number;
+  vsLastWeek?: number;
+  // 구 API 필드
+  totalDetectionSec?: number;
+  goodPostureRatio?: number;
+  breakdown?: {
+    turtleNeckSec?: number;
+    shoulderIssueSec?: number;
+    darkEnvSec?: number;
+    turtleNeckCount?: number;
+    shoulderIssueCount?: number;
+    darkEnvCount?: number;
   };
-  darkDetectionMode: "ON" | "OFF";
+  darkDetectionMode?: "ON" | "OFF";
 };
 
 export type WeeklyDashboard = {
@@ -421,42 +531,37 @@ export type WeeklyDashboard = {
   to: string;
   days: {
     date: string;
-    totalDetectionSec: number;
-    healthScore: number;
-    goodPostureSec: number;
-    turtleNeckSec: number;
-    shoulderIssueSec: number;
-    darkEnvSec: number;
-    goodPostureCount: number;
-    turtleNeckCount: number;
-    shoulderIssueCount: number;
-    darkEnvCount: number;
+    badPostureRatio: number;
   }[];
+  turtleNeckTotalSec: number;
+  roundShoulderTotalSec: number;
+  shoulderAsymmetryTotalSec: number;
+  darkEnvTotalSec: number;
+  goodPostureRatio: number;
   worstWeekday: string;
-  worstHour: number;
 };
 
 export type DailyDashboard = {
   date: string;
-  hours: {
-    hour: number;
-    goodRatio: number;
-    turtleNeckRatio: number;
-    shoulderIssueRatio: number;
-    darkEnvRatio: number;
-    turtleNeckCount: number;
-    shoulderIssueCount: number;
-    darkEnvCount: number;
+  slots: {
+    slotIndex: number;
+    startHour: number;
+    goodPostureCount: number;
+    singleBadCount: number;
+    overlappingCount: number;
   }[];
 };
 
 export type TimelineDashboard = {
   date: string;
   buckets: {
-    startHour: number;
-    startMin: number;
+    // 신 API: time 문자열 / 구 API: startHour + startMin
+    time?: string;
+    startHour?: number;
+    startMin?: number;
     dominantState: "GOOD" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "DARK_ENV";
-    healthScore: number;
+    message?: string;
+    healthScore?: number;
   }[];
 };
 
@@ -475,6 +580,70 @@ export function getDashboardDaily(date: string) {
 export function getDashboardTimeline(date: string) {
   return request<TimelineDashboard>(`/dashboard/timeline?date=${date}`, { method: "GET" }, true);
 }
+
+// ── AI API ──────────────────────────────────────────────
+
+const AI_URL = process.env.NEXT_PUBLIC_AI_API_URL ?? "";
+
+export type AIHealthScoreRequest = {
+  id: string;
+  counts: {
+    turtle_neck: number;
+    round_shoulder: number;
+    shoulder_tilted: number;
+    dark_environment: number;
+  };
+  total_frames: number;
+  low_visibility_frames: number;
+};
+
+export type AIHealthScoreBreakdown = {
+  count: number;
+  ratio: number;
+  severity: number;
+  weight: number;
+  penalty: number;
+};
+
+export type AIHealthScoreResult = {
+  success: boolean;
+  data: {
+    id: string;
+    result: {
+      score: number | null;
+      grade: string | null;
+      status: "ok" | "insufficient_data";
+      effective_frames: number;
+      total_frames: number;
+      low_visibility_frames: number;
+      total_penalty: number;
+      breakdown: Record<string, AIHealthScoreBreakdown>;
+    };
+  } | null;
+  error: { code: string; message: string; hint: string } | null;
+};
+
+export async function postAIHealthScore(
+  body: AIHealthScoreRequest,
+): Promise<AIHealthScoreResult> {
+  if (!AI_URL) throw new Error("AI API URL이 설정되지 않았습니다.");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(`${AI_URL}/v1/health/score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`AI 건강 점수 요청 실패 (${res.status})`);
+    return res.json() as Promise<AIHealthScoreResult>;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ── Cloudinary ──────────────────────────────────────────
 
 export async function uploadImageToCloudinary(file: File): Promise<string> {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;

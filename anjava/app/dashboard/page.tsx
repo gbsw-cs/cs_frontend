@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AvatarColored from "../components/AvatarColored";
 
 const WebcamView = dynamic(() => import("../components/WebcamView"), {
@@ -70,6 +70,7 @@ export default function DashboardPage() {
   const [darkPending, setDarkPending] = useState(false);
   const [badges, setBadges] = useState<ApiBadge[]>([]);
   const [webcamVisible, setWebcamVisible] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function toggleDarkDetection(next: boolean) {
     if (darkPending) return;
@@ -90,55 +91,85 @@ export default function DashboardPage() {
     const date = getKSTDate();
     const monday = getMondayKST();
 
-    getMe()
-      .then(setMe)
-      .catch(() => router.push("/login"));
+    getMe().then((m) => {
+      setMe(m);
+      setDarkMode(m.settings.darkDetectionEnabled);
+    }).catch(() => router.push("/login"));
 
-    getBadges()
-      .then((b) => setBadges(b.slice(0, 3)))
-      .catch(() => {});
+    getBadges().then((b) => setBadges(b.slice(0, 3))).catch(() => {});
 
-    Promise.allSettled([
-      getDashboardToday(),
-      getDashboardWeekly(monday),
-      getDashboardDaily(date),
-      getDashboardTimeline(date),
-    ]).then(([t, w, d, tl]) => {
-      if (t.status === "fulfilled") {
-        setToday(t.value);
-        setDarkMode(t.value.darkDetectionMode === "ON");
-      }
-      if (w.status === "fulfilled") setWeekly(w.value);
-      if (d.status === "fulfilled") setDaily(d.value);
-      if (tl.status === "fulfilled") setTimeline(tl.value);
-    });
+    const loadData = () => {
+      Promise.allSettled([
+        getDashboardToday(),
+        getDashboardWeekly(monday),
+        getDashboardDaily(date),
+        getDashboardTimeline(date),
+      ]).then(([t, w, d, tl]) => {
+        if (t.status === "fulfilled") setToday(t.value);
+        if (w.status === "fulfilled") setWeekly(w.value);
+        if (d.status === "fulfilled") setDaily(d.value);
+        if (tl.status === "fulfilled") setTimeline(tl.value);
+      });
+    };
+
+    loadData();
+    pollRef.current = setInterval(loadData, 30_000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── 파생 데이터 ────────────────────────────────────────
 
-  // 건강 점수
-  const healthScore = today?.healthScore ?? 0;
+  // 건강 점수 - 신 API(postureScore) / 구 API(healthScore) 둘 다 처리
+  const rawScore: number | null = today?.postureScore ?? today?.healthScore ?? null;
+  const healthScore = rawScore ?? 0; // 계산용 (null → 0)
+  // 경고 횟수 - 신 API(warningCount) / 구 API(breakdown 합산) 둘 다 처리
+  const warningCount = today?.warningCount
+    ?? ((today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0));
 
-  // 일일 바 차트 (24시간, 데이터 없으면 더미)
-  const hourBars = daily?.hours ?? Array.from({ length: 24 }, (_, i) => ({
-    hour: i, goodRatio: 0, turtleNeckRatio: 0,
-    shoulderIssueRatio: 0, darkEnvRatio: 0,
-    turtleNeckCount: 0, shoulderIssueCount: 0, darkEnvCount: 0,
+  // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
+  const slots = daily?.slots ?? Array.from({ length: 8 }, (_, i) => ({
+    slotIndex: i,
+    startHour: i * 3,
+    goodPostureCount: 0,
+    singleBadCount: 0,
+    overlappingCount: 0,
   }));
 
+  // 총 이벤트 수
+  const totalEventCount = slots.reduce(
+    (s, sl) => s + sl.goodPostureCount + sl.singleBadCount + sl.overlappingCount,
+    0,
+  );
+
   // 최근 활동 (타임라인 버킷 → 최근 5개, 현재 시각 이전, 실제 감지 데이터만)
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const kstNow = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
+  const [kstH, kstM] = kstNow.split(":").map(Number);
+  const nowMin = kstH * 60 + kstM;
   const recentActivity = timeline?.buckets
-    .filter(
-      (b) =>
-        b.startHour * 60 + b.startMin <= nowMin &&
-        b.dominantState !== null &&
-        b.dominantState !== undefined &&
-        STATE_LABEL[b.dominantState] !== undefined
-    )
+    .filter((b) => {
+      // 신 API: time="09:00" / 구 API: startHour+startMin
+      const bMin = b.time
+        ? (() => { const [h, m] = b.time.split(":").map(Number); return h * 60 + m; })()
+        : ((b.startHour ?? 0) * 60 + (b.startMin ?? 0));
+      return bMin <= nowMin && STATE_LABEL[b.dominantState] !== undefined;
+    })
     .slice(-5)
     .reverse() ?? [];
+
+  // 비교 통계 (null이면 데이터 없음)
+  const yDiff = today?.vsYesterday ?? null;
+  const wDiff = today?.vsLastWeek ?? null;
+
+  // 주간 통계
+  const turtleH = weekly ? Math.round(weekly.turtleNeckTotalSec / 3600) : 0;
+  const shoulderH = weekly ? Math.round((weekly.roundShoulderTotalSec + weekly.shoulderAsymmetryTotalSec) / 3600) : 0;
+  const asymH = weekly ? Math.round(weekly.shoulderAsymmetryTotalSec / 3600) : 0;
+  const darkH = weekly ? Math.round(weekly.darkEnvTotalSec / 3600) : 0;
+  const goodPct = weekly ? Math.round(weekly.goodPostureRatio * 100) : 0;
+
+  // 주간 선형 차트 값
+  const weeklyValues = weekly?.days.map((d) => d.badPostureRatio * 100) ?? [30, 55, 40, 30, 35, 50, 35];
 
   return (
     <div className="min-h-screen bg-zinc-50 px-3 py-3 sm:px-5 sm:py-4">
@@ -208,7 +239,7 @@ export default function DashboardPage() {
               <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
                 {recentActivity.map((b, i) => {
                   const isGood = b.dominantState === "GOOD";
-                  const timeStr = `${String(b.startHour).padStart(2, "0")}:${String(b.startMin).padStart(2, "0")}`;
+                  const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
                   const icon =
                     b.dominantState === "GOOD"
                       ? "✅"
@@ -300,16 +331,16 @@ export default function DashboardPage() {
                 />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
-                today && today.goodPostureRatio >= 0.6
+                today && healthScore >= 60
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
-                  : today && today.goodPostureRatio > 0
+                  : today && healthScore > 0
                   ? "bg-amber-50 text-amber-600 ring-amber-200 hover:bg-amber-100"
                   : "bg-zinc-50 text-zinc-500 ring-zinc-200 hover:bg-zinc-100"
               }`}>
-                {today
-                  ? today.goodPostureRatio >= 0.6
+                {today && rawScore !== null
+                  ? healthScore >= 60
                     ? "정확한 자세입니다 👍"
-                    : today.goodPostureRatio > 0
+                    : healthScore > 0
                     ? "자세를 교정해주세요 ⚠️"
                     : "자세 데이터 수집 중..."
                   : "자세 데이터 수집 중..."}
@@ -334,60 +365,40 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-2 flex items-stretch gap-3">
-              {/* 좌측: 총 시간 */}
+              {/* 좌측: 총 이벤트 수 */}
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-zinc-900">
-                    {today ? Math.floor((today.totalDetectionSec ?? 0) / 3600) : 0}
+                    {totalEventCount}
                   </span>
-                  <span className="text-xs text-zinc-500">시간</span>
+                  <span className="text-xs text-zinc-500">건</span>
                 </div>
                 <div className="text-[10px] text-zinc-400">상태 비율</div>
               </div>
 
-              {/* 우측: 스택 바 차트 */}
+              {/* 우측: 스택 바 차트 (8개 slots) */}
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
-                  {(() => {
-                    const buckets: (typeof hourBars[0] & { label: string })[] = [];
-                    for (let i = 0; i < 8; i++) {
-                      const startH = i * 3;
-                      const slice = hourBars.slice(startH, startH + 3);
-                      const avg = {
-                        hour: startH,
-                        goodRatio: slice.reduce((s, h) => s + h.goodRatio, 0) / 3,
-                        turtleNeckRatio: slice.reduce((s, h) => s + h.turtleNeckRatio, 0) / 3,
-                        shoulderIssueRatio: slice.reduce((s, h) => s + h.shoulderIssueRatio, 0) / 3,
-                        darkEnvRatio: slice.reduce((s, h) => s + h.darkEnvRatio, 0) / 3,
-                        turtleNeckCount: 0,
-                        shoulderIssueCount: 0,
-                        darkEnvCount: 0,
-                        label: `${startH}시`,
-                      };
-                      buckets.push(avg);
-                    }
-                    return buckets.map((b, i) => {
-                      const good = Math.max(0, b.goodRatio) * 100;
-                      const warn = (Math.max(0, b.turtleNeckRatio) + Math.max(0, b.darkEnvRatio)) * 100;
-                      const danger = Math.max(0, b.shoulderIssueRatio) * 100;
-                      const total = good + warn + danger;
-                      const hasData = total > 0;
-                      const inactive = Math.max(0, 100 - total);
-                      return (
-                        <div key={i} className="flex h-full w-4 flex-col justify-end">
-                          <div className="flex h-full w-full flex-col overflow-hidden rounded-full">
-                            <div className="bg-zinc-200" style={{ height: `${hasData ? inactive : 100}%` }} />
-                            <div className="bg-emerald-400" style={{ height: `${good}%` }} />
-                            <div className="bg-amber-400" style={{ height: `${warn}%` }} />
-                            <div className="bg-rose-400" style={{ height: `${danger}%` }} />
-                          </div>
+                  {slots.map((slot, i) => {
+                    const total = slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount;
+                    const goodH = total > 0 ? (slot.goodPostureCount / total) * 100 : 0;
+                    const singleH = total > 0 ? (slot.singleBadCount / total) * 100 : 0;
+                    const overH = total > 0 ? (slot.overlappingCount / total) * 100 : 0;
+                    const hasData = total > 0;
+                    return (
+                      <div key={i} className="flex h-full w-4 flex-col justify-end">
+                        <div className="flex h-full w-full flex-col overflow-hidden rounded-full">
+                          <div className="bg-zinc-200" style={{ height: hasData ? `${Math.max(0, 100 - goodH - singleH - overH)}%` : "100%" }} />
+                          <div className="bg-emerald-400" style={{ height: `${goodH}%` }} />
+                          <div className="bg-amber-400" style={{ height: `${singleH}%` }} />
+                          <div className="bg-rose-400" style={{ height: `${overH}%` }} />
                         </div>
-                      );
-                    });
-                  })()}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="mt-1 flex justify-around text-[9px] text-zinc-400">
-                  {["0시", "3시", "6시", "9시", "12시", "15시", "18시", "21시", "24시"].map((h) => (
+                  {["0시", "3시", "6시", "9시", "12시", "15시", "18시", "21시"].map((h) => (
                     <span key={h}>{h}</span>
                   ))}
                 </div>
@@ -397,10 +408,12 @@ export default function DashboardPage() {
 
           {/* 오늘의 건강 점수 */}
           <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
-            <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
+            </div>
 
             <div className="mt-3 flex items-center gap-4">
-              {/* 도넛 차트 */}
+              {/* 도넛 차트 (단색) */}
               <div className="relative shrink-0">
                 {(() => {
                   const size = 130;
@@ -408,30 +421,21 @@ export default function DashboardPage() {
                   const circ = 2 * Math.PI * r;
                   const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
-                  const good = today ? today.goodPostureRatio : 0;
-                  const total = today ? today.totalDetectionSec : 0;
-                  const warnRatio = total > 0 && today?.breakdown
-                    ? (today.breakdown.turtleNeckSec + today.breakdown.darkEnvSec) / total
-                    : 0;
-                  const dangerRatio = total > 0 && today?.breakdown
-                    ? today.breakdown.shoulderIssueSec / total
-                    : 0;
-                  const goodLen = usable * good;
-                  const warnLen = usable * warnRatio;
-                  const dangerLen = usable * dangerRatio;
+                  const score = healthScore;
+                  const goodLen = usable * (score / 100);
+                  const badLen = usable - goodLen;
                   const gapLen = circ * (gapDeg / 360);
                   const rotation = 90 + gapDeg / 2;
                   return (
                     <svg width={size} height={size} viewBox="0 0 120 120">
                       <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
                       {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
-                      {warnLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#fbbf24" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${warnLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
-                      {dangerLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen + warnLen} ${dangerLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {badLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${badLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
                     </svg>
                   );
                 })()}
                 <span className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-zinc-900">
-                  {healthScore}
+                  {rawScore !== null ? healthScore : "—"}
                 </span>
               </div>
 
@@ -439,35 +443,29 @@ export default function DashboardPage() {
               <div className="flex-1 space-y-2.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
-                  <span className="text-sm font-bold text-emerald-500">{healthScore}</span>
+                  <span className="text-sm font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />경고 횟수</span>
+                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />자세 경고 총 횟수</span>
                   <span className="text-sm font-bold text-rose-500">
-                    {(today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0)}
+                    {warningCount}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />조명 환경</span>
-                  <span className="text-sm font-bold text-amber-500">{today?.breakdown?.darkEnvCount ?? 0}</span>
+                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />상태 판정</span>
+                  <span className="text-sm font-bold text-amber-500">
+                    {today ? (healthScore >= 40 ? 0 : 10) : 0}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* 비교 통계 */}
             {(() => {
-              const yDay = new Date();
-              yDay.setDate(yDay.getDate() - 1);
-              const ySrc = weekly?.days.find((d) => d.date === yDay.toISOString().split("T")[0]);
-              const yDiff = today && ySrc ? today.healthScore - ySrc.healthScore : 0;
-              const weekAvg = weekly && weekly.days.length > 0
-                ? weekly.days.reduce((s, d) => s + d.healthScore, 0) / weekly.days.length
-                : 0;
-              const wDiff = today ? Math.round(today.healthScore - weekAvg) : 0;
-              const fmt = (n: number) =>
-                n > 0 ? `${n}% 향상` : n < 0 ? `${Math.abs(n)}% 하락` : "변동 없음";
-              const color = (n: number) =>
-                n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
+              const fmt = (n: number | null) =>
+                n === null ? "—" : n > 0 ? `+${n}% 향상` : n < 0 ? `${n}% 하락` : "변동 없음";
+              const color = (n: number | null) =>
+                n === null ? "text-zinc-300" : n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
               return (
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div className="border-t border-zinc-200 pt-2 text-center">
@@ -492,7 +490,7 @@ export default function DashboardPage() {
 
               {/* 종합 상태 메시지 */}
               {(() => {
-                const score = today?.healthScore ?? 0;
+                const score = healthScore;
                 const tone =
                   score >= 70
                     ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
@@ -511,10 +509,8 @@ export default function DashboardPage() {
               {/* 감지 항목 리스트 */}
               <ul className="mt-2 space-y-1.5">
                 {[
-                  { label: "거북목 감지", count: today?.breakdown?.turtleNeckCount },
-                  { label: "라운드 숄더 감지", count: today?.breakdown?.shoulderIssueCount },
-                  { label: "어둠 속 코딩 감지", count: today?.breakdown?.darkEnvCount },
-                  { label: "상태 표시", count: today?.healthScore !== undefined ? (today.healthScore >= 40 ? 0 : 10) : undefined },
+                  { label: "자세 경고 총 횟수", count: warningCount },
+                  { label: "상태 판정", count: today ? (healthScore >= 40 ? 0 : 10) : undefined },
                 ].map(({ label, count }) => {
                   const status =
                     count === undefined
@@ -561,39 +557,24 @@ export default function DashboardPage() {
             </div>
 
             {/* 통계 카드 행 */}
-            {(() => {
-              const turtleH = weekly ? Math.round(weekly.days.reduce((s, d) => s + d.turtleNeckSec, 0) / 3600) : 0;
-              const shoulderH = weekly ? Math.round(weekly.days.reduce((s, d) => s + d.shoulderIssueSec, 0) / 3600) : 0;
-              const asymH = weekly ? Math.round(weekly.days.reduce((s, d) => s + d.turtleNeckSec + d.shoulderIssueSec, 0) / 3600 / 2) : 0;
-              const darkH = weekly ? Math.round(weekly.days.reduce((s, d) => s + d.darkEnvSec, 0) / 3600) : 0;
-              const goodPct = weekly
-                ? Math.round(
-                    weekly.days.reduce((s, d) => s + (d.totalDetectionSec > 0 ? d.goodPostureSec / d.totalDetectionSec : 0), 0) /
-                    weekly.days.length * 100
-                  )
-                : 0;
-
-              return (
-                <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-6">
-                  <div className="col-span-2 rounded-lg ring-1 ring-zinc-100 sm:col-span-4">
-                    <div className="grid grid-cols-2 divide-x divide-zinc-100 sm:grid-cols-4">
-                      <DurationStat label="거북목 지속 시간" hour={turtleH} />
-                      <DurationStat label="라운드 숄더 지속 시간" hour={shoulderH} />
-                      <DurationStat label="자세 비대칭 지속 시간" hour={asymH} />
-                      <DurationStat label="어둠 코딩 지속 시간" hour={darkH} />
-                    </div>
-                  </div>
-                  <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
-                    <div className="text-[10px] text-zinc-400">최악 요일</div>
-                    <div className="text-lg font-bold text-rose-500">{weekly?.worstWeekday ? (WEEKDAY_KR[weekly.worstWeekday] ?? "—") : "—"}</div>
-                  </div>
-                  <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
-                    <div className="text-[10px] text-zinc-400">정자세 비율</div>
-                    <div className="text-lg font-bold text-[#2563EB]">{goodPct}%</div>
-                  </div>
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-6">
+              <div className="col-span-2 rounded-lg ring-1 ring-zinc-100 sm:col-span-4">
+                <div className="grid grid-cols-2 divide-x divide-zinc-100 sm:grid-cols-4">
+                  <DurationStat label="거북목 지속 시간" hour={turtleH} />
+                  <DurationStat label="라운드 숄더 지속 시간" hour={shoulderH} />
+                  <DurationStat label="자세 비대칭 지속 시간" hour={asymH} />
+                  <DurationStat label="어둠 코딩 지속 시간" hour={darkH} />
                 </div>
-              );
-            })()}
+              </div>
+              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+                <div className="text-[10px] text-zinc-400">최악 요일</div>
+                <div className="text-lg font-bold text-rose-500">{weekly?.worstWeekday ? (WEEKDAY_KR[weekly.worstWeekday] ?? "—") : "—"}</div>
+              </div>
+              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+                <div className="text-[10px] text-zinc-400">정자세 비율</div>
+                <div className="text-lg font-bold text-[#2563EB]">{goodPct}%</div>
+              </div>
+            </div>
 
             {/* 선형 차트 */}
             <div className="relative mt-2 flex flex-col">
@@ -601,10 +582,7 @@ export default function DashboardPage() {
                 비정상<br />자세 비율
               </div>
               {(() => {
-                const values = weekly?.days.map((d) => {
-                  if (!d.totalDetectionSec) return 0;
-                  return (((d.turtleNeckSec ?? 0) + (d.shoulderIssueSec ?? 0) + (d.darkEnvSec ?? 0)) / d.totalDetectionSec) * 100;
-                }) ?? [30, 55, 40, 30, 35, 50, 35];
+                const values = weeklyValues;
                 const W = 700;
                 const H = 120;
                 const step = values.length > 1 ? W / (values.length - 1) : 0;

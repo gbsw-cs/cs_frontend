@@ -61,14 +61,23 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
   }
 
   const json = await res.json().catch(() => ({})) as any
-  if (!res.ok) throw new Error(json.message ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    const err = Object.assign(new Error(json.message ?? `HTTP ${res.status}`), { status: res.status })
+    throw err
+  }
   return json.data as T
 }
 
 // ─── Session ─────────────────────────────────────────────────
 async function startSession(): Promise<void> {
-  const stored = await chrome.storage.local.get(["accessToken", "currentSessionId", "baselineDone"])
-  if (!stored.accessToken || stored.currentSessionId || !stored.baselineDone) return
+  const stored = await chrome.storage.local.get(["accessToken", "currentSessionId"])
+  if (!stored.accessToken) return
+
+  // 세션 ID가 이미 있으면 세션 생성은 건너뛰고 offscreen만 시작
+  if (stored.currentSessionId) {
+    try { await startOffscreenDetection() } catch {}
+    return
+  }
   const startedAt = new Date().toISOString()
   try {
     const data = await apiCall<{ sessionId: string; startedAt: string }>(
@@ -80,16 +89,38 @@ async function startSession(): Promise<void> {
       sessionStartedAt: data.startedAt
     })
   } catch (apiErr: any) {
-    // 세션 API 미구현(404) 또는 실패 시 로컬 세션으로 폴백
-    if (apiErr?.status === 404 || String(apiErr?.message).includes("404")) {
+    if (apiErr?.status === 409) {
+      // 이미 진행 중인 세션 → GET /sessions/current로 기존 세션 ID 복원
+      try {
+        const cur = await apiCall<{ sessionId: string; startedAt: string } | null>(
+          "/sessions/current", { method: "GET" }
+        )
+        if (cur?.sessionId) {
+          await chrome.storage.local.set({
+            currentSessionId: cur.sessionId,
+            sessionStartedAt: cur.startedAt
+          })
+          console.log("[session] 기존 세션 복원:", cur.sessionId)
+        }
+      } catch {
+        await chrome.storage.local.set({
+          currentSessionId: `local-${Date.now()}`,
+          sessionStartedAt: startedAt
+        })
+      }
+    } else if (apiErr?.status === 404 || String(apiErr?.message).includes("404")) {
       console.warn("[session] API 없음 → 로컬 세션 생성")
+      await chrome.storage.local.set({
+        currentSessionId: `local-${Date.now()}`,
+        sessionStartedAt: startedAt
+      })
     } else {
       console.error("[session] start 실패:", apiErr)
+      await chrome.storage.local.set({
+        currentSessionId: `local-${Date.now()}`,
+        sessionStartedAt: startedAt
+      })
     }
-    await chrome.storage.local.set({
-      currentSessionId: `local-${Date.now()}`,
-      sessionStartedAt: startedAt
-    })
   }
   try { await startOffscreenDetection() } catch {}
 }
@@ -137,10 +168,11 @@ async function startOffscreenDetection(): Promise<void> {
   console.log("[offscreen] startOffscreenDetection:", {
     hasToken: !!accessToken, hasUserId: !!userId, hasBaseline: !!baselineData
   })
-  if (!accessToken || !baselineData) {
-    console.warn("[offscreen] 시작 불가 - accessToken 또는 baselineData 없음")
+  if (!accessToken) {
+    console.warn("[offscreen] 시작 불가 - accessToken 없음")
     return
   }
+  // baselineData 없으면 null로 동작 (brightness 보정 없이 감지)
   let resolvedUserId = userId
   if (!resolvedUserId && accessToken) {
     try {
@@ -265,7 +297,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 })
 
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.storage.local.set({ baselineDone: false, baselineData: null })
+  // baseline은 유지 (Chrome 재시작해도 재측정 불필요)
   await startSession()
   await restartAlarms()
 })
@@ -278,6 +310,33 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === POSTURE_ALARM) showNotification("posture")
   else if (alarm.name === BREAK_ALARM) showNotification("break")
 })
+
+// ─── Timeline ────────────────────────────────────────────────
+const TIMELINE_STATE_MAP: Record<string, string> = {
+  TURTLE_NECK: "TURTLE_NECK",
+  ROUND_SHOULDER: "SHOULDER_ISSUE",
+  SHOULDER_ASYMMETRY: "SHOULDER_ISSUE",
+  DARK_ENV: "DARK_ENV",
+  GOOD_POSTURE: "GOOD",
+}
+
+function postTimeline(rawState: string, message: string): void {
+  const dominantState = TIMELINE_STATE_MAP[rawState]
+  if (!dominantState) return  // POSTURE_REMINDER 등 비감지 상태 제외
+
+  const now = new Date()
+  const date = now.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" })
+  const time = now.toLocaleTimeString("en-GB", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+
+  apiCall("/dashboard/timeline", {
+    method: "POST",
+    body: JSON.stringify({ date, time, dominantState, message }),
+  }).catch(() => {})
+}
 
 // ─── Messages ────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -308,6 +367,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "DETECTION_ACTIVE") {
     chrome.storage.local.set({ offscreenActive: true })
+    console.log("[detection] ✅ offscreen 감지 시작됨")
     sendResponse({ ok: true })
     return true
   }
@@ -418,6 +478,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "POSTURE_ALERT") {
     sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+    postTimeline(msg.state, msg.message)
     chrome.storage.local.get("settings").then(({ settings: s }) => {
       if (s?.pushEnabled !== false) {
         chrome.notifications.create("posture-detect", {
@@ -436,6 +497,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "POSTURE_ALERT_OFFSCREEN") {
     sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+    postTimeline(msg.state, msg.message)
     chrome.storage.local.get("settings").then(({ settings: s }) => {
       if (s?.pushEnabled !== false) {
         chrome.notifications.create("posture-offscreen", {

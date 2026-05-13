@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 const TOTAL = 3;
+const STORE_URL =
+  process.env.NEXT_PUBLIC_EXTENSION_STORE_URL ?? "https://chromewebstore.google.com";
 
 export default function ExtensionGuidePage() {
   const router = useRouter();
@@ -46,8 +48,8 @@ export default function ExtensionGuidePage() {
         <div className="rounded-3xl bg-white shadow-[0_4px_30px_rgba(0,0,0,0.05)] ring-1 ring-zinc-100">
           <div className="flex h-[520px] items-center justify-center px-8 py-12 sm:px-16 sm:py-16">
             <div className="flex h-full w-full items-center justify-center">
-              {step === 1 && <Slide1 />}
-              {step === 2 && <Slide2 />}
+              {step === 1 && <Slide1 storeUrl={STORE_URL} />}
+              {step === 2 && <Slide2 storeUrl={STORE_URL} />}
               {step === 3 && <Slide3 />}
             </div>
           </div>
@@ -108,7 +110,7 @@ export default function ExtensionGuidePage() {
   );
 }
 
-function Slide1() {
+function Slide1({ storeUrl }: { storeUrl: string }) {
   return (
     <div className="flex flex-col items-center text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2563EB] shadow-lg shadow-[#2563EB]/30">
@@ -123,10 +125,15 @@ function Slide1() {
         <br />
         별도의 앱 설치 없이 브라우저만으로 사용 가능합니다.
       </p>
-      <button className="mt-6 flex w-full max-w-[320px] items-center justify-center gap-2 rounded-lg bg-[#2563EB] py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+      <a
+        href={storeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-6 flex w-full max-w-[320px] items-center justify-center gap-2 rounded-lg bg-[#2563EB] py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+      >
         <Download size={15} />
         Chrome 웹 스토어에서 설치
-      </button>
+      </a>
       <div className="mt-4 grid w-full max-w-[320px] grid-cols-2 gap-3">
         <MiniChip icon={<Clock size={16} />} label="스크린타임 감지" />
         <MiniChip icon={<Sliders size={16} />} label="맞춤 설정" />
@@ -144,7 +151,7 @@ function MiniChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
-function Slide2() {
+function Slide2({ storeUrl }: { storeUrl: string }) {
   return (
     <div className="grid w-full max-w-[820px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_240px] md:gap-12">
       <div>
@@ -154,12 +161,21 @@ function Slide2() {
         <p className="mt-3 text-sm leading-relaxed text-zinc-500">
           Chrome 웹 스토어에서 &lsquo;안자봐&rsquo;를 검색하거나
           <br />
-          제공된 링크를 통해 바로 접속할 수 있습니다.
+          아래 버튼을 눌러 바로 설치 페이지로 이동하세요.
         </p>
-        <div className="mt-6 rounded-xl bg-[#2563EB]/5 p-4 ring-1 ring-[#2563EB]/15">
+        <a
+          href={storeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 flex items-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 w-fit"
+        >
+          <Download size={15} />
+          확장 프로그램 설치하기
+        </a>
+        <div className="mt-4 rounded-xl bg-[#2563EB]/5 p-4 ring-1 ring-[#2563EB]/15">
           <div className="text-xs font-semibold text-[#2563EB]">💡 빠른 설치 팁</div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-            이전 슬라이드의 다운로드 버튼을 클릭하면 바로 웹 스토어로 이동합니다.
+            버튼 클릭 후 &lsquo;Chrome에 추가&rsquo;를 누르면 바로 설치됩니다.
           </p>
         </div>
       </div>

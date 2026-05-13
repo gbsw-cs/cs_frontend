@@ -1,6 +1,23 @@
 import { useEffect, useRef } from "react"
 
 const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
+const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
+
+const SEVERITY: Record<string, number> = {
+  TURTLE_NECK: 2,
+  SHOULDER_ISSUE: 2,
+  ROUND_SHOULDER: 2,
+  SHOULDER_ASYMMETRY: 2,
+  DARK_ENV: 1,
+  GOOD_POSTURE: 1,
+}
+
+interface DetectionEvent {
+  type: string
+  severity: number
+  durationSec: number
+  detectedAt: string
+}
 
 interface Landmark { x: number; y: number; z: number }
 interface Frame {
@@ -25,13 +42,19 @@ function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): nu
 }
 
 export default function OffscreenPage() {
-  const streamRef      = useRef<MediaStream | null>(null)
-  const detectorRef    = useRef<any>(null)
-  const cancelledRef   = useRef(false)
-  const framesRef      = useRef<Frame[]>([])
+  const streamRef         = useRef<MediaStream | null>(null)
+  const detectorRef       = useRef<any>(null)
+  const cancelledRef      = useRef(false)
+  const framesRef         = useRef<Frame[]>([])
   const lastAlertMsRef    = useRef(0)
   const darkModeRef       = useRef(false)
   const reportedActiveRef = useRef(false)
+
+  // 이벤트 배치 전송용
+  const currentStateRef   = useRef<string | null>(null)
+  const stateStartRef     = useRef<number>(0)
+  const eventQueueRef     = useRef<DetectionEvent[]>([])
+  const batchTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     const handleMessage = (msg: any, _sender: any, sendResponse: any) => {
@@ -68,8 +91,87 @@ export default function OffscreenPage() {
     }
   }, [])
 
+  // AI 상태 → 백엔드 이벤트 타입 매핑
+  function toBackendType(state: string): string {
+    if (state === "TURTLE_NECK") return "TURTLE_NECK"
+    if (state === "SHOULDER_ISSUE") return "ROUND_SHOULDER"
+    if (state === "DARK_ENV") return "DARK_ENV"
+    return "GOOD_POSTURE"
+  }
+
+  // 상태 변경 시 이전 상태를 이벤트 큐에 추가
+  function recordStateChange(newState: string) {
+    const prev = currentStateRef.current
+    const now = Date.now()
+    if (prev !== null && stateStartRef.current > 0) {
+      const durationSec = Math.round((now - stateStartRef.current) / 1000)
+      if (durationSec >= 1) {
+        eventQueueRef.current.push({
+          type: toBackendType(prev),
+          severity: SEVERITY[toBackendType(prev)] ?? 1,
+          durationSec,
+          detectedAt: new Date(stateStartRef.current).toISOString(),
+        })
+      }
+    }
+    currentStateRef.current = newState
+    stateStartRef.current = now
+  }
+
+  // 이벤트 큐를 백엔드에 배치 전송
+  async function flushEvents() {
+    // 현재 진행 중인 상태를 스냅샷으로 큐에 추가 (상태 변화 없어도 주기적 전송)
+    if (currentStateRef.current !== null && stateStartRef.current > 0) {
+      const now = Date.now()
+      const durationSec = Math.round((now - stateStartRef.current) / 1000)
+      if (durationSec >= 5) {
+        eventQueueRef.current.push({
+          type: toBackendType(currentStateRef.current),
+          severity: SEVERITY[toBackendType(currentStateRef.current)] ?? 1,
+          durationSec,
+          detectedAt: new Date(stateStartRef.current).toISOString(),
+        })
+        stateStartRef.current = now  // 스냅샷 후 타이머 리셋
+      }
+    }
+
+    if (eventQueueRef.current.length === 0) return
+    // extension context 무효화 방어
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return
+    let currentSessionId: string | undefined
+    let accessToken: string | undefined
+    try {
+      const result = await chrome.storage.local.get(["currentSessionId", "accessToken"])
+      currentSessionId = result.currentSessionId
+      accessToken = result.accessToken
+    } catch {
+      return
+    }
+    // 로컬 세션(local-xxx)은 백엔드에 전송 불가 → 스킵
+    if (!currentSessionId || !accessToken || String(currentSessionId).startsWith("local-")) return
+    const events = eventQueueRef.current.splice(0)
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ events }),
+      })
+      if (!res.ok) {
+        // 백엔드 오류 시 큐에 복원
+        eventQueueRef.current.unshift(...events)
+      }
+    } catch {
+      // 네트워크 오류 시 큐에 복원
+      eventQueueRef.current.unshift(...events)
+    }
+  }
+
   function stopDetection() {
     cancelledRef.current = true
+    if (batchTimerRef.current) { clearInterval(batchTimerRef.current); batchTimerRef.current = null }
+    // 남은 이벤트 전송
+    if (currentStateRef.current !== null) recordStateChange("__end__")
+    flushEvents().catch(() => {})
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     detectorRef.current = null
@@ -78,6 +180,13 @@ export default function OffscreenPage() {
   async function startDetection(accessToken: string, userId: string, baselineData: any) {
     cancelledRef.current = false
     framesRef.current = []
+    currentStateRef.current = null
+    stateStartRef.current = 0
+    eventQueueRef.current = []
+
+    // 30초마다 이벤트 배치 전송
+    if (batchTimerRef.current) clearInterval(batchTimerRef.current)
+    batchTimerRef.current = setInterval(() => { flushEvents().catch(() => {}) }, 30_000)
 
     console.log("[offscreen] 웹캠 요청 중...")
     let stream: MediaStream
@@ -172,7 +281,14 @@ export default function OffscreenPage() {
 
       framesRef.current = [...framesRef.current.slice(-9), frame]
 
-      const { accessToken: currentToken } = await chrome.storage.local.get("accessToken")
+      let currentToken: string | undefined
+      try {
+        const stored = await chrome.storage.local.get("accessToken")
+        currentToken = stored.accessToken
+      } catch {
+        setTimeout(tick, 5000)
+        return
+      }
       if (currentToken && !cancelledRef.current) {
         try {
           const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
@@ -204,9 +320,21 @@ export default function OffscreenPage() {
               chrome.runtime.sendMessage({ type: "DETECTION_ACTIVE" }).catch(() => {})
             }
             const data = await res.json().catch(() => null)
-            const state: string = typeof data === "string" ? data :
+            const rawState: string = typeof data === "string" ? data :
               (data?.dominant_state ?? data?.state ?? data?.result ?? "")
-            if (state && !["GOOD","good","OK","ok",""].includes(state)) {
+
+            // 정규화: 좋은 자세는 GOOD_POSTURE, 나쁜 자세는 원본 유지
+            const normalizedState = ["GOOD","good","OK","ok",""].includes(rawState)
+              ? "GOOD_POSTURE"
+              : rawState
+
+            // 상태 변경 감지 → 이벤트 큐에 추가
+            if (normalizedState !== currentStateRef.current) {
+              recordStateChange(normalizedState)
+            }
+
+            // 나쁜 자세 경고 (30초 쿨다운)
+            if (normalizedState !== "GOOD_POSTURE") {
               const now = Date.now()
               if (now - lastAlertMsRef.current > 30_000) {
                 lastAlertMsRef.current = now
@@ -215,8 +343,8 @@ export default function OffscreenPage() {
                   SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
                 }
-                const message = msgs[state] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
-                chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state, message })
+                const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
+                chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })
               }
             }
           }

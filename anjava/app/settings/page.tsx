@@ -429,6 +429,7 @@ export default function SettingsPage() {
                     >
                       {b ? (
                         b.iconUrl
+                          // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={b.iconUrl} alt={b.name} className="h-7 w-7 object-contain" />
                           : <span>🏅</span>
                       ) : null}
@@ -522,13 +523,18 @@ export default function SettingsPage() {
             <Group title="리포트">
               <Row
                 title="리포트 수신 동의"
-                desc="매일 자세 리포트를 받습니다."
+                desc="매주 월요일 자정에 지난 주 리포트를 받습니다."
                 action={
                   <Toggle
                     on={settings.reportPushEnabled}
                     onChange={(v) => patchSettings({ reportPushEnabled: v })}
                   />
                 }
+              />
+              <Row
+                title="주간 리포트 이력"
+                desc="발송된 리포트를 확인하거나 재발송할 수 있습니다."
+                action={<StartButton href="/reports" label="보기" />}
               />
             </Group>
 
@@ -677,17 +683,17 @@ function Row({
   );
 }
 
-function StartButton({ href }: { href?: string }) {
+function StartButton({ href, label = "시작" }: { href?: string; label?: string }) {
   const className =
     "inline-block rounded-lg bg-zinc-100 px-5 py-2 text-[13px] font-medium text-zinc-600 transition hover:bg-[#2563EB] hover:text-white";
   if (href) {
     return (
       <Link href={href} className={className}>
-        시작
+        {label}
       </Link>
     );
   }
-  return <button className={className}>시작</button>;
+  return <button className={className}>{label}</button>;
 }
 
 function Toggle({
