@@ -8,7 +8,11 @@ const SEVERITY: Record<string, number> = {
   SHOULDER_ISSUE: 2,
   ROUND_SHOULDER: 2,
   SHOULDER_ASYMMETRY: 2,
+  shoulder_tilted: 2,
+  round_shoulder: 2,
+  turtle_neck: 2,
   DARK_ENV: 1,
+  dark_env: 1,
   GOOD_POSTURE: 1,
 }
 
@@ -93,9 +97,10 @@ export default function OffscreenPage() {
 
   // AI 상태 → 백엔드 이벤트 타입 매핑
   function toBackendType(state: string): string {
-    if (state === "TURTLE_NECK") return "TURTLE_NECK"
-    if (state === "SHOULDER_ISSUE") return "ROUND_SHOULDER"
-    if (state === "DARK_ENV") return "DARK_ENV"
+    if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
+    if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
+    if (state === "shoulder_tilted") return "SHOULDER_ASYMMETRY"
+    if (state === "DARK_ENV" || state === "dark_env") return "DARK_ENV"
     return "GOOD_POSTURE"
   }
 
@@ -321,11 +326,13 @@ export default function OffscreenPage() {
               chrome.runtime.sendMessage({ type: "DETECTION_ACTIVE" }).catch(() => {})
             }
             const data = await res.json().catch(() => null)
+            // final_status 우선, 구버전 필드 폴백
             const rawState: string = typeof data === "string" ? data :
-              (data?.dominant_state ?? data?.state ?? data?.result ?? "")
+              (data?.data?.final_status ?? data?.dominant_state ?? data?.state ?? data?.result ?? "")
 
             // 정규화: 좋은 자세는 GOOD_POSTURE, 나쁜 자세는 원본 유지
-            const normalizedState = ["GOOD","good","OK","ok",""].includes(rawState)
+            const GOOD_STATES = ["GOOD","good","OK","ok","good_posture","GOOD_POSTURE",""]
+            const normalizedState = GOOD_STATES.includes(rawState)
               ? "GOOD_POSTURE"
               : rawState
 
@@ -344,8 +351,12 @@ export default function OffscreenPage() {
                 lastAlertMsRef.current = now
                 const msgs: Record<string,string> = {
                   TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+                  turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
                   SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-                  DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
+                  round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                  shoulder_tilted: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+                  DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+                  dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
                 }
                 const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
                 chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })

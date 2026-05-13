@@ -314,9 +314,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // ─── Timeline ────────────────────────────────────────────────
 const TIMELINE_STATE_MAP: Record<string, string> = {
   TURTLE_NECK: "TURTLE_NECK",
+  turtle_neck: "TURTLE_NECK",
   ROUND_SHOULDER: "SHOULDER_ISSUE",
+  round_shoulder: "SHOULDER_ISSUE",
   SHOULDER_ASYMMETRY: "SHOULDER_ISSUE",
+  shoulder_tilted: "SHOULDER_ISSUE",
   DARK_ENV: "DARK_ENV",
+  dark_env: "DARK_ENV",
   GOOD_POSTURE: "GOOD",
 }
 
