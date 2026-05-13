@@ -104,23 +104,29 @@ export default function WebcamView() {
         const frame = await createPostureFrame(video);
         if (!frame) return;
         framesRef.current = [...framesRef.current.slice(-(BATCH_FRAME_COUNT - 1)), frame];
-
-        const baseline = readBaseline();
-        if (!baseline) {
-          setAiStatus("idle");
-          return;
-        }
         if (framesRef.current.length < BATCH_FRAME_COUNT) {
           setAiStatus("idle");
           return;
         }
 
+        // userId를 세션 ID로 사용 (webcam-test와 동일한 ID)
+        const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
         const id =
+          userId ??
           localStorage.getItem("aiSessionId") ??
           (typeof crypto !== "undefined" && "randomUUID" in crypto
             ? crypto.randomUUID()
             : `${Date.now()}`);
         localStorage.setItem("aiSessionId", id);
+
+        let baseline = readBaseline();
+        // baseline 없으면 즉시 측정
+        if (!baseline) {
+          const refreshed = await refreshBaseline(id, framesRef.current);
+          if (!refreshed) { setAiStatus("idle"); return; }
+          baseline = readBaseline();
+          if (!baseline) { setAiStatus("idle"); return; }
+        }
 
         const response = await fetch("/v1/posture/detect/batch", {
           method: "POST",
@@ -141,12 +147,16 @@ export default function WebcamView() {
         });
         if (!response.ok) {
           const errorBody = await response.json().catch(() => null);
-          console.error("Posture batch request failed", response.status, errorBody);
-          if (errorBody?.error?.code === "E_ENVIRONMENT_DRIFT") {
+          const code = errorBody?.error?.code;
+          // baseline 없음 또는 환경 변화 → 재측정
+          if (code === "E_ENVIRONMENT_DRIFT" || code === "E_INVALID_BASELINE") {
+            console.log(`[WebcamView] ${code} → baseline 재측정`);
+            localStorage.removeItem("aiBaseline");
             const refreshed = await refreshBaseline(id, framesRef.current);
             setAiStatus(refreshed ? "idle" : "error");
             return;
           }
+          console.error("Posture batch request failed", response.status, errorBody);
           setAiStatus("error");
           return;
         }
