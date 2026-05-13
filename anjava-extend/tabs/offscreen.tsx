@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 
-const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
 const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
+const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 
 const SEVERITY: Record<string, number> = {
   TURTLE_NECK: 2,
@@ -288,9 +288,9 @@ export default function OffscreenPage() {
       }
       if (currentToken && !cancelledRef.current) {
         try {
-          const res = await fetch(`${AI_API_BASE}/v1/posture/detect/batch`, {
+          const res = await fetch(`${WEB_URL}/v1/posture/detect/batch`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${currentToken}` },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               id: userId ?? "unknown",
               frames: framesRef.current,
