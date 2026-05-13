@@ -1,14 +1,14 @@
 "use client";
 
-export const HOOD_CSS_FILTER: Record<string, string> = {
-  default: "sepia(1) saturate(3) hue-rotate(100deg)",
-  sky:     "sepia(1) saturate(3) hue-rotate(185deg)",
-  violet:  "sepia(1) saturate(3) hue-rotate(240deg)",
-  rose:    "sepia(1) saturate(4) hue-rotate(310deg)",
-  amber:   "sepia(1) saturate(4) hue-rotate(10deg)",
-  orange:  "sepia(1) saturate(5) hue-rotate(0deg)",
-  pink:    "sepia(1) saturate(5) hue-rotate(300deg)",
-  zinc:    "saturate(0)",
+export const HOOD_COLOR_HEX: Record<string, string> = {
+  default: "#6ee7b7",
+  sky: "#7dd3fc",
+  violet: "#c4b5fd",
+  rose: "#fda4af",
+  amber: "#fcd34d",
+  orange: "#fdba74",
+  pink: "#f9a8d4",
+  zinc: "#d4d4d8",
 };
 
 type Props = {
@@ -17,19 +17,43 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-export default function AvatarColored({ hoodColorId = "default", className = "", style }: Props) {
-  const filter = HOOD_CSS_FILTER[hoodColorId] ?? "none";
+export default function AvatarColored({
+  hoodColorId = "default",
+  className = "",
+  style,
+}: Props) {
+  const hoodHex = HOOD_COLOR_HEX[hoodColorId] ?? HOOD_COLOR_HEX.default;
+
   return (
-    <div className={`relative ${className}`} style={style}>
+    <div
+      className={`relative ${className}`}
+      style={{ aspectRatio: "1023 / 1537", ...style }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/avatar.png" alt="아바타" className="h-full w-full object-contain" />
+      <img src="/avatar-base.png" alt="아바타" className="block h-full w-full" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full"
+        style={{
+          backgroundColor: hoodHex,
+          maskImage: "url('/avatar-clothes-mask.png')",
+          WebkitMaskImage: "url('/avatar-clothes-mask.png')",
+          maskPosition: "0 0",
+          WebkitMaskPosition: "0 0",
+          maskRepeat: "no-repeat",
+          WebkitMaskRepeat: "no-repeat",
+          maskSize: "100% 100%",
+          WebkitMaskSize: "100% 100%",
+          transition: "background-color 0.25s ease",
+        }}
+      />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/avatar-hood.png"
+        src="/avatar-clothes-shading.png"
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-contain"
-        style={{ filter, transition: "filter 0.4s ease" }}
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ mixBlendMode: "multiply" }}
       />
     </div>
   );
