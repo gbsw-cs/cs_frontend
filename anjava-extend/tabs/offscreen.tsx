@@ -54,6 +54,9 @@ export default function OffscreenPage() {
   const darkModeRef       = useRef(false)
   const reportedActiveRef = useRef(false)
 
+  // START_DETECTION에서 받은 토큰 (tick에서 storage 재접근 불필요)
+  const accessTokenRef    = useRef<string>("")
+
   // 이벤트 배치 전송용
   const currentStateRef   = useRef<string | null>(null)
   const stateStartRef     = useRef<number>(0)
@@ -140,18 +143,18 @@ export default function OffscreenPage() {
 
     if (eventQueueRef.current.length === 0) return
     // extension context 무효화 방어
+    const accessToken = accessTokenRef.current
+    if (!accessToken) return
     if (typeof chrome === "undefined" || !chrome.storage?.local) return
     let currentSessionId: string | undefined
-    let accessToken: string | undefined
     try {
-      const result = await chrome.storage.local.get(["currentSessionId", "accessToken"])
+      const result = await chrome.storage.local.get(["currentSessionId"])
       currentSessionId = result.currentSessionId
-      accessToken = result.accessToken
     } catch {
       return
     }
     // 로컬 세션(local-xxx)은 백엔드에 전송 불가 → 스킵
-    if (!currentSessionId || !accessToken || String(currentSessionId).startsWith("local-")) return
+    if (!currentSessionId || String(currentSessionId).startsWith("local-")) return
     const events = eventQueueRef.current.splice(0)
     console.log(`[offscreen] flush: ${events.length}개 이벤트 전송`, events.map(e => `${e.type}(${e.durationSec}s)`))
     try {
@@ -182,6 +185,7 @@ export default function OffscreenPage() {
   }
 
   async function startDetection(accessToken: string, userId: string, baselineData: any) {
+    accessTokenRef.current = accessToken   // tick에서 storage 재접근 불필요
     cancelledRef.current = false
     framesRef.current = []
     currentStateRef.current = null
@@ -278,14 +282,7 @@ export default function OffscreenPage() {
 
       framesRef.current = [...framesRef.current.slice(-9), frame]
 
-      let currentToken: string | undefined
-      try {
-        const stored = await chrome.storage.local.get("accessToken")
-        currentToken = stored.accessToken
-      } catch {
-        setTimeout(tick, 5000)
-        return
-      }
+      const currentToken = accessTokenRef.current
       if (currentToken && !cancelledRef.current) {
         try {
           const res = await fetch(`${WEB_URL}/v1/posture/detect/batch`, {
