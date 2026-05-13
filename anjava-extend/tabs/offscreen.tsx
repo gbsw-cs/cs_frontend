@@ -336,25 +336,21 @@ export default function OffscreenPage() {
               recordStateChange(normalizedState)
             }
 
-            // 나쁜 자세 경고 (30초 쿨다운)
-            if (normalizedState !== "GOOD_POSTURE") {
-              const now = Date.now()
-              if (now - lastAlertMsRef.current > 10_000) {
-                lastAlertMsRef.current = now
-                const msgs: Record<string,string> = {
-                  TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
-                  turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
-                  SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-                  ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-                  round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-                  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
-                  shoulder_tilted: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
-                  DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
-                  dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
-                }
-                const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
-                chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })
+            // 나쁜 자세로 상태가 변경될 때마다 알림
+            if (normalizedState !== "GOOD_POSTURE" && normalizedState !== currentStateRef.current) {
+              const msgs: Record<string,string> = {
+                TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+                turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+                SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+                SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+                shoulder_tilted: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+                DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+                dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
               }
+              const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
+              chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })
             }
           }
         } catch { /* silent */ }

@@ -126,7 +126,7 @@ export default function WebcamView() {
   const webcamRef = useRef<Webcam>(null);
   const analyzingRef = useRef(false);
   const framesRef = useRef<PostureFrame[]>([]);
-  const lastToastRef = useRef(0);
+  const lastStatusRef = useRef("");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -224,15 +224,12 @@ export default function WebcamView() {
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
         }
-        // 나쁜 자세 감지 시 toast (10초 쿨다운)
+        // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
         const msg = POSTURE_MESSAGES[finalStatus];
-        if (msg) {
-          const now = Date.now();
-          if (now - lastToastRef.current > 10_000) {
-            lastToastRef.current = now;
-            showPostureToast(msg);
-          }
+        if (msg && finalStatus !== lastStatusRef.current) {
+          showPostureToast(msg);
         }
+        lastStatusRef.current = finalStatus;
         setAiStatus("ok");
       } catch {
         setAiStatus("error");
