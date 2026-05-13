@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import "./baseline.css"
 
-const API_BASE    = process.env.PLASMO_PUBLIC_API_BASE!
-const AI_API_BASE = process.env.PLASMO_PUBLIC_AI_API_BASE!
+const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
+const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 
 const DURATION_MS = 10_000
 const INTERVAL_MS = 200
@@ -181,12 +181,9 @@ export default function BaselinePage() {
       const validCount = frames.filter(f => f.visibility >= 0.8).length
       console.log(`[baseline-tab] 업로드 | 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%) | userId: ${finalId}`)
 
-      const res = await fetch(`${AI_API_BASE}/v1/baseline/cal`, {
+      const res = await fetch(`${WEB_URL}/v1/baseline/cal`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: finalId, frames })
       })
 
