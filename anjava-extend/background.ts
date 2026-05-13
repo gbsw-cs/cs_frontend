@@ -146,13 +146,11 @@ async function endSession(): Promise<void> {
 // ─── Offscreen ───────────────────────────────────────────────
 async function ensureOffscreen(): Promise<void> {
   if (await chrome.offscreen.hasDocument()) return
-  console.log("[offscreen] creating document...")
   await chrome.offscreen.createDocument({
     url: chrome.runtime.getURL("tabs/offscreen.html"),
     reasons: ["USER_MEDIA" as any],
     justification: "Webcam access for background posture detection"
   })
-  console.log("[offscreen] document created")
 }
 
 async function closeOffscreen(): Promise<void> {
@@ -165,9 +163,6 @@ async function closeOffscreen(): Promise<void> {
 async function startOffscreenDetection(): Promise<void> {
   const { accessToken, userId, baselineData, settings } =
     await chrome.storage.local.get(["accessToken", "userId", "baselineData", "settings"])
-  console.log("[offscreen] startOffscreenDetection:", {
-    hasToken: !!accessToken, hasUserId: !!userId, hasBaseline: !!baselineData
-  })
   if (!accessToken) {
     console.warn("[offscreen] 시작 불가 - accessToken 없음")
     return
@@ -357,12 +352,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "OFFSCREEN_READY") {
-    console.log("[offscreen] OFFSCREEN_READY 수신")
     if (pendingOffscreenData) {
       const data = pendingOffscreenData
       pendingOffscreenData = null
       chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
-        .then(() => console.log("[offscreen] START_DETECTION 전송 완료"))
         .catch(e => console.error("[offscreen] START_DETECTION 전송 실패:", e))
     }
     sendResponse({ ok: true })
@@ -378,7 +371,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "DETECTION_ACTIVE") {
     chrome.storage.local.set({ offscreenActive: true })
-    console.log("[detection] ✅ offscreen 감지 시작됨")
     sendResponse({ ok: true })
     return true
   }

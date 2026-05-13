@@ -63,7 +63,6 @@ export default function OffscreenPage() {
   useEffect(() => {
     const handleMessage = (msg: any, _sender: any, sendResponse: any) => {
       if (msg?.type === "START_DETECTION") {
-        console.log("[offscreen] START_DETECTION 수신, userId:", msg.userId)
         darkModeRef.current = msg.settings?.darkDetectionEnabled ?? false
         startDetection(msg.accessToken, msg.userId, msg.baselineData)
         sendResponse({ ok: true })
@@ -84,7 +83,6 @@ export default function OffscreenPage() {
 
     // CRITICAL: register listener BEFORE sending OFFSCREEN_READY
     chrome.runtime.onMessage.addListener(handleMessage)
-    console.log("[offscreen] 초기화 완료, OFFSCREEN_READY 전송")
     chrome.runtime.sendMessage({ type: "OFFSCREEN_READY" }).catch(e =>
       console.error("[offscreen] OFFSCREEN_READY 전송 실패:", e)
     )
@@ -194,13 +192,11 @@ export default function OffscreenPage() {
     if (batchTimerRef.current) clearInterval(batchTimerRef.current)
     batchTimerRef.current = setInterval(() => { flushEvents().catch(() => {}) }, 30_000)
 
-    console.log("[offscreen] 웹캠 요청 중...")
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480, facingMode: "user" }
       })
-      console.log("[offscreen] 웹캠 획득 성공")
     } catch (e) {
       console.error("[offscreen] 웹캠 획득 실패:", e)
       return
@@ -221,7 +217,6 @@ export default function OffscreenPage() {
     vid.play()
 
     // LOCAL model — no CDN download needed
-    console.log("[offscreen] MediaPipe 초기화 중 (로컬 모델)...")
     try {
       const { PoseLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision")
       const wasmPath = chrome.runtime.getURL("assets/mediapipe-wasm")
@@ -234,10 +229,8 @@ export default function OffscreenPage() {
       })
       try {
         detectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("GPU"))
-        console.log("[offscreen] MediaPipe GPU 성공")
       } catch {
         detectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("CPU"))
-        console.log("[offscreen] MediaPipe CPU 성공")
       }
     } catch (e) {
       console.error("[offscreen] MediaPipe 초기화 실패:", e)
@@ -281,8 +274,6 @@ export default function OffscreenPage() {
         brightness: Math.max(0, Math.round(rawBrightness - brightnessOffset))
       }
 
-      console.log("[offscreen] tick | vis:", frame.visibility.toFixed(2), "| brightness:", frame.brightness)
-
       if (frame.visibility < 0.5) { setTimeout(tick, 5000); return }
 
       framesRef.current = [...framesRef.current.slice(-9), frame]
@@ -308,8 +299,6 @@ export default function OffscreenPage() {
               dark_mode: darkModeRef.current, dark_abs_threshold: 60, dark_relative_ratio: 0.5
             })
           })
-          console.log("[offscreen] 응답:", res.status, res.ok ? "OK" : "FAIL")
-
           if (!res.ok) {
             const errBody = await res.text().catch(() => "")
             try {
@@ -340,8 +329,6 @@ export default function OffscreenPage() {
             const normalizedState = GOOD_STATES.includes(rawState)
               ? "GOOD_POSTURE"
               : rawState
-
-            console.log(`[offscreen] 감지: ${rawState || "(없음)"} → ${normalizedState}`)
 
             // 상태 변경 감지 → 이벤트 큐에 추가
             if (normalizedState !== currentStateRef.current) {

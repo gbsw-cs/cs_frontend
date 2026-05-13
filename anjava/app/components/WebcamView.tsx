@@ -150,7 +150,6 @@ export default function WebcamView() {
           const code = errorBody?.error?.code;
           // baseline 없음 또는 환경 변화 → 재측정
           if (code === "E_ENVIRONMENT_DRIFT" || code === "E_INVALID_BASELINE") {
-            console.log(`[WebcamView] ${code} → baseline 재측정`);
             localStorage.removeItem("aiBaseline");
             const refreshed = await refreshBaseline(id, framesRef.current);
             setAiStatus(refreshed ? "idle" : "error");
@@ -163,9 +162,7 @@ export default function WebcamView() {
         const result = await response.json().catch(() => null);
         const detectedLabels = findDetectedLabels(result);
         if (detectedLabels.length > 0) {
-          console.log("자세 감지됨", detectedLabels, result);
-        } else {
-          console.log("자세 정상", result);
+          console.log("자세 감지됨", detectedLabels);
         }
         setAiStatus("ok");
       } catch {
