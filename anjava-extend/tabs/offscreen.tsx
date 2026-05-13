@@ -327,14 +327,14 @@ export default function OffscreenPage() {
               ? "GOOD_POSTURE"
               : rawState
 
-            // 상태 변경 감지 → 이벤트 큐에 추가
-            if (normalizedState !== currentStateRef.current) {
-              console.log(`[offscreen] 상태 변경: ${currentStateRef.current} → ${normalizedState}`)
+            // prevState 저장 후 상태 변경 처리 (순서 중요)
+            const prevState = currentStateRef.current
+            if (normalizedState !== prevState) {
               recordStateChange(normalizedState)
             }
 
-            // 나쁜 자세로 상태가 변경될 때마다 알림
-            if (normalizedState !== "GOOD_POSTURE" && normalizedState !== currentStateRef.current) {
+            // 나쁜 자세로 상태가 변경될 때마다 알림 (prevState 기준으로 비교)
+            if (normalizedState !== "GOOD_POSTURE" && normalizedState !== prevState) {
               const msgs: Record<string,string> = {
                 TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
                 turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
