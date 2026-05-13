@@ -64,10 +64,69 @@ function findDetectedLabels(value: unknown, prefix = ""): string[] {
   });
 }
 
+const POSTURE_MESSAGES: Record<string, string> = {
+  turtle_neck:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  dark_env:           "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+};
+
+const TOAST_STYLE = `
+  #anjava-web-toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #18181b; color: #fff;
+    padding: 12px 16px 12px 14px; border-radius: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px; line-height: 1.4; z-index: 2147483647;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    display: flex; align-items: flex-start; gap: 10px;
+    max-width: 300px; min-width: 220px;
+    border-left: 4px solid #f59e0b;
+    animation: anjava-web-in 0.28s cubic-bezier(0.16,1,0.3,1);
+  }
+  #anjava-web-toast.out { animation: anjava-web-out 0.22s ease forwards; }
+  @keyframes anjava-web-in {
+    from { opacity: 0; transform: translateY(16px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes anjava-web-out {
+    to { opacity: 0; transform: translateY(12px) scale(0.95); }
+  }
+`;
+
+let webToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showPostureToast(message: string) {
+  if (typeof document === "undefined") return;
+  if (!document.getElementById("anjava-web-style")) {
+    const s = document.createElement("style");
+    s.id = "anjava-web-style";
+    s.textContent = TOAST_STYLE;
+    document.head.appendChild(s);
+  }
+  if (webToastTimer) { clearTimeout(webToastTimer); webToastTimer = null; }
+  const old = document.getElementById("anjava-web-toast");
+  if (old) old.remove();
+  const el = document.createElement("div");
+  el.id = "anjava-web-toast";
+  el.innerHTML = `<span style="font-size:20px;flex-shrink:0;margin-top:1px">⚠️</span>
+    <div>
+      <div style="font-weight:700;margin-bottom:2px;color:#fbbf24">자세 교정 알림</div>
+      <div style="opacity:0.85;font-size:12px">${message}</div>
+    </div>
+    <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#71717a;cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0">✕</button>`;
+  document.body.appendChild(el);
+  webToastTimer = setTimeout(() => {
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 220);
+  }, 6000);
+}
+
 export default function WebcamView() {
   const webcamRef = useRef<Webcam>(null);
   const analyzingRef = useRef(false);
   const framesRef = useRef<PostureFrame[]>([]);
+  const lastToastRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -160,9 +219,19 @@ export default function WebcamView() {
           return;
         }
         const result = await response.json().catch(() => null);
+        const finalStatus: string = result?.data?.final_status ?? "";
         const detectedLabels = findDetectedLabels(result);
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
+        }
+        // 나쁜 자세 감지 시 toast (10초 쿨다운)
+        const msg = POSTURE_MESSAGES[finalStatus];
+        if (msg) {
+          const now = Date.now();
+          if (now - lastToastRef.current > 10_000) {
+            lastToastRef.current = now;
+            showPostureToast(msg);
+          }
         }
         setAiStatus("ok");
       } catch {

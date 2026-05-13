@@ -339,7 +339,7 @@ export default function OffscreenPage() {
             // 나쁜 자세 경고 (30초 쿨다운)
             if (normalizedState !== "GOOD_POSTURE") {
               const now = Date.now()
-              if (now - lastAlertMsRef.current > 30_000) {
+              if (now - lastAlertMsRef.current > 10_000) {
                 lastAlertMsRef.current = now
                 const msgs: Record<string,string> = {
                   TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
