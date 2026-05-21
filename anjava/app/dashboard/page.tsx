@@ -51,10 +51,13 @@ const WEEKDAY_KR: Record<string, string> = {
 const DAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
 
 const STATE_LABEL: Record<string, string> = {
-  GOOD: "정확한 자세 유지",
-  TURTLE_NECK: "거북목 자세 감지",
-  SHOULDER_ISSUE: "어깨 자세 교정 필요",
-  DARK_ENV: "어두운 환경 감지",
+  GOOD_POSTURE:       "자세 교정 완료",
+  GOOD:               "자세 교정 완료",
+  TURTLE_NECK:        "거북목 발생",
+  SHOULDER_ISSUE:     "어깨 자세 이상 발생",
+  ROUND_SHOULDER:     "라운드숄더 발생",
+  SHOULDER_ASYMMETRY: "어깨 비대칭 발생",
+  DARK_ENV:           "어두운 환경 감지",
 };
 
 // ── 컴포넌트 ──────────────────────────────────────────────
@@ -106,9 +109,15 @@ export default function DashboardPage() {
         getDashboardTimeline(date),
       ]).then(([t, w, d, tl]) => {
         if (t.status === "fulfilled") setToday(t.value);
+        else console.error("[dashboard] today 실패:", (t as any).reason);
         if (w.status === "fulfilled") setWeekly(w.value);
+        else console.error("[dashboard] weekly 실패:", (w as any).reason);
         if (d.status === "fulfilled") setDaily(d.value);
-        if (tl.status === "fulfilled") setTimeline(tl.value);
+        else console.error("[dashboard] daily 실패:", (d as any).reason);
+        if (tl.status === "fulfilled") {
+          console.log("[dashboard] timeline 응답:", tl.value);
+          setTimeline(tl.value);
+        } else console.error("[dashboard] timeline 실패:", (tl as any).reason);
       });
     };
 
@@ -120,13 +129,6 @@ export default function DashboardPage() {
 
   // ── 파생 데이터 ────────────────────────────────────────
 
-  // 건강 점수 - 신 API(postureScore) / 구 API(healthScore) 둘 다 처리
-  const rawScore: number | null = today?.postureScore ?? today?.healthScore ?? null;
-  const healthScore = rawScore ?? 0; // 계산용 (null → 0)
-  // 경고 횟수 - 신 API(warningCount) / 구 API(breakdown 합산) 둘 다 처리
-  const warningCount = today?.warningCount
-    ?? ((today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0));
-
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
   const slots = daily?.slots ?? Array.from({ length: 8 }, (_, i) => ({
     slotIndex: i,
@@ -135,6 +137,23 @@ export default function DashboardPage() {
     singleBadCount: 0,
     overlappingCount: 0,
   }));
+
+  // 슬롯 집계 (실시간 반영용)
+  const slotGood = slots.reduce((s, sl) => s + sl.goodPostureCount, 0);
+  const slotBad  = slots.reduce((s, sl) => s + sl.singleBadCount + sl.overlappingCount, 0);
+  const slotTotal = slotGood + slotBad;
+  const derivedScore    = slotTotal > 0 ? Math.round((slotGood / slotTotal) * 100) : null;
+  const derivedWarnings = slotBad;
+
+  // 건강 점수 - 슬롯 데이터 있으면 실시간 계산값 우선 (API는 세션 종료 후에만 갱신)
+  const apiScore: number | null = today?.postureScore ?? today?.healthScore ?? null;
+  const rawScore: number | null = slotTotal > 0 ? derivedScore : (apiScore ?? null);
+  const healthScore = rawScore ?? 0;
+
+  // 경고 횟수 - API 값 우선, 없으면 슬롯 기반 실시간 계산값 사용
+  const apiWarnings = today?.warningCount
+    ?? ((today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0));
+  const warningCount = apiWarnings > 0 ? apiWarnings : derivedWarnings;
 
   // 총 이벤트 수
   const totalEventCount = slots.reduce(
@@ -161,12 +180,14 @@ export default function DashboardPage() {
   const yDiff = today?.vsYesterday ?? null;
   const wDiff = today?.vsLastWeek ?? null;
 
-  // 주간 통계
-  const turtleH = weekly ? Math.round(weekly.turtleNeckTotalSec / 3600) : 0;
-  const shoulderH = weekly ? Math.round((weekly.roundShoulderTotalSec + weekly.shoulderAsymmetryTotalSec) / 3600) : 0;
-  const asymH = weekly ? Math.round(weekly.shoulderAsymmetryTotalSec / 3600) : 0;
-  const darkH = weekly ? Math.round(weekly.darkEnvTotalSec / 3600) : 0;
-  const goodPct = weekly ? Math.round(weekly.goodPostureRatio * 100) : 0;
+  // 주간 통계 (초 단위 그대로 사용 → DurationStat에서 h/m 표시)
+  const turtleSec  = weekly?.turtleNeckTotalSec ?? 0;
+  const shoulderSec = weekly ? (weekly.roundShoulderTotalSec + weekly.shoulderAsymmetryTotalSec) : 0;
+  const asymSec    = weekly?.shoulderAsymmetryTotalSec ?? 0;
+  const darkSec    = weekly?.darkEnvTotalSec ?? 0;
+  const goodPct    = slotTotal > 0
+    ? Math.round((slotGood / slotTotal) * 100)
+    : (weekly ? Math.round(weekly.goodPostureRatio * 100) : 0);
 
   // 주간 선형 차트 값
   const weeklyValues = weekly?.days.map((d) => d.badPostureRatio * 100) ?? [30, 55, 40, 30, 35, 50, 35];
@@ -238,27 +259,25 @@ export default function DashboardPage() {
             {recentActivity.length > 0 ? (
               <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
                 {recentActivity.map((b, i) => {
-                  const isGood = b.dominantState === "GOOD";
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
+                  const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
                   const icon =
-                    b.dominantState === "GOOD"
+                    isGoodState
                       ? "✅"
                       : b.dominantState === "TURTLE_NECK"
                       ? "⚠️"
-                      : b.dominantState === "SHOULDER_ISSUE"
+                      : (b.dominantState === "SHOULDER_ISSUE" || b.dominantState === "ROUND_SHOULDER" || b.dominantState === "SHOULDER_ASYMMETRY")
                       ? "🚨"
                       : "🌙";
                   const dotColor =
-                    b.dominantState === "GOOD"
+                    isGoodState
                       ? "bg-emerald-400"
                       : b.dominantState === "TURTLE_NECK"
                       ? "bg-amber-400"
-                      : b.dominantState === "SHOULDER_ISSUE"
+                      : (b.dominantState === "SHOULDER_ISSUE" || b.dominantState === "ROUND_SHOULDER" || b.dominantState === "SHOULDER_ASYMMETRY")
                       ? "bg-rose-400"
                       : "bg-zinc-400";
-                  const label = isGood
-                    ? `자세 교정 완료 ${icon}`
-                    : `${STATE_LABEL[b.dominantState]} ${icon}`;
+                  const label = `${STATE_LABEL[b.dominantState] ?? "자세 이상 발생"} ${icon}`;
                   return (
                     <li key={i} className="flex items-center gap-2 text-[11px]">
                       <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
@@ -560,10 +579,10 @@ export default function DashboardPage() {
             <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-6">
               <div className="col-span-2 rounded-lg ring-1 ring-zinc-100 sm:col-span-4">
                 <div className="grid grid-cols-2 divide-x divide-zinc-100 sm:grid-cols-4">
-                  <DurationStat label="거북목 지속 시간" hour={turtleH} />
-                  <DurationStat label="라운드 숄더 지속 시간" hour={shoulderH} />
-                  <DurationStat label="자세 비대칭 지속 시간" hour={asymH} />
-                  <DurationStat label="어둠 코딩 지속 시간" hour={darkH} />
+                  <DurationStat label="거북목 지속 시간" sec={turtleSec} />
+                  <DurationStat label="라운드 숄더 지속 시간" sec={shoulderSec} />
+                  <DurationStat label="자세 비대칭 지속 시간" sec={asymSec} />
+                  <DurationStat label="어둠 코딩 지속 시간" sec={darkSec} />
                 </div>
               </div>
               <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
@@ -621,12 +640,14 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-function DurationStat({ label, hour }: { label: string; hour: number }) {
+function DurationStat({ label, sec }: { label: string; sec: number }) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  const display = h > 0 ? `${h}h ${m > 0 ? m + "m" : ""}`.trim() : `${m}m`;
   return (
     <div className="px-2 py-2">
       <div className="truncate text-[9px] text-zinc-400">{label}</div>
-      <div className="text-base font-bold text-zinc-900">{hour}h</div>
-      <div className="text-[9px] text-zinc-400">↓4h 저번주 대비</div>
+      <div className="text-base font-bold text-zinc-900">{display}</div>
     </div>
   );
 }

@@ -56,6 +56,7 @@ export default function OffscreenPage() {
 
   // START_DETECTION에서 받은 토큰 (tick에서 storage 재접근 불필요)
   const accessTokenRef    = useRef<string>("")
+  const sessionIdRef      = useRef<string>("")
 
   // 이벤트 배치 전송용
   const currentStateRef   = useRef<string | null>(null)
@@ -67,6 +68,7 @@ export default function OffscreenPage() {
     const handleMessage = (msg: any, _sender: any, sendResponse: any) => {
       if (msg?.type === "START_DETECTION") {
         darkModeRef.current = msg.settings?.darkDetectionEnabled ?? false
+        sessionIdRef.current = msg.sessionId ?? ""
         startDetection(msg.accessToken, msg.userId, msg.baselineData)
         sendResponse({ ok: true })
         return true
@@ -142,34 +144,53 @@ export default function OffscreenPage() {
     }
 
     if (eventQueueRef.current.length === 0) return
-    // extension context 무효화 방어
     const accessToken = accessTokenRef.current
     if (!accessToken) return
-    if (typeof chrome === "undefined" || !chrome.storage?.local) return
-    let currentSessionId: string | undefined
-    try {
-      const result = await chrome.storage.local.get(["currentSessionId"])
-      currentSessionId = result.currentSessionId
-    } catch {
+    const currentSessionId = sessionIdRef.current
+    if (!currentSessionId || String(currentSessionId).startsWith("local-")) {
+      chrome.runtime.sendMessage({ type: "FLUSH_RESULT", ok: false, status: -2, body: `local 세션이라 스킵: ${currentSessionId}`, sessionId: currentSessionId || "none" }).catch(() => {})
       return
     }
-    // 로컬 세션(local-xxx)은 백엔드에 전송 불가 → 스킵
-    if (!currentSessionId || String(currentSessionId).startsWith("local-")) return
     const events = eventQueueRef.current.splice(0)
-    console.log(`[offscreen] flush: ${events.length}개 이벤트 전송`, events.map(e => `${e.type}(${e.durationSec}s)`))
+    chrome.runtime.sendMessage({ type: "FLUSH_START", count: events.length, sessionId: currentSessionId }).catch(() => {})
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
       const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ events }),
+        signal: controller.signal,
       })
-      if (!res.ok) {
-        // 백엔드 오류 시 큐에 복원
+      clearTimeout(timeoutId)
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) {
+        chrome.runtime.sendMessage({
+          type: "FLUSH_RESULT",
+          ok: true,
+          count: events.length,
+          accepted: (body as any)?.data?.accepted ?? events.length,
+          sessionId: currentSessionId,
+        }).catch(() => {})
+      } else {
         eventQueueRef.current.unshift(...events)
+        chrome.runtime.sendMessage({
+          type: "FLUSH_RESULT",
+          ok: false,
+          status: res.status,
+          body: JSON.stringify(body),
+          sessionId: currentSessionId,
+        }).catch(() => {})
       }
-    } catch {
-      // 네트워크 오류 시 큐에 복원
+    } catch (e: any) {
       eventQueueRef.current.unshift(...events)
+      chrome.runtime.sendMessage({
+        type: "FLUSH_RESULT",
+        ok: false,
+        status: 0,
+        body: e?.message ?? "네트워크 오류",
+        sessionId: currentSessionId,
+      }).catch(() => {})
     }
   }
 
@@ -194,7 +215,15 @@ export default function OffscreenPage() {
 
     // 30초마다 이벤트 배치 전송
     if (batchTimerRef.current) clearInterval(batchTimerRef.current)
-    batchTimerRef.current = setInterval(() => { flushEvents().catch(() => {}) }, 30_000)
+    batchTimerRef.current = setInterval(() => {
+      chrome.runtime.sendMessage({
+        type: "OFFSCREEN_HEARTBEAT",
+        queueSize: eventQueueRef.current.length,
+        currentState: currentStateRef.current,
+        hasToken: !!accessTokenRef.current,
+      }).catch(() => {})
+      flushEvents().catch(() => {})
+    }, 30_000)
 
     let stream: MediaStream
     try {
@@ -348,6 +377,10 @@ export default function OffscreenPage() {
               }
               const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
               chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })
+            }
+            // 좋은 자세로 회복됐을 때 타임라인에 GOOD 기록 (알림은 보내지 않음)
+            else if (normalizedState === "GOOD_POSTURE" && prevState !== null && prevState !== "GOOD_POSTURE") {
+              chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: "GOOD_POSTURE", message: "" })
             }
           }
         } catch { /* silent */ }

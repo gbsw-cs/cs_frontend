@@ -25,11 +25,18 @@ const BREAK_ALARM = "break-reminder"
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: any
+  sessionId: string
   settings: { darkDetectionEnabled: boolean }
 } | null = null
 
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
+}
+
+function getNotificationIcon(): string {
+  const icons = (chrome.runtime.getManifest() as any).icons ?? {}
+  const path = icons["128"] ?? icons["48"] ?? icons["32"] ?? ""
+  return path ? chrome.runtime.getURL(path) : ""
 }
 
 // ─── API ────────────────────────────────────────────────────
@@ -62,7 +69,7 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
 
   const json = await res.json().catch(() => ({})) as any
   if (!res.ok) {
-    const err = Object.assign(new Error(json.message ?? `HTTP ${res.status}`), { status: res.status })
+    const err = Object.assign(new Error(json.message ?? `HTTP ${res.status}`), { status: res.status, validationErrors: json.validationErrors })
     throw err
   }
   return json.data as T
@@ -73,15 +80,16 @@ async function startSession(): Promise<void> {
   const stored = await chrome.storage.local.get(["accessToken", "currentSessionId"])
   if (!stored.accessToken) return
 
-  // 세션 ID가 이미 있으면 세션 생성은 건너뛰고 offscreen만 시작
-  if (stored.currentSessionId) {
+  // 실제 세션 ID가 이미 있으면 offscreen만 시작 (local- 폴백은 무효 처리)
+  const isRealSession = stored.currentSessionId && !String(stored.currentSessionId).startsWith("local-")
+  if (isRealSession) {
     try { await startOffscreenDetection() } catch {}
     return
   }
   const startedAt = new Date().toISOString()
   try {
     const data = await apiCall<{ sessionId: string; startedAt: string }>(
-      "/sessions/start",
+      "/sessions",
       { method: "POST", body: JSON.stringify({ startedAt }) }
     )
     await chrome.storage.local.set({
@@ -161,8 +169,8 @@ async function closeOffscreen(): Promise<void> {
 }
 
 async function startOffscreenDetection(): Promise<void> {
-  const { accessToken, userId, baselineData, settings } =
-    await chrome.storage.local.get(["accessToken", "userId", "baselineData", "settings"])
+  const { accessToken, userId, baselineData, settings, currentSessionId } =
+    await chrome.storage.local.get(["accessToken", "userId", "baselineData", "settings", "currentSessionId"])
   if (!accessToken) {
     console.warn("[offscreen] 시작 불가 - accessToken 없음")
     return
@@ -187,6 +195,7 @@ async function startOffscreenDetection(): Promise<void> {
   }
   pendingOffscreenData = {
     accessToken, userId: resolvedUserId, baselineData,
+    sessionId: currentSessionId ?? "",
     settings: { darkDetectionEnabled: settings?.darkDetectionEnabled ?? false }
   }
   try {
@@ -221,12 +230,50 @@ async function stopOffscreenDetection(): Promise<void> {
 }
 
 // ─── Notifications ───────────────────────────────────────────
-async function sendToActiveTab(msg: object): Promise<void> {
+const TOAST_MESSAGES: Record<string, string> = {
+  TURTLE_NECK:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  turtle_neck:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  SHOULDER_ISSUE:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  ROUND_SHOULDER:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  DARK_ENV:           "어두운 환경이 감지되었어요! 밝기를 높여주세요.",
+  dark_env:           "어두운 환경이 감지되었어요! 밝기를 높여주세요.",
+  GOOD_POSTURE:       "자세가 교정되었어요! 바른 자세를 유지해보세요.",
+}
+
+async function sendToActiveTab(msg: any): Promise<void> {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
   for (const tab of tabs) {
-    if (tab?.id && tab.url?.match(/^https?:\/\//)) {
-      chrome.tabs.sendMessage(tab.id, msg).catch(() => {})
-    }
+    if (!tab?.id || !tab.url?.match(/^https?:\/\//)) continue
+    const isGood = msg.state === "GOOD_POSTURE"
+    const text = TOAST_MESSAGES[msg.state as string] ?? msg.message ?? "자세를 확인해주세요."
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (toastText: string, successMode: boolean) => {
+        const TID = "anjava-posture-toast", SID = "anjava-posture-style"
+        if (!document.getElementById(SID)) {
+          const s = document.createElement("style"); s.id = SID
+          s.textContent = `#${TID}{position:fixed;top:24px;right:24px;background:#fff;color:#18181b;padding:0;border-radius:18px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,.14),0 2px 8px rgba(0,0,0,.08);width:420px;overflow:hidden;border:1px solid rgba(0,0,0,.07);animation:anjava-in .32s cubic-bezier(.16,1,.3,1);pointer-events:auto}#${TID} .ah{display:flex;align-items:center;gap:10px;padding:16px 18px 13px;border-bottom:1px solid #f4f4f5}#${TID} .ai{font-size:22px;flex-shrink:0}#${TID} .at{font-weight:700;font-size:15px;color:#2563eb;flex:1}#${TID}.suc .at{color:#16a34a}#${TID} .ac{background:none;border:none;color:#a1a1aa;cursor:pointer;font-size:18px;padding:0;line-height:1}#${TID} .ac:hover{color:#52525b}#${TID} .ab{padding:13px 18px 15px;font-size:14px;color:#3f3f46;line-height:1.6}#${TID} .ap{height:4px;background:#2563eb;animation:anjava-progress 6s linear forwards;transform-origin:left}#${TID}.suc .ap{background:#16a34a}#${TID}.out{animation:anjava-out .24s ease forwards}@keyframes anjava-in{from{opacity:0;transform:translateX(60px) scale(.95)}to{opacity:1;transform:translateX(0) scale(1)}}@keyframes anjava-out{to{opacity:0;transform:translateX(60px) scale(.95)}}@keyframes anjava-progress{from{transform:scaleX(1)}to{transform:scaleX(0)}}`
+          document.head.appendChild(s)
+        }
+        const old = document.getElementById(TID); if (old) old.remove()
+        const el = document.createElement("div"); el.id = TID
+        if (successMode) el.classList.add("suc")
+        const hdr = document.createElement("div"); hdr.className = "ah"
+        const ico = document.createElement("span"); ico.className = "ai"; ico.textContent = successMode ? "✅" : "⚠️"
+        const ttl = document.createElement("span"); ttl.className = "at"; ttl.textContent = "자세 교정 알림"
+        const cls = document.createElement("button"); cls.className = "ac"; cls.textContent = "✕"
+        cls.onclick = () => { el.classList.add("out"); setTimeout(() => el.remove(), 240) }
+        hdr.append(ico, ttl, cls)
+        const bdy = document.createElement("div"); bdy.className = "ab"; bdy.textContent = toastText
+        const bar = document.createElement("div"); bar.className = "ap"
+        el.append(hdr, bdy, bar); document.body.appendChild(el)
+        setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 240) }, 6000)
+      },
+      args: [text, isGood]
+    }).catch((e) => console.error("[toast] 주입 실패:", tab.url, e))
   }
 }
 
@@ -241,7 +288,7 @@ async function showNotification(type: "posture" | "break"): Promise<void> {
   // 시스템 알림
   await chrome.notifications.create({
     type: "basic",
-    iconUrl: "assets/icon.png",
+    iconUrl: getNotificationIcon(),
     title: isPosture ? "자세 교정 알림" : "휴식 알림",
     message,
     priority: 2,
@@ -307,16 +354,19 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 })
 
 // ─── Timeline ────────────────────────────────────────────────
+// 백엔드 허용값: TURTLE_NECK, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE
 const TIMELINE_STATE_MAP: Record<string, string> = {
-  TURTLE_NECK: "TURTLE_NECK",
-  turtle_neck: "TURTLE_NECK",
-  ROUND_SHOULDER: "SHOULDER_ISSUE",
-  round_shoulder: "SHOULDER_ISSUE",
-  SHOULDER_ASYMMETRY: "SHOULDER_ISSUE",
-  shoulder_tilted: "SHOULDER_ISSUE",
-  DARK_ENV: "DARK_ENV",
-  dark_env: "DARK_ENV",
-  GOOD_POSTURE: "GOOD",
+  TURTLE_NECK:        "TURTLE_NECK",
+  turtle_neck:        "TURTLE_NECK",
+  SHOULDER_ISSUE:     "ROUND_SHOULDER",
+  ROUND_SHOULDER:     "ROUND_SHOULDER",
+  round_shoulder:     "ROUND_SHOULDER",
+  SHOULDER_ASYMMETRY: "SHOULDER_ASYMMETRY",
+  shoulder_tilted:    "SHOULDER_ASYMMETRY",
+  DARK_ENV:           "DARK_ENV",
+  dark_env:           "DARK_ENV",
+  GOOD_POSTURE:       "GOOD_POSTURE",
+  GOOD:               "GOOD_POSTURE",
 }
 
 function postTimeline(rawState: string, message: string): void {
@@ -331,10 +381,15 @@ function postTimeline(rawState: string, message: string): void {
     minute: "2-digit",
   })
 
+  console.log(`[timeline] POST date=${date} time=${time} state=${dominantState} msg="${message}"`)
   apiCall("/dashboard/timeline", {
     method: "POST",
-    body: JSON.stringify({ date, time, dominantState, message }),
-  }).catch(() => {})
+    body: JSON.stringify({ date, time, dominantState, message: "" }),
+  }).then(() => {
+    console.log(`[timeline] 저장 성공: ${dominantState}`)
+  }).catch((e: any) => {
+    console.error(`[timeline] 저장 실패 [${dominantState}]:`, e.message, "validationErrors:", e.validationErrors)
+  })
 }
 
 // ─── Messages ────────────────────────────────────────────────
@@ -371,6 +426,28 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "DETECTION_ACTIVE") {
     chrome.storage.local.set({ offscreenActive: true })
+    sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "FLUSH_START") {
+    console.log(`[events] 🚀 fetch 시작: ${msg.count}개 → session: ${msg.sessionId}`)
+    sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "OFFSCREEN_HEARTBEAT") {
+    console.log(`[offscreen] 💓 heartbeat | state: ${msg.currentState} | queue: ${msg.queueSize} | hasToken: ${msg.hasToken}`)
+    sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "FLUSH_RESULT") {
+    if (msg.ok) {
+      console.log(`[events] ✅ ${msg.count}개 전송 성공 (accepted: ${msg.accepted}) session: ${msg.sessionId}`)
+    } else {
+      console.error(`[events] ❌ 전송 실패 HTTP ${msg.status} | session: ${msg.sessionId} | ${msg.body}`)
+    }
     sendResponse({ ok: true })
     return true
   }
@@ -486,7 +563,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (s?.pushEnabled !== false) {
         chrome.notifications.create("posture-detect", {
           type: "basic",
-          iconUrl: "assets/icon.png",
+          iconUrl: getNotificationIcon(),
           title: "자세 경고",
           message: msg.message,
           priority: 2,
@@ -499,20 +576,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT_OFFSCREEN") {
-    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
     postTimeline(msg.state, msg.message)
-    chrome.storage.local.get("settings").then(({ settings: s }) => {
-      if (s?.pushEnabled !== false) {
-        chrome.notifications.create("posture-offscreen", {
-          type: "basic",
-          iconUrl: "assets/icon.png",
-          title: "자세 경고",
-          message: msg.message,
-          priority: 2,
-          silent: s?.soundEnabled === false
-        })
-      }
-    })
+    // 토스트는 나쁜 자세·좋은 자세 회복 모두 표시
+    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+    // 시스템 알림·소리는 나쁜 자세일 때만
+    if (msg.state !== "GOOD_POSTURE") {
+      chrome.storage.local.get("settings").then(({ settings: s }) => {
+        if (s?.pushEnabled !== false) {
+          chrome.notifications.create("posture-offscreen", {
+            type: "basic",
+            iconUrl: getNotificationIcon(),
+            title: "자세 경고",
+            message: msg.message,
+            priority: 2,
+            silent: s?.soundEnabled === false
+          })
+        }
+      })
+    }
     sendResponse({ success: true })
     return true
   }

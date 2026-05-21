@@ -559,7 +559,7 @@ export type TimelineDashboard = {
     time?: string;
     startHour?: number;
     startMin?: number;
-    dominantState: "GOOD" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "DARK_ENV";
+    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV";
     message?: string;
     healthScore?: number;
   }[];
