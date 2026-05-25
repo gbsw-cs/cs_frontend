@@ -1,5 +1,5 @@
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "/api/backend";
+  process.env.NEXT_PUBLIC_API_URL || "/api/backend";
 
 type ApiSuccess<T> = {
   success: true;
