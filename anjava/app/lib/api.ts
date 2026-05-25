@@ -1,5 +1,5 @@
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://3.38.108.207:30080/api";
+  process.env.NEXT_PUBLIC_API_URL ?? "/api/backend";
 
 type ApiSuccess<T> = {
   success: true;
