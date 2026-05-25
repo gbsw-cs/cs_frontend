@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Cell, LabelList,
+} from "recharts";
+import {
   getCurrentReport,
   getReports,
   getReport,
@@ -346,6 +350,65 @@ function ReportRow({
   );
 }
 
+/* ─── ScoreLineChart (recharts) ─────────────────────────────── */
+function ScoreLineChart({ data }: { data: (number | null)[] }) {
+  const entries = DAYS.map((day, i) => ({
+    day,
+    score: data[i] !== null && data[i] !== undefined ? data[i] : undefined,
+  }));
+  return (
+    <ResponsiveContainer width="100%" height={88}>
+      <LineChart data={entries} margin={{ top: 14, right: 6, bottom: 0, left: -36 }}>
+        <CartesianGrid stroke="#3f3f46" strokeDasharray="2 2" vertical={false} />
+        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#52525b" }} tickLine={false} axisLine={false} />
+        <YAxis hide domain={["auto", "auto"]} />
+        <Line
+          type="monotone"
+          dataKey="score"
+          stroke="#3b82f6"
+          strokeWidth={1.5}
+          dot={{ r: 2.5, fill: "#3b82f6", strokeWidth: 0 }}
+          activeDot={{ r: 3.5 }}
+          connectNulls={false}
+          isAnimationActive={false}
+          label={{ position: "top", fontSize: 7, fill: "#94a3b8", dy: -2 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+/* ─── ScoreBarChart (recharts) ──────────────────────────────── */
+function ScoreBarChart({ data }: { data: (number | null)[] }) {
+  const entries = DAYS.map((day, i) => ({
+    day,
+    score: data[i] !== null && data[i] !== undefined ? (data[i] as number) : 0,
+    real: data[i] !== null && data[i] !== undefined,
+  }));
+  return (
+    <ResponsiveContainer width="100%" height={88}>
+      <BarChart data={entries} margin={{ top: 14, right: 6, bottom: 0, left: -36 }}>
+        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#52525b" }} tickLine={false} axisLine={false} />
+        <YAxis hide />
+        <Bar dataKey="score" radius={[2, 2, 0, 0]} minPointSize={4} isAnimationActive={false}>
+          {entries.map((e, i) => (
+            <Cell
+              key={i}
+              fill={!e.real ? "#27272a" : e.score >= 70 ? "#3b82f6" : e.score >= 50 ? "#fbbf24" : "#fb7185"}
+            />
+          ))}
+          <LabelList
+            dataKey="score"
+            position="top"
+            style={{ fontSize: "7px", fill: "#94a3b8" }}
+            formatter={(v: unknown) => (typeof v === "number" && v > 0 ? v : "")}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 /* ─── ReportDetailView ──────────────────────────────────────── */
 function ReportDetailView({ detail }: { detail: CurrentReport }) {
   const daily = detail.healthScore?.daily ?? [];
@@ -357,186 +420,96 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
 
   const totalSec = detail.session?.totalDetectionSec ?? 0;
   const totalCount = detail.topIssues.reduce((s, i) => s + i.count, 0);
-  const maxDaily = Math.max(...validScores, 1);
-  const maxIssueDur = detail.topIssues[0]?.durationSec ?? 1;
 
   const nextGoal = weekly !== null && weekly >= 70
     ? "현재의 바른 자세 습관을 유지하며, 집중 작업 시 30분마다 스트레칭을 추가해보세요."
     : "매 시간 자세를 점검하고, 모니터 높이와 의자 높이를 올바르게 조정해보세요.";
 
+  const chartData: (number | null)[] = daily.length > 0 ? daily : Array(7).fill(null);
+
   return (
-    <div className="space-y-4 p-5">
+    <div className="space-y-3 p-5">
 
-      {/* ① 점수 카드 (다크) */}
-      <div className="rounded-2xl bg-zinc-900 p-5">
-        <div className="flex items-stretch gap-5">
+      {/* Row 1 — 3 equal dark cards */}
+      <div className="grid grid-cols-3 gap-3">
 
-          {/* 점수 */}
-          <div className="flex min-w-[72px] flex-col items-center justify-center">
-            <div className="text-5xl font-black leading-none text-white">
-              {weekly ?? "—"}
+        {/* Card 1: 이번 주 점수 */}
+        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+            이번 주 점수
+          </div>
+          <div className="text-5xl font-black leading-none text-white">
+            {weekly ?? "—"}
+          </div>
+          <div className={`mt-2 self-start rounded-full px-2.5 py-0.5 text-[10px] font-bold ${labelBg} ${labelColor}`}>
+            {labelText}
+          </div>
+          <div className="my-3 border-t border-zinc-700" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500">감지 건수</span>
+              <span className="text-[11px] font-semibold text-zinc-300">{totalCount}회</span>
             </div>
-            <div className={`mt-2 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${labelBg} ${labelColor}`}>
-              {labelText}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-500">감지 시간</span>
+              <span className="text-[11px] font-semibold text-zinc-300">{fmtSec(totalSec)}</span>
             </div>
           </div>
+        </div>
 
-          {/* 일별 점수 바 차트 */}
-          <div className="flex flex-1 items-end gap-1">
-            {(daily.length > 0 ? daily : Array(7).fill(null)).map((score, i) => {
-              const has = score !== null && score !== undefined;
-              const h = has ? Math.max(Math.round((score / maxDaily) * 64), 6) : 6;
-              return (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                  {has && (
-                    <span className="text-[8px] font-semibold text-zinc-400">{score}</span>
-                  )}
-                  <div
-                    className="w-full rounded-t transition-all"
-                    style={{
-                      height: `${h}px`,
-                      background: has ? "#3b82f6" : "#27272a",
-                    }}
-                  />
-                  <span className="text-[9px] text-zinc-500">{DAYS[i]}</span>
-                </div>
-              );
-            })}
+        {/* Card 2: 자세 점수 추이 */}
+        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+            자세 점수 추이
           </div>
+          <div className="flex-1 flex items-center">
+            <ScoreLineChart data={chartData} />
+          </div>
+        </div>
 
-          {/* 이슈 분포 미니 바 */}
-          {detail.topIssues.length > 0 && (
-            <div className="flex items-end gap-1 border-l border-zinc-700 pl-4">
-              {detail.topIssues.slice(0, 4).map((issue) => {
-                const h = Math.max(Math.round((issue.durationSec / maxIssueDur) * 64), 6);
-                return (
-                  <div key={issue.type} className="flex flex-col items-center gap-1.5">
-                    <div
-                      className="w-4 rounded-t"
-                      style={{ height: `${h}px`, background: ISSUE_BAR_COLORS[issue.type] ?? "#71717a" }}
-                    />
-                    <span className="text-[8px] text-zinc-500">
-                      {ISSUE_LABELS[issue.type]?.slice(0, 2) ?? "??"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        {/* Card 3: 요일별 평균 */}
+        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+            요일별 평균
+          </div>
+          <div className="flex-1 flex items-center">
+            <ScoreBarChart data={chartData} />
+          </div>
         </div>
       </div>
 
-      {/* ② AI 솔루션 */}
-      {detail.aiSolution ? (
-        <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-100">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-xl">🤖</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#2563EB]">AI 솔루션</span>
-          </div>
+      {/* Row 2: AI 솔루션 */}
+      <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-100">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-xl">🤖</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#2563EB]">AI 솔루션</span>
+        </div>
+        {detail.aiSolution ? (
           <p className="text-sm leading-relaxed text-zinc-700">{detail.aiSolution}</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-200 pt-4">
-            <div>
-              <div className="text-[10px] text-zinc-400">감지 건수</div>
-              <div className="mt-0.5 text-base font-bold text-zinc-900">{totalCount}회</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-zinc-400">총 감지 시간</div>
-              <div className="mt-0.5 text-base font-bold text-zinc-900">{fmtSec(totalSec)}</div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-100">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-xl">🤖</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#2563EB]">AI 솔루션</span>
-          </div>
+        ) : (
           <p className="text-sm text-zinc-400">이번 주 데이터가 충분히 쌓이면 AI 솔루션이 제공됩니다.</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-200 pt-4">
-            <div>
-              <div className="text-[10px] text-zinc-400">감지 건수</div>
-              <div className="mt-0.5 text-base font-bold text-zinc-900">{totalCount}회</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-zinc-400">총 감지 시간</div>
-              <div className="mt-0.5 text-base font-bold text-zinc-900">{fmtSec(totalSec)}</div>
-            </div>
+        )}
+        {detail.topIssues.length > 0 && (
+          <div className="mt-3 space-y-1.5 border-t border-zinc-200 pt-3">
+            {detail.topIssues.map((issue) => (
+              <div key={issue.type} className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-700">
+                  {ISSUE_LABELS[issue.type] ?? issue.type}
+                </span>
+                <span className="text-[11px] text-zinc-400">{fmtSec(issue.durationSec)}</span>
+              </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ③ 다음 주 목표 */}
+      {/* Row 3: 다음 주 목표 */}
       <div className="rounded-2xl bg-gradient-to-r from-[#2563EB] to-blue-500 p-5">
         <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-100">
           다음 주 목표
         </div>
         <p className="text-sm leading-relaxed text-white">{nextGoal}</p>
       </div>
-
-      {/* ④ 주요 이슈 바 차트 */}
-      {detail.topIssues.length > 0 && (
-        <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-100">
-          <div className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-            주요 자세 이슈
-          </div>
-
-          {/* 가로 바 차트 */}
-          <div className="space-y-3">
-            {detail.topIssues.map((issue) => {
-              const pct = (issue.durationSec / maxIssueDur) * 100;
-              return (
-                <div key={issue.type}>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-zinc-400">#{issue.rank}</span>
-                      <span className="text-xs font-semibold text-zinc-800">
-                        {ISSUE_LABELS[issue.type] ?? issue.type}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-zinc-400">
-                      {fmtSec(issue.durationSec)} · {issue.count}회
-                    </div>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
-                    <div
-                      className={`h-full rounded-full transition-all ${ISSUE_COLORS[issue.type] ?? "bg-zinc-400"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 세로 막대 그래프 (일별 이슈 분포) */}
-          {daily.length > 0 && (
-            <div className="mt-5 border-t border-zinc-200 pt-4">
-              <div className="mb-3 text-[10px] font-semibold text-zinc-400">일별 건강 점수 추이</div>
-              <div className="flex items-end gap-2" style={{ height: 72 }}>
-                {daily.map((score, i) => {
-                  const has = score !== null && score !== undefined;
-                  const h = has ? Math.max(Math.round((score / maxDaily) * 64), 4) : 4;
-                  const color = has
-                    ? score >= 70 ? "#3b82f6" : score >= 50 ? "#fbbf24" : "#fb7185"
-                    : "#e4e4e7";
-                  return (
-                    <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                      {has && (
-                        <span className="text-[9px] font-semibold" style={{ color }}>{score}</span>
-                      )}
-                      <div
-                        className="w-full rounded-t"
-                        style={{ height: `${h}px`, background: color }}
-                      />
-                      <span className="text-[9px] text-zinc-400">{DAYS[i]}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
