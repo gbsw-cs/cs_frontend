@@ -11,14 +11,16 @@ async function proxy(req: NextRequest, ctx: Context) {
 
   const reqHeaders = new Headers(req.headers);
   reqHeaders.delete("host");
+  reqHeaders.delete("expect");
 
-  const res = await fetch(url, {
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  const body = hasBody ? await req.text() : undefined;
+
+  const res = await fetch(url.toString(), {
     method: req.method,
     headers: reqHeaders,
-    body: req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
+    body: body || undefined,
     redirect: "manual",
-    // @ts-ignore
-    duplex: "half",
   });
 
   const resHeaders = new Headers(res.headers);
