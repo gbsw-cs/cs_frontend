@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_API_URL ?? "http://cs-backend.p-e.kr/api";
+const BACKEND = process.env.BACKEND_API_URL || "http://cs-backend.p-e.kr/api";
 
 type Context = { params: Promise<{ path: string[] }> };
 
