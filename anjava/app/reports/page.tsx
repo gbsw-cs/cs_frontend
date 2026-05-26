@@ -81,8 +81,30 @@ function scoreLabel(score: number | null): { text: string; color: string; bg: st
   return { text: "개선 필요", color: "text-rose-400", bg: "bg-rose-500/20" };
 }
 
+const MOCK_REPORT: CurrentReport = {
+  weekStartDate: "2026-05-19",
+  weekEndDate: "2026-05-25",
+  session: { firstStartedAt: "2026-05-19T09:00:00Z", lastEndedAt: "2026-05-25T18:30:00Z", totalDetectionSec: 72000 },
+  healthScore: { weekly: 74, daily: [68, 72, 80, 71, 76, 74, null] },
+  timeline: [
+    { date: "2026-05-19", startHour: 9, startMin: 0, dominantState: "TURTLE_NECK", healthScore: 68 },
+    { date: "2026-05-20", startHour: 9, startMin: 30, dominantState: "GOOD_POSTURE", healthScore: 72 },
+    { date: "2026-05-21", startHour: 10, startMin: 0, dominantState: "GOOD_POSTURE", healthScore: 80 },
+    { date: "2026-05-22", startHour: 9, startMin: 0, dominantState: "ROUND_SHOULDER", healthScore: 71 },
+    { date: "2026-05-23", startHour: 9, startMin: 15, dominantState: "GOOD_POSTURE", healthScore: 76 },
+    { date: "2026-05-24", startHour: 10, startMin: 30, dominantState: "TURTLE_NECK", healthScore: 74 },
+  ],
+  topIssues: [
+    { type: "TURTLE_NECK", durationSec: 5400, count: 18, rank: 1 },
+    { type: "ROUND_SHOULDER", durationSec: 2700, count: 9, rank: 2 },
+    { type: "SHOULDER_ASYMMETRY", durationSec: 900, count: 3, rank: 3 },
+  ],
+  aiSolution: "거북목이 주요 문제로 감지되었습니다. 모니터 높이를 눈높이에 맞게 조정하고, 1시간마다 목 스트레칭을 해보세요. 라운드숄더 예방을 위해 어깨를 뒤로 젖히는 운동도 추천드립니다.",
+};
+
 export default function ReportsPage() {
   const [current, setCurrent] = useState<CurrentReport | null>(null);
+  const [showSample, setShowSample] = useState(false);
   const [currentLoading, setCurrentLoading] = useState(true);
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,8 +215,15 @@ export default function ReportsPage() {
               ))}
             </div>
           ) : !current ? (
-            <div className="py-12 text-center text-sm text-zinc-400">
-              이번 주 감지 데이터가 없습니다
+            <div className="flex flex-col items-center gap-3 py-12">
+              <p className="text-sm text-zinc-400">이번 주 감지 데이터가 없습니다</p>
+              <button
+                onClick={() => setShowSample((v) => !v)}
+                className="rounded-full bg-zinc-100 px-4 py-1.5 text-xs font-semibold text-zinc-500 transition hover:bg-zinc-200"
+              >
+                {showSample ? "샘플 닫기" : "샘플로 미리보기"}
+              </button>
+              {showSample && <ReportDetailView detail={MOCK_REPORT} />}
             </div>
           ) : (
             <ReportDetailView detail={current} />
