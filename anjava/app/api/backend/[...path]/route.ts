@@ -8,6 +8,7 @@ const FORWARDED_REQUEST_HEADERS = [
 ] as const;
 const FORWARDED_RESPONSE_HEADERS = [
   "content-type",
+  "location",
   "set-cookie",
 ] as const;
 
