@@ -2,8 +2,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { login, resolvePostAuthPath, saveTokens } from "../lib/api";
+import { useEffect, useState } from "react";
+import { getAccessToken, login, resolvePostAuthPath, saveTokens } from "../lib/api";
 import { SocialLoginButtons } from "../components/SocialLoginButtons";
 import { validatePassword } from "../lib/validation";
 
@@ -15,6 +15,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const passwordError = validatePassword(password);
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

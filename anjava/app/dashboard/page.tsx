@@ -236,7 +236,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[204px_minmax(0,0.82fr)_minmax(0,0.72fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[204px_240px_minmax(0,1fr)]">
 
           {/* ── Row 1 ── */}
 
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[204px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[280px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[160px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[236px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {

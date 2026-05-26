@@ -1,7 +1,20 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { getAccessToken } from "./lib/api";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (getAccessToken()) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
+
   return (
     <div className="flex min-h-screen flex-col items-center bg-white px-6 py-10 sm:py-16">
       <div className="flex flex-1 flex-col items-center justify-center">
