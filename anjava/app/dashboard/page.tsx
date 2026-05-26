@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[148px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[160px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -390,14 +390,14 @@ export default function DashboardPage() {
 
           {/* 3D 아바타 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
-            <div className="flex flex-col items-center">
+            <div className="-mt-2 flex flex-col items-center">
               <div className="flex h-40 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
                 />
               </div>
-              <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
+              <button className={`mt-0.5 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
                 liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
@@ -410,7 +410,7 @@ export default function DashboardPage() {
               }`}>
                 {avatarStatusText}
               </button>
-              <div className="mt-2 w-full rounded-lg px-3 py-2 text-center ring-1 ring-zinc-100">
+              <div className="mt-1 w-full rounded-lg px-3 py-2 text-center ring-1 ring-zinc-100">
                 <div className="text-[10px] font-semibold text-zinc-400">실시간 감지 상태</div>
                 <div className={`mt-1 text-xs font-bold ${
                   liveIsGood
@@ -456,12 +456,12 @@ export default function DashboardPage() {
                   </span>
                   <span className="text-xs text-zinc-500">건</span>
                 </div>
-                <div className="text-[10px] text-zinc-400">상태 비율</div>
+                <div className="translate-y-1 text-[10px] text-zinc-400">상태 비율</div>
               </div>
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex h-16 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
+                <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
                     const total = slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount;
                     const goodH = total > 0 ? (slot.goodPostureCount / total) * 100 : 0;
@@ -480,7 +480,7 @@ export default function DashboardPage() {
                     );
                   })}
                 </div>
-                <div className="mt-1 flex justify-around text-[9px] text-zinc-400">
+                <div className="mt-2 flex justify-around text-[9px] text-zinc-400">
                   {["0시", "3시", "6시", "9시", "12시", "15시", "18시", "21시"].map((h) => (
                     <span key={h}>{h}</span>
                   ))}
@@ -490,7 +490,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[172px] lg:self-start">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[172px] lg:self-end">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
