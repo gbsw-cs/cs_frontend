@@ -44,7 +44,7 @@
       "https://*/*"
     ],
     "content_security_policy": {
-      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://storage.googleapis.com https://cs-backend.p-e.kr http://cs-backend.p-e.kr http://3.38.108.207 http://localhost:*"
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://anjava.vercel.app https://storage.googleapis.com http://localhost:*"
     }
   }
 }

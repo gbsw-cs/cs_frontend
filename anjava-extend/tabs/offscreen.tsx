@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 
-const API_BASE = process.env.PLASMO_PUBLIC_API_BASE!
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const API_BASE = `${WEB_URL}/api/backend`
 
 const SEVERITY: Record<string, number> = {
   TURTLE_NECK: 2,
