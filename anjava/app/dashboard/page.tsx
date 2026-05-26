@@ -173,7 +173,7 @@ export default function DashboardPage() {
     0,
   );
 
-  // 최근 활동 (타임라인 버킷 → 최근 5개, 현재 시각 이전, 실제 감지 데이터만)
+  // 최근 활동 (타임라인 버킷 → 현재 시각 이전, 실제 감지 데이터만)
   const kstNow = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
   const [kstH, kstM] = kstNow.split(":").map(Number);
   const nowMin = kstH * 60 + kstM;
@@ -185,7 +185,6 @@ export default function DashboardPage() {
         : ((b.startHour ?? 0) * 60 + (b.startMin ?? 0));
       return bMin <= nowMin && STATE_LABEL[b.dominantState] !== undefined;
     })
-    .slice(-5)
     .reverse() ?? [];
   const recentActivity = liveDetection
     ? [
@@ -197,7 +196,7 @@ export default function DashboardPage() {
         ...timelineActivity.filter((b) =>
           b.time !== liveDetection.updatedAt || b.dominantState !== liveDetection.state
         ),
-      ].slice(0, 5)
+      ]
     : timelineActivity;
 
   // 비교 통계 (null이면 데이터 없음)
@@ -285,7 +284,7 @@ export default function DashboardPage() {
             </div>
 
             {recentActivity.length > 0 ? (
-              <ul className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
+              <ul className="mt-2 max-h-44 flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
                 {recentActivity.map((b, i) => {
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
                   const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
