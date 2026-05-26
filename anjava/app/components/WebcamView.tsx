@@ -435,6 +435,7 @@ export default function WebcamView({
         // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
         if (msg && finalStatus !== lastStatusRef.current) {
           showPostureToast(msg);
+          window.postMessage({ type: "ANJAVA_POSTURE_RELAY", state: finalStatus, message: msg }, "*");
         }
         recordStateChange(backendState, msg);
         lastStatusRef.current = finalStatus;

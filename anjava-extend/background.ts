@@ -1,17 +1,6 @@
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 
-const POSTURE_TIPS = [
-  "허리를 펴고 앉아주세요!",
-  "모니터와 눈 높이를 맞춰주세요",
-  "어깨를 뒤로 젖히고 긴장을 풀어주세요",
-  "턱을 당기고 목을 바르게 세워주세요",
-  "의자에 깊숙이 앉아 등받이에 기대주세요",
-  "손목이 꺾이지 않게 키보드 위치를 확인하세요",
-  "양 발을 바닥에 평평하게 놓아주세요",
-  "화면과의 거리를 팔 길이 정도로 유지하세요"
-]
-
 const BREAK_TIPS = [
   "잠시 일어나서 스트레칭 해주세요!",
   "눈을 감고 10초간 쉬어주세요",
@@ -21,7 +10,6 @@ const BREAK_TIPS = [
   "제자리에서 가볍게 기지개를 켜주세요"
 ]
 
-const POSTURE_ALARM = "posture-reminder"
 const BREAK_ALARM = "break-reminder"
 
 let pendingOffscreenData: {
@@ -285,28 +273,21 @@ async function sendToActiveTab(msg: any): Promise<void> {
   }
 }
 
-async function showNotification(type: "posture" | "break"): Promise<void> {
+async function showNotification(): Promise<void> {
   const { settings } = await chrome.storage.local.get("settings")
   const s = settings || {}
   if (s.pushEnabled === false) return
 
-  const isPosture = type === "posture"
-  const message = isPosture ? rand(POSTURE_TIPS) : rand(BREAK_TIPS)
+  const message = rand(BREAK_TIPS)
 
-  // 시스템 알림
   await chrome.notifications.create({
     type: "basic",
     iconUrl: getNotificationIcon(),
-    title: isPosture ? "자세 교정 알림" : "휴식 알림",
+    title: "휴식 알림",
     message,
     priority: 2,
     silent: s.soundEnabled === false
   })
-
-  // 활성 탭 content script toast
-  if (isPosture) {
-    await sendToActiveTab({ type: "POSTURE_ALERT", state: "POSTURE_REMINDER", message })
-  }
 }
 
 // ─── Alarms ──────────────────────────────────────────────────
@@ -318,10 +299,6 @@ async function restartAlarms(): Promise<void> {
   const { settings } = await chrome.storage.local.get("settings")
   const s = settings || { postureInterval: 30, breakInterval: 60 }
   await chrome.alarms.clearAll()
-  chrome.alarms.create(POSTURE_ALARM, {
-    delayInMinutes: s.postureInterval,
-    periodInMinutes: s.postureInterval
-  })
   chrome.alarms.create(BREAK_ALARM, {
     delayInMinutes: s.breakInterval,
     periodInMinutes: s.breakInterval
@@ -357,8 +334,7 @@ chrome.runtime.onSuspend.addListener(async () => {
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === POSTURE_ALARM) showNotification("posture")
-  else if (alarm.name === BREAK_ALARM) showNotification("break")
+  if (alarm.name === BREAK_ALARM) showNotification()
 })
 
 // ─── Timeline ────────────────────────────────────────────────
@@ -419,6 +395,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
             "profileImg", "userName", "offscreenActive"])
       .then(sendResponse)
+    return true
+  }
+
+  if (msg.type === "POSTURE_ALERT_FROM_WEB") {
+    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
+    sendResponse({ ok: true })
     return true
   }
 

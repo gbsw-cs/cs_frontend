@@ -149,6 +149,21 @@ function showToast(message: string, icon = "⚠️", isSuccess = false) {
   }, 6000)
 }
 
+// anjava 웹페이지 → content script → background relay
+const WEB_RELAY_KEY = "__anjava_web_relay__"
+if (!(window as any)[WEB_RELAY_KEY]) {
+  (window as any)[WEB_RELAY_KEY] = true
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return
+    if (event.data?.type !== "ANJAVA_POSTURE_RELAY") return
+    chrome.runtime.sendMessage({
+      type: "POSTURE_ALERT_FROM_WEB",
+      state: event.data.state,
+      message: event.data.message,
+    }).catch(() => {})
+  })
+}
+
 // 재주입 시 구버전 listener 제거 후 새 listener 등록
 const LISTENER_KEY = "__anjava_toast_listener__"
 if ((window as any)[LISTENER_KEY]) {
