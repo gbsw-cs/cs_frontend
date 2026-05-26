@@ -43,7 +43,7 @@ function getNotificationIcon(): string {
 // ─── API ────────────────────────────────────────────────────
 async function apiCall<T>(path: string, init: RequestInit, retry = true): Promise<T> {
   const stored = await chrome.storage.local.get(["accessToken", "refreshToken"])
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  const headers: Record<string, string> = { "Accept": "application/json", "Content-Type": "application/json" }
   if (stored.accessToken) headers.Authorization = `Bearer ${stored.accessToken}`
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
@@ -70,10 +70,17 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
 
   const json = await res.json().catch(() => ({})) as any
   if (!res.ok) {
-    const err = Object.assign(new Error(json.message ?? `HTTP ${res.status}`), { status: res.status, validationErrors: json.validationErrors })
+    const err = Object.assign(
+      new Error(json.message ?? json.error?.message ?? `HTTP ${res.status}`),
+      {
+        status: res.status,
+        responseBody: json,
+        validationErrors: json.validationErrors ?? json.error?.validationErrors,
+      },
+    )
     throw err
   }
-  return json.data as T
+  return (json.data ?? json) as T
 }
 
 // ─── Session ─────────────────────────────────────────────────
@@ -381,15 +388,23 @@ function postTimeline(rawState: string, message: string): void {
     hour: "2-digit",
     minute: "2-digit",
   })
-
   console.log(`[timeline] POST date=${date} time=${time} state=${dominantState} msg="${message}"`)
   apiCall("/dashboard/timeline", {
     method: "POST",
-    body: JSON.stringify({ date, time, dominantState, message: "" }),
+    body: JSON.stringify({ date, time, dominantState, message: message ?? "" }),
   }).then(() => {
     console.log(`[timeline] 저장 성공: ${dominantState}`)
   }).catch((e: any) => {
-    console.error(`[timeline] 저장 실패 [${dominantState}]:`, e.message, "validationErrors:", e.validationErrors)
+    console.error(
+      `[timeline] 저장 실패 [${dominantState}]:`,
+      e.message,
+      "status:",
+      e.status,
+      "validationErrors:",
+      e.validationErrors,
+      "response:",
+      e.responseBody,
+    )
   })
 }
 

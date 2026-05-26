@@ -237,7 +237,11 @@ async function rawRequest<T>(
     error.status = res.status;
     throw error;
   }
-  return (json as ApiSuccess<T>).data;
+  const success = json as Partial<ApiSuccess<T>>;
+  if (success.success === true && "data" in success) {
+    return success.data as T;
+  }
+  return json as T;
 }
 
 let refreshing: Promise<Tokens> | null = null;
@@ -567,6 +571,26 @@ export type TimelineDashboard = {
   }[];
 };
 
+export type DetectionState =
+  | "GOOD_POSTURE"
+  | "TURTLE_NECK"
+  | "SHOULDER_ISSUE"
+  | "ROUND_SHOULDER"
+  | "SHOULDER_ASYMMETRY"
+  | "DARK_ENV";
+
+export type DetectionSession = {
+  sessionId: string;
+  startedAt: string;
+};
+
+export type DetectionSessionEvent = {
+  type: DetectionState;
+  severity: number;
+  durationSec: number;
+  detectedAt: string;
+};
+
 export function getDashboardToday() {
   return request<TodayDashboard>("/dashboard/today", { method: "GET" }, true);
 }
@@ -581,6 +605,56 @@ export function getDashboardDaily(date: string) {
 
 export function getDashboardTimeline(date: string) {
   return request<TimelineDashboard>(`/dashboard/timeline?date=${date}`, { method: "GET" }, true);
+}
+
+export function startDetectionSession(startedAt = new Date().toISOString()) {
+  return request<DetectionSession>(
+    "/sessions",
+    { method: "POST", body: JSON.stringify({ startedAt }) },
+    true,
+  );
+}
+
+export function endDetectionSession(sessionId: string, endedAt = new Date().toISOString()) {
+  return request<{
+    sessionId: string;
+    totalDurationSec: number;
+    goodPostureSec: number;
+    turtleNeckSec: number;
+    shoulderIssueSec: number;
+    darkEnvSec: number;
+    goodPostureCount: number;
+    turtleNeckCount: number;
+    shoulderIssueCount: number;
+    darkEnvCount: number;
+    healthScore: number;
+    newBadges: { code: string; name: string }[];
+  }>(
+    `/sessions/${sessionId}/end`,
+    { method: "POST", body: JSON.stringify({ endedAt }) },
+    true,
+  );
+}
+
+export function postSessionEvents(sessionId: string, events: DetectionSessionEvent[]) {
+  return request<{ accepted: number }>(
+    `/sessions/${sessionId}/events`,
+    { method: "POST", body: JSON.stringify({ events }) },
+    true,
+  );
+}
+
+export function postDashboardTimeline(body: {
+  date: string;
+  time: string;
+  dominantState: DetectionState;
+  message: string;
+}) {
+  return request<{ accepted: number }>(
+    "/dashboard/timeline",
+    { method: "POST", body: JSON.stringify(body) },
+    true,
+  );
 }
 
 // ── AI API ──────────────────────────────────────────────

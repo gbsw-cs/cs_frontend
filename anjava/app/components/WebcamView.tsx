@@ -3,6 +3,14 @@
 import Webcam from "react-webcam";
 import { useEffect, useRef, useState } from "react";
 import { createPostureFrame, type PostureFrame } from "../lib/poseFrame";
+import {
+  endDetectionSession,
+  postDashboardTimeline,
+  postSessionEvents,
+  startDetectionSession,
+  type DetectionSessionEvent,
+  type DetectionState,
+} from "../lib/api";
 
 const VIDEO_CONSTRAINTS = {
   width: 640,
@@ -13,6 +21,57 @@ const FRAME_CAPTURE_INTERVAL_MS = 1000;
 const BATCH_SEND_INTERVAL_MS = 5000;
 const BATCH_FRAME_COUNT = 10;
 const BASELINE_RETRY_COOLDOWN_MS = 30_000;
+const EVENT_FLUSH_INTERVAL_MS = 30_000;
+
+type WebcamViewProps = {
+  darkDetectionEnabled?: boolean;
+  onDetectionStateChange?: (state: DetectionState, message: string) => void;
+  onDashboardDataChanged?: () => void;
+};
+
+const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
+  good: "GOOD_POSTURE",
+  good_posture: "GOOD_POSTURE",
+  normal: "GOOD_POSTURE",
+  turtle_neck: "TURTLE_NECK",
+  round_shoulder: "ROUND_SHOULDER",
+  shoulder_tilted: "SHOULDER_ASYMMETRY",
+  shoulder_asymmetry: "SHOULDER_ASYMMETRY",
+  shoulder_issue: "SHOULDER_ISSUE",
+  dark_env: "DARK_ENV",
+  dark_environment: "DARK_ENV",
+};
+
+const STATE_SEVERITY: Record<DetectionState, number> = {
+  GOOD_POSTURE: 1,
+  TURTLE_NECK: 2,
+  SHOULDER_ISSUE: 2,
+  ROUND_SHOULDER: 2,
+  SHOULDER_ASYMMETRY: 2,
+  DARK_ENV: 1,
+};
+
+function toBackendState(finalStatus: string): DetectionState {
+  return AI_STATUS_TO_BACKEND_STATE[finalStatus.toLowerCase()] ?? "GOOD_POSTURE";
+}
+
+function getKSTDateTime() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    time: `${value("hour")}:${value("minute")}`,
+  };
+}
 
 function isBaselineReady() {
   if (typeof window === "undefined") return false;
@@ -142,16 +201,103 @@ function showPostureToast(message: string) {
   }, 6000);
 }
 
-export default function WebcamView() {
+export default function WebcamView({
+  darkDetectionEnabled = false,
+  onDetectionStateChange,
+  onDashboardDataChanged,
+}: WebcamViewProps) {
   const webcamRef = useRef<Webcam>(null);
   const analyzingRef = useRef(false);
   const framesRef = useRef<PostureFrame[]>([]);
   const lastStatusRef = useRef("");
   const lastBatchSentAtRef = useRef(0);
   const baselineRetryAtRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
+  const eventQueueRef = useRef<DetectionSessionEvent[]>([]);
+  const stateStartRef = useRef<number>(Date.now());
+  const lastBackendStateRef = useRef<DetectionState | null>(null);
+  const onDetectionStateChangeRef = useRef(onDetectionStateChange);
+  const onDashboardDataChangedRef = useRef(onDashboardDataChanged);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
+
+  useEffect(() => {
+    onDetectionStateChangeRef.current = onDetectionStateChange;
+    onDashboardDataChangedRef.current = onDashboardDataChanged;
+  }, [onDetectionStateChange, onDashboardDataChanged]);
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    startDetectionSession()
+      .then((session) => {
+        if (cancelled) return;
+        sessionIdRef.current = session.sessionId;
+        stateStartRef.current = Date.now();
+      })
+      .catch((e) => {
+        console.error("Detection session start failed", e);
+      });
+
+    async function flushEvents() {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) return;
+      const currentState = lastBackendStateRef.current;
+      if (currentState) {
+        const now = Date.now();
+        eventQueueRef.current.push({
+          type: currentState,
+          severity: STATE_SEVERITY[currentState],
+          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
+          detectedAt: new Date(stateStartRef.current).toISOString(),
+        });
+        stateStartRef.current = now;
+      }
+      if (eventQueueRef.current.length === 0) return;
+      const events = eventQueueRef.current.splice(0, 100);
+      try {
+        await postSessionEvents(sessionId, events);
+        onDashboardDataChangedRef.current?.();
+      } catch (e) {
+        eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
+        console.error("Detection events upload failed", e);
+      }
+    }
+
+    const flushInterval = window.setInterval(flushEvents, EVENT_FLUSH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(flushInterval);
+      const previous = lastBackendStateRef.current;
+      if (previous) {
+        const now = Date.now();
+        eventQueueRef.current.push({
+          type: previous,
+          severity: STATE_SEVERITY[previous],
+          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
+          detectedAt: new Date(stateStartRef.current).toISOString(),
+        });
+      }
+      const sessionId = sessionIdRef.current;
+      const events = eventQueueRef.current.splice(0, 100);
+      sessionIdRef.current = null;
+      lastBackendStateRef.current = null;
+      if (sessionId) {
+        if (events.length > 0) {
+          void postSessionEvents(sessionId, events).catch((e) => {
+            console.error("Detection events final upload failed", e);
+          });
+        }
+        void endDetectionSession(sessionId).then(() => {
+          onDashboardDataChangedRef.current?.();
+        }).catch((e) => {
+          console.error("Detection session end failed", e);
+        });
+      }
+    };
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -171,6 +317,35 @@ export default function WebcamView() {
       localStorage.setItem("aiBaselineReady", "1");
       localStorage.setItem("aiSessionId", id);
       return true;
+    }
+
+    function recordStateChange(nextState: DetectionState, message: string) {
+      const previous = lastBackendStateRef.current;
+      const now = Date.now();
+      if (previous && previous !== nextState) {
+        eventQueueRef.current.push({
+          type: previous,
+          severity: STATE_SEVERITY[previous],
+          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
+          detectedAt: new Date(stateStartRef.current).toISOString(),
+        });
+      }
+      if (previous !== nextState) {
+        stateStartRef.current = now;
+        lastBackendStateRef.current = nextState;
+        const { date, time } = getKSTDateTime();
+        void postDashboardTimeline({
+          date,
+          time,
+          dominantState: nextState,
+          message,
+        }).then(() => {
+          onDashboardDataChangedRef.current?.();
+        }).catch((e) => {
+          console.error("Dashboard timeline upload failed", e);
+        });
+      }
+      onDetectionStateChangeRef.current?.(nextState, message);
     }
 
     async function analyzeFrame() {
@@ -224,7 +399,7 @@ export default function WebcamView() {
             round_shoulder_z_threshold: 0.05,
             round_shoulder_absolute_max: 0,
             round_shoulder_backup_z_threshold: 0,
-            dark_mode: false,
+            dark_mode: darkDetectionEnabled,
             dark_abs_threshold: 60,
             dark_relative_ratio: 0.5,
           }),
@@ -245,15 +420,17 @@ export default function WebcamView() {
         }
         const result = await response.json().catch(() => null);
         const finalStatus: string = result?.data?.final_status ?? "";
+        const backendState = toBackendState(finalStatus);
+        const msg = POSTURE_MESSAGES[finalStatus] ?? "";
         const detectedLabels = findDetectedLabels(result);
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
         }
         // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
-        const msg = POSTURE_MESSAGES[finalStatus];
         if (msg && finalStatus !== lastStatusRef.current) {
           showPostureToast(msg);
         }
+        recordStateChange(backendState, msg);
         lastStatusRef.current = finalStatus;
         setAiStatus("ok");
       } catch {
@@ -266,7 +443,7 @@ export default function WebcamView() {
     analyzeFrame();
     const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [ready]);
+  }, [ready, darkDetectionEnabled]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">

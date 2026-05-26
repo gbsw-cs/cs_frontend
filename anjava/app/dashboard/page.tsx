@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AvatarColored from "../components/AvatarColored";
 
 const WebcamView = dynamic(() => import("../components/WebcamView"), {
@@ -28,6 +28,7 @@ import {
   type WeeklyDashboard,
   type DailyDashboard,
   type TimelineDashboard,
+  type DetectionState,
 } from "../lib/api";
 
 // ── 날짜 헬퍼 ──────────────────────────────────────────────
@@ -73,7 +74,42 @@ export default function DashboardPage() {
   const [darkPending, setDarkPending] = useState(false);
   const [badges, setBadges] = useState<ApiBadge[]>([]);
   const [webcamVisible, setWebcamVisible] = useState(false);
+  const [liveDetection, setLiveDetection] = useState<{
+    state: DetectionState;
+    message: string;
+    updatedAt: string;
+  } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refreshCooldownRef = useRef(0);
+
+  const loadDashboardData = useCallback(() => {
+    const date = getKSTDate();
+    const monday = getMondayKST();
+    return Promise.allSettled([
+      getDashboardToday(),
+      getDashboardWeekly(monday),
+      getDashboardDaily(date),
+      getDashboardTimeline(date),
+    ]).then(([t, w, d, tl]) => {
+      if (t.status === "fulfilled") setToday(t.value);
+      else console.error("[dashboard] today 실패:", t.reason);
+      if (w.status === "fulfilled") setWeekly(w.value);
+      else console.error("[dashboard] weekly 실패:", w.reason);
+      if (d.status === "fulfilled") setDaily(d.value);
+      else console.error("[dashboard] daily 실패:", d.reason);
+      if (tl.status === "fulfilled") {
+        console.log("[dashboard] timeline 응답:", tl.value);
+        setTimeline(tl.value);
+      } else console.error("[dashboard] timeline 실패:", tl.reason);
+    });
+  }, []);
+
+  const refreshDashboardDataSoon = useCallback(() => {
+    const now = Date.now();
+    if (now - refreshCooldownRef.current < 5000) return;
+    refreshCooldownRef.current = now;
+    void loadDashboardData();
+  }, [loadDashboardData]);
 
   async function toggleDarkDetection(next: boolean) {
     if (darkPending) return;
@@ -91,9 +127,6 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const date = getKSTDate();
-    const monday = getMondayKST();
-
     getMe().then((m) => {
       setMe(m);
       setDarkMode(m.settings.darkDetectionEnabled);
@@ -101,31 +134,10 @@ export default function DashboardPage() {
 
     getBadges().then((b) => setBadges(b.slice(0, 3))).catch(() => {});
 
-    const loadData = () => {
-      Promise.allSettled([
-        getDashboardToday(),
-        getDashboardWeekly(monday),
-        getDashboardDaily(date),
-        getDashboardTimeline(date),
-      ]).then(([t, w, d, tl]) => {
-        if (t.status === "fulfilled") setToday(t.value);
-        else console.error("[dashboard] today 실패:", t.reason);
-        if (w.status === "fulfilled") setWeekly(w.value);
-        else console.error("[dashboard] weekly 실패:", w.reason);
-        if (d.status === "fulfilled") setDaily(d.value);
-        else console.error("[dashboard] daily 실패:", d.reason);
-        if (tl.status === "fulfilled") {
-          console.log("[dashboard] timeline 응답:", tl.value);
-          setTimeline(tl.value);
-        } else console.error("[dashboard] timeline 실패:", tl.reason);
-      });
-    };
-
-    loadData();
-    pollRef.current = setInterval(loadData, 30_000);
+    void loadDashboardData();
+    pollRef.current = setInterval(loadDashboardData, 10_000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadDashboardData, router]);
 
   // ── 파생 데이터 ────────────────────────────────────────
 
@@ -322,7 +334,21 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-xl">
-              <WebcamView />
+              <WebcamView
+                darkDetectionEnabled={darkMode}
+                onDetectionStateChange={(state, message) => {
+                  setLiveDetection({
+                    state,
+                    message,
+                    updatedAt: new Date().toLocaleTimeString("en-GB", {
+                      timeZone: "Asia/Seoul",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  });
+                }}
+                onDashboardDataChanged={refreshDashboardDataSoon}
+              />
               {!webcamVisible && (
                 <div
                   className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-zinc-900/60 backdrop-blur-md"
@@ -361,9 +387,27 @@ export default function DashboardPage() {
                     ? "정확한 자세입니다 👍"
                     : healthScore > 0
                     ? "자세를 교정해주세요 ⚠️"
-                    : "자세 데이터 수집 중..."
+                  : "자세 데이터 수집 중..."
                   : "자세 데이터 수집 중..."}
               </button>
+              <div className="mt-2 w-full rounded-lg px-3 py-2 text-center ring-1 ring-zinc-100">
+                <div className="text-[10px] font-semibold text-zinc-400">실시간 감지 상태</div>
+                <div className={`mt-1 text-xs font-bold ${
+                  liveDetection?.state === "GOOD_POSTURE"
+                    ? "text-emerald-500"
+                    : liveDetection
+                    ? "text-rose-500"
+                    : "text-zinc-400"
+                }`}>
+                  {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : "분석 대기 중"}
+                </div>
+                {liveDetection?.message ? (
+                  <div className="mt-1 truncate text-[10px] text-zinc-500">{liveDetection.message}</div>
+                ) : null}
+                <div className="mt-1 text-[9px] text-zinc-300">
+                  {liveDetection ? `${liveDetection.updatedAt} 갱신` : "웹캠 연결 후 자동 갱신"}
+                </div>
+              </div>
             </div>
           </Card>
 
