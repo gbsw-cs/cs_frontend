@@ -74,11 +74,11 @@ function fmtDateTime(isoStr: string) {
 }
 
 function scoreLabel(score: number | null): { text: string; color: string; bg: string } {
-  if (score === null) return { text: "데이터 없음", color: "text-zinc-400", bg: "bg-zinc-700" };
-  if (score >= 90) return { text: "훌륭해요", color: "text-emerald-400", bg: "bg-emerald-500/20" };
-  if (score >= 70) return { text: "좋음", color: "text-emerald-400", bg: "bg-emerald-500/20" };
-  if (score >= 50) return { text: "보통", color: "text-amber-400", bg: "bg-amber-500/20" };
-  return { text: "개선 필요", color: "text-rose-400", bg: "bg-rose-500/20" };
+  if (score === null) return { text: "데이터 없음", color: "text-zinc-500", bg: "bg-zinc-100" };
+  if (score >= 90) return { text: "훌륭해요", color: "text-emerald-600", bg: "bg-emerald-50 ring-1 ring-emerald-200" };
+  if (score >= 70) return { text: "좋음", color: "text-emerald-600", bg: "bg-emerald-50 ring-1 ring-emerald-200" };
+  if (score >= 50) return { text: "보통", color: "text-amber-600", bg: "bg-amber-50 ring-1 ring-amber-200" };
+  return { text: "개선 필요", color: "text-rose-600", bg: "bg-rose-50 ring-1 ring-rose-200" };
 }
 
 const MOCK_REPORT: CurrentReport = {
@@ -388,19 +388,19 @@ function ScoreLineChart({ data }: { data: (number | null)[] }) {
   return (
     <ResponsiveContainer width="100%" height={88}>
       <LineChart data={entries} margin={{ top: 14, right: 6, bottom: 0, left: -36 }}>
-        <CartesianGrid stroke="#3f3f46" strokeDasharray="2 2" vertical={false} />
-        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#52525b" }} tickLine={false} axisLine={false} />
+        <CartesianGrid stroke="#e4e4e7" strokeDasharray="2 2" vertical={false} />
+        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#71717a" }} tickLine={false} axisLine={false} />
         <YAxis hide domain={["auto", "auto"]} />
         <Line
           type="monotone"
           dataKey="score"
-          stroke="#3b82f6"
-          strokeWidth={1.5}
-          dot={{ r: 2.5, fill: "#3b82f6", strokeWidth: 0 }}
+          stroke="#2563EB"
+          strokeWidth={2}
+          dot={{ r: 2.5, fill: "#2563EB", strokeWidth: 0 }}
           activeDot={{ r: 3.5 }}
           connectNulls={false}
           isAnimationActive={false}
-          label={{ position: "top", fontSize: 7, fill: "#94a3b8", dy: -2 }}
+          label={{ position: "top", fontSize: 7, fill: "#71717a", dy: -2 }}
         />
       </LineChart>
     </ResponsiveContainer>
@@ -417,19 +417,19 @@ function ScoreBarChart({ data }: { data: (number | null)[] }) {
   return (
     <ResponsiveContainer width="100%" height={88}>
       <BarChart data={entries} margin={{ top: 14, right: 6, bottom: 0, left: -36 }}>
-        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#52525b" }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#71717a" }} tickLine={false} axisLine={false} />
         <YAxis hide />
-        <Bar dataKey="score" radius={[2, 2, 0, 0]} minPointSize={4} isAnimationActive={false}>
+        <Bar dataKey="score" radius={[3, 3, 0, 0]} minPointSize={4} isAnimationActive={false}>
           {entries.map((e, i) => (
             <Cell
               key={i}
-              fill={!e.real ? "#27272a" : e.score >= 70 ? "#3b82f6" : e.score >= 50 ? "#fbbf24" : "#fb7185"}
+              fill={!e.real ? "#f4f4f5" : e.score >= 70 ? "#2563EB" : e.score >= 50 ? "#f59e0b" : "#f43f5e"}
             />
           ))}
           <LabelList
             dataKey="score"
             position="top"
-            style={{ fontSize: "7px", fill: "#94a3b8" }}
+            style={{ fontSize: "7px", fill: "#71717a" }}
             formatter={(v: unknown) => (typeof v === "number" && v > 0 ? v : "")}
           />
         </Bar>
@@ -459,36 +459,36 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
   return (
     <div className="space-y-3 p-5">
 
-      {/* Row 1 — 3 equal dark cards */}
+      {/* Row 1 — 3 equal cards */}
       <div className="grid grid-cols-3 gap-3">
 
         {/* Card 1: 이번 주 점수 */}
-        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+        <div className="rounded-2xl bg-white p-4 flex flex-col ring-1 ring-zinc-100 shadow-sm">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-3">
             이번 주 점수
           </div>
-          <div className="text-5xl font-black leading-none text-white">
+          <div className="text-5xl font-black leading-none text-[#2563EB]">
             {weekly ?? "—"}
           </div>
           <div className={`mt-2 self-start rounded-full px-2.5 py-0.5 text-[10px] font-bold ${labelBg} ${labelColor}`}>
             {labelText}
           </div>
-          <div className="my-3 border-t border-zinc-700" />
+          <div className="my-3 border-t border-zinc-100" />
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500">감지 건수</span>
-              <span className="text-[11px] font-semibold text-zinc-300">{totalCount}회</span>
+              <span className="text-[10px] text-zinc-400">감지 건수</span>
+              <span className="text-[11px] font-semibold text-zinc-700">{totalCount}회</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500">감지 시간</span>
-              <span className="text-[11px] font-semibold text-zinc-300">{fmtSec(totalSec)}</span>
+              <span className="text-[10px] text-zinc-400">감지 시간</span>
+              <span className="text-[11px] font-semibold text-zinc-700">{fmtSec(totalSec)}</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: 자세 점수 추이 */}
-        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+        <div className="rounded-2xl bg-white p-4 flex flex-col ring-1 ring-zinc-100 shadow-sm">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-3">
             자세 점수 추이
           </div>
           <div className="flex-1 flex items-center">
@@ -497,8 +497,8 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
         </div>
 
         {/* Card 3: 요일별 평균 */}
-        <div className="rounded-2xl bg-zinc-900 p-4 flex flex-col">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+        <div className="rounded-2xl bg-white p-4 flex flex-col ring-1 ring-zinc-100 shadow-sm">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-3">
             요일별 평균
           </div>
           <div className="flex-1 flex items-center">
@@ -508,7 +508,7 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
       </div>
 
       {/* Row 2: AI 솔루션 */}
-      <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-100">
+      <div className="rounded-2xl bg-white p-5 ring-1 ring-blue-100 border-l-4 border-[#2563EB]">
         <div className="mb-3 flex items-center gap-2">
           <span className="text-xl">🤖</span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#2563EB]">AI 솔루션</span>
