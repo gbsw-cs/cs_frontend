@@ -9,7 +9,8 @@ const VIDEO_CONSTRAINTS = {
   height: 480,
   facingMode: "user",
 };
-const DETECT_INTERVAL_MS = 1000;
+const FRAME_CAPTURE_INTERVAL_MS = 1000;
+const BATCH_SEND_INTERVAL_MS = 5000;
 const BATCH_FRAME_COUNT = 10;
 const BASELINE_RETRY_COOLDOWN_MS = 30_000;
 
@@ -146,6 +147,7 @@ export default function WebcamView() {
   const analyzingRef = useRef(false);
   const framesRef = useRef<PostureFrame[]>([]);
   const lastStatusRef = useRef("");
+  const lastBatchSentAtRef = useRef(0);
   const baselineRetryAtRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -184,6 +186,10 @@ export default function WebcamView() {
           setAiStatus("idle");
           return;
         }
+        const now = Date.now();
+        if (lastBatchSentAtRef.current > 0 && now - lastBatchSentAtRef.current < BATCH_SEND_INTERVAL_MS) {
+          return;
+        }
 
         // userId를 세션 ID로 사용 (webcam-test와 동일한 ID)
         const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
@@ -205,6 +211,7 @@ export default function WebcamView() {
           if (!refreshed) { setAiStatus("idle"); return; }
         }
 
+        lastBatchSentAtRef.current = now;
         const response = await fetch("/v1/posture/detect/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -257,7 +264,7 @@ export default function WebcamView() {
     }
 
     analyzeFrame();
-    const interval = window.setInterval(analyzeFrame, DETECT_INTERVAL_MS);
+    const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, [ready]);
 
