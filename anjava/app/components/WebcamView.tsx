@@ -1,7 +1,7 @@
 "use client";
 
 import Webcam from "react-webcam";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPostureFrame, type PostureFrame } from "../lib/poseFrame";
 import {
   endDetectionSession,
@@ -222,6 +222,19 @@ export default function WebcamView({
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
 
+  const flushQueuedEvents = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || eventQueueRef.current.length === 0) return;
+    const events = eventQueueRef.current.splice(0, 100);
+    try {
+      await postSessionEvents(sessionId, events);
+      onDashboardDataChangedRef.current?.();
+    } catch (e) {
+      eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
+      console.error("Detection events upload failed", e);
+    }
+  }, []);
+
   useEffect(() => {
     onDetectionStateChangeRef.current = onDetectionStateChange;
     onDashboardDataChangedRef.current = onDashboardDataChanged;
@@ -255,15 +268,7 @@ export default function WebcamView({
         });
         stateStartRef.current = now;
       }
-      if (eventQueueRef.current.length === 0) return;
-      const events = eventQueueRef.current.splice(0, 100);
-      try {
-        await postSessionEvents(sessionId, events);
-        onDashboardDataChangedRef.current?.();
-      } catch (e) {
-        eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
-        console.error("Detection events upload failed", e);
-      }
+      await flushQueuedEvents();
     }
 
     const flushInterval = window.setInterval(flushEvents, EVENT_FLUSH_INTERVAL_MS);
@@ -297,7 +302,7 @@ export default function WebcamView({
         });
       }
     };
-  }, [ready]);
+  }, [ready, flushQueuedEvents]);
 
   useEffect(() => {
     if (!ready) return;
@@ -329,6 +334,7 @@ export default function WebcamView({
           durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
           detectedAt: new Date(stateStartRef.current).toISOString(),
         });
+        void flushQueuedEvents();
       }
       if (previous !== nextState) {
         stateStartRef.current = now;
@@ -443,7 +449,7 @@ export default function WebcamView({
     analyzeFrame();
     const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [ready, darkDetectionEnabled]);
+  }, [ready, darkDetectionEnabled, flushQueuedEvents]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">
