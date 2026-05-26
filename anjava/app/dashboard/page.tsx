@@ -216,11 +216,7 @@ export default function DashboardPage() {
   const weeklyValues = weekly?.days.map((d) => d.badPostureRatio * 100) ?? [30, 55, 40, 30, 35, 50, 35];
 
   return (
-    <>
-    <div
-      data-dashboard-theme={darkMode ? "dark" : "light"}
-      className="anjava-dashboard min-h-screen bg-zinc-50 px-3 py-3 transition-colors duration-300 sm:px-5 sm:py-4"
-    >
+    <div className="min-h-screen bg-zinc-50 px-3 py-3 transition-colors duration-300 sm:px-5 sm:py-4">
       <div className="mx-auto w-full max-w-[1600px]">
         {/* Top badge */}
         <div className="mb-3 flex shrink-0 justify-center">
@@ -688,93 +684,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-    <style jsx global>{`
-      .anjava-dashboard,
-      .anjava-dashboard * {
-        transition-property: background-color, border-color, color, fill, stroke, box-shadow;
-        transition-duration: 220ms;
-        transition-timing-function: ease;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] {
-        background:
-          radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.16), transparent 32rem),
-          radial-gradient(circle at 82% 18%, rgba(16, 185, 129, 0.12), transparent 28rem),
-          #09090b;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .bg-white {
-        background-color: rgba(24, 24, 27, 0.86) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .bg-zinc-50 {
-        background-color: rgba(39, 39, 42, 0.84) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .bg-zinc-100 {
-        background-color: rgba(63, 63, 70, 0.76) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .bg-zinc-200,
-      .anjava-dashboard[data-dashboard-theme="dark"] .bg-zinc-300 {
-        background-color: rgba(82, 82, 91, 0.76) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-900 {
-        color: #f4f4f5 !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-700,
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-600 {
-        color: #d4d4d8 !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-500 {
-        color: #a1a1aa !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-400,
-      .anjava-dashboard[data-dashboard-theme="dark"] .text-zinc-300 {
-        color: #71717a !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .ring-zinc-100,
-      .anjava-dashboard[data-dashboard-theme="dark"] .ring-zinc-200 {
-        --tw-ring-color: rgba(82, 82, 91, 0.7) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .border-zinc-100,
-      .anjava-dashboard[data-dashboard-theme="dark"] .border-zinc-200 {
-        border-color: rgba(82, 82, 91, 0.7) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .divide-zinc-100 > :not([hidden]) ~ :not([hidden]) {
-        border-color: rgba(82, 82, 91, 0.7) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .border-dashed {
-        border-color: rgba(113, 113, 122, 0.55) !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] .shadow-sm {
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] svg circle[stroke="#f4f4f5"] {
-        stroke: #3f3f46;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] svg line[stroke="#e4e4e7"],
-      .anjava-dashboard[data-dashboard-theme="dark"] svg path[stroke="#d4d4d8"] {
-        stroke: #52525b;
-      }
-
-      .anjava-dashboard[data-dashboard-theme="dark"] svg circle[fill="#e4e4e7"] {
-        fill: #52525b;
-        stroke: #18181b;
-      }
-    `}</style>
-    </>
   );
 }
 

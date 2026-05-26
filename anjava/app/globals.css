@@ -29,3 +29,99 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", Arial, sans-serif;
   -webkit-text-size-adjust: 100%;
 }
+
+html,
+body,
+body * {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+html.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  color-scheme: dark;
+}
+
+html.dark body {
+  background: #000000;
+  color: #ffffff;
+}
+
+html.dark .bg-white,
+html.dark .bg-zinc-50,
+html.dark .hover\:bg-zinc-50:hover {
+  background-color: #000000 !important;
+}
+
+html.dark .bg-zinc-100,
+html.dark .bg-zinc-200,
+html.dark .bg-zinc-300,
+html.dark .hover\:bg-zinc-100:hover {
+  background-color: #18181b !important;
+}
+
+html.dark .bg-zinc-50\/50,
+html.dark .hover\:bg-zinc-50\/60:hover {
+  background-color: rgba(24, 24, 27, 0.72) !important;
+}
+
+html.dark .text-zinc-900,
+html.dark .text-zinc-800,
+html.dark .text-zinc-700,
+html.dark .text-zinc-600 {
+  color: #ffffff !important;
+}
+
+html.dark .text-zinc-500 {
+  color: #d4d4d8 !important;
+}
+
+html.dark .text-zinc-400,
+html.dark .text-zinc-300 {
+  color: #a1a1aa !important;
+}
+
+html.dark .border-zinc-100,
+html.dark .border-zinc-200,
+html.dark .divide-zinc-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #27272a !important;
+}
+
+html.dark .ring-zinc-100,
+html.dark .ring-zinc-200 {
+  --tw-ring-color: #27272a !important;
+}
+
+html.dark .shadow-sm,
+html.dark [class*="shadow-"] {
+  box-shadow: 0 0 0 1px rgba(39, 39, 42, 0.9) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #3f3f46 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #71717a !important;
+}
+
+html.dark svg circle[stroke="#f4f4f5"] {
+  stroke: #27272a;
+}
+
+html.dark svg line[stroke="#e4e4e7"],
+html.dark svg path[stroke="#d4d4d8"] {
+  stroke: #52525b;
+}
+
+html.dark svg circle[fill="#e4e4e7"] {
+  fill: #52525b;
+  stroke: #000000;
+}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import ThemeBootstrap from "./components/ThemeBootstrap";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,10 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var d=document.documentElement;var on=localStorage.getItem('uiDarkMode')==='1';d.classList.toggle('dark',on);d.dataset.theme=on?'dark':'light';}catch(e){}",
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ThemeBootstrap />
         {children}
         <Analytics />
         <SpeedInsights />

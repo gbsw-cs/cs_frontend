@@ -22,6 +22,12 @@ import {
 } from "../lib/api";
 import { validatePassword } from "../lib/validation";
 import AvatarColored from "../components/AvatarColored";
+import {
+  applyUiTheme,
+  getStoredUiTheme,
+  setStoredUiTheme,
+  THEME_CHANGE_EVENT,
+} from "../components/ThemeBootstrap";
 
 type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
 
@@ -64,16 +70,21 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const on = localStorage.getItem("uiDarkMode") === "1";
+    const on = getStoredUiTheme();
     setDarkModeState(on);
-    document.documentElement.classList.toggle("dark", on);
+    applyUiTheme(on);
+
+    function onThemeChange(e: Event) {
+      setDarkModeState(Boolean((e as CustomEvent<boolean>).detail));
+    }
+
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
   }, []);
 
   function setDarkMode(next: boolean) {
     setDarkModeState(next);
-    if (typeof window === "undefined") return;
-    localStorage.setItem("uiDarkMode", next ? "1" : "0");
-    document.documentElement.classList.toggle("dark", next);
+    setStoredUiTheme(next);
   }
 
   const [currentPw, setCurrentPw] = useState("");
