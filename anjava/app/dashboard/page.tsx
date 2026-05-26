@@ -236,12 +236,12 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[176px_minmax(0,0.9fr)_minmax(0,0.78fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[204px_minmax(0,0.82fr)_minmax(0,0.72fr)]">
 
           {/* ── Row 1 ── */}
 
           {/* 프로필 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[176px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[204px]">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
@@ -277,7 +277,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[176px]">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[204px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             </div>
 
             {recentActivity.length > 0 ? (
-              <ul className="mt-2 max-h-32 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
+              <ul className="mt-2 max-h-40 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
                 {recentActivity.map((b, i) => {
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
                   const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[176px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[204px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[120px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[148px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -389,9 +389,9 @@ export default function DashboardPage() {
           {/* ── Row 2 ── */}
 
           {/* 3D 아바타 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
             <div className="flex flex-col items-center">
-              <div className="flex h-44 w-full justify-center overflow-hidden">
+              <div className="flex h-40 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
@@ -432,7 +432,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 일간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden lg:col-span-5">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden lg:col-span-6">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="text-xs font-bold text-zinc-900">일간 스크린타임</div>
               <div className="flex items-center gap-3 text-[10px]">
@@ -490,17 +490,17 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-3">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[172px] lg:self-start">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-3 flex items-center gap-4">
+            <div className="mt-2 flex items-center gap-3">
               {/* 도넛 차트 (단색) */}
               <div className="relative shrink-0">
                 {(() => {
-                  const size = 104;
-                  const r = 38;
+                  const size = 88;
+                  const r = 32;
                   const circ = 2 * Math.PI * r;
                   const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
@@ -523,20 +523,20 @@ export default function DashboardPage() {
               </div>
 
               {/* 우측 리스트 */}
-              <div className="flex-1 space-y-2.5 text-xs">
+              <div className="flex-1 space-y-1.5 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
-                  <span className="text-sm font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
+                  <span className="text-xs font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />자세 경고 총 횟수</span>
-                  <span className="text-sm font-bold text-rose-500">
+                  <span className="text-xs font-bold text-rose-500">
                     {warningCount}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />상태 판정</span>
-                  <span className="text-sm font-bold text-amber-500">
+                  <span className="text-xs font-bold text-amber-500">
                     {today ? (healthScore >= 40 ? 0 : 10) : 0}
                   </span>
                 </div>
@@ -550,14 +550,14 @@ export default function DashboardPage() {
               const color = (n: number | null) =>
                 n === null ? "text-zinc-300" : n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
               return (
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="border-t border-zinc-200 pt-2 text-center">
-                    <div className="text-[11px] text-zinc-400">어제 대비</div>
-                    <div className={`mt-0.5 text-sm font-bold ${color(yDiff)}`}>{fmt(yDiff)}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="border-t border-zinc-200 pt-1.5 text-center">
+                    <div className="text-[10px] text-zinc-400">어제 대비</div>
+                    <div className={`mt-0.5 text-xs font-bold ${color(yDiff)}`}>{fmt(yDiff)}</div>
                   </div>
-                  <div className="border-t border-zinc-200 pt-2 text-center">
-                    <div className="text-[11px] text-zinc-400">지난주 대비</div>
-                    <div className={`mt-0.5 text-sm font-bold ${color(wDiff)}`}>{fmt(wDiff)}</div>
+                  <div className="border-t border-zinc-200 pt-1.5 text-center">
+                    <div className="text-[10px] text-zinc-400">지난주 대비</div>
+                    <div className={`mt-0.5 text-xs font-bold ${color(wDiff)}`}>{fmt(wDiff)}</div>
                   </div>
                 </div>
               );

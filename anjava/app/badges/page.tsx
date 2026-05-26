@@ -234,7 +234,7 @@ export default function BadgesPage() {
               );
             })}
 
-            {masterBadges.length === 0 && (
+            {!error && masterBadges.length === 0 && (
               <div className="rounded-2xl bg-white px-6 py-16 text-center shadow-sm ring-1 ring-zinc-100">
                 <div className="mb-2 text-3xl">🏅</div>
                 <div className="text-sm font-medium text-zinc-500">등록된 뱃지가 없습니다</div>

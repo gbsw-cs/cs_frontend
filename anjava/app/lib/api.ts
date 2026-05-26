@@ -1,5 +1,7 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+const API_URL = /cs-backend\.p-e\.kr/i.test(configuredApiUrl)
+  ? "/api/backend"
+  : configuredApiUrl.replace(/\/$/, "");
 
 type ApiSuccess<T> = {
   success: true;

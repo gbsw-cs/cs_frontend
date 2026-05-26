@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = (process.env.BACKEND_API_URL || "http://cs-backend.p-e.kr/api")
-  .replace(/^https:\/\/cs-backend\.p-e\.kr\/api\/?$/, "http://cs-backend.p-e.kr/api");
+function getBackendBase() {
+  const configured = process.env.BACKEND_API_URL || "http://cs-backend.p-e.kr/api";
+  const url = new URL(configured);
+  if (url.hostname === "cs-backend.p-e.kr") {
+    url.protocol = "http:";
+    url.pathname = "/api";
+    url.search = "";
+    url.hash = "";
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+const BACKEND = getBackendBase();
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "authorization",
