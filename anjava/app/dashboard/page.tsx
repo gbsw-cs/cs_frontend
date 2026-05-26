@@ -214,23 +214,34 @@ export default function DashboardPage() {
 
   // 주간 선형 차트 값
   const weeklyValues = weekly?.days.map((d) => d.badPostureRatio * 100) ?? [30, 55, 40, 30, 35, 50, 35];
+  const liveIsGood = liveDetection?.state === "GOOD_POSTURE";
+  const liveIsBad = Boolean(liveDetection && !liveIsGood);
+  const avatarStatusText = liveDetection
+    ? liveIsGood
+      ? "정확한 자세입니다 ✅"
+      : `${STATE_LABEL[liveDetection.state] ?? "자세 이상 발생"}`
+    : rawScore !== null
+    ? healthScore >= 60
+      ? "정확한 자세입니다 ✅"
+      : "자세를 교정해주세요 ⚠️"
+    : "자세 데이터 수집 중...";
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-3 py-3 transition-colors duration-300 sm:px-5 sm:py-4">
-      <div className="mx-auto w-full max-w-[1600px]">
+    <div className="h-screen overflow-hidden bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3">
+      <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col">
         {/* Top badge */}
-        <div className="mb-3 flex shrink-0 justify-center">
-          <span className="rounded-full bg-[#2563EB]/10 px-4 py-1 text-xs font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
+        <div className="mb-2 flex shrink-0 justify-center">
+          <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
             ● AI 신체 활성화 중 ●
           </span>
         </div>
 
-        <div className="grid grid-cols-12 gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[148px_minmax(0,1fr)_minmax(0,1fr)]">
 
           {/* ── Row 1 ── */}
 
           {/* 프로필 */}
-          <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[148px]">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
@@ -266,7 +277,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex min-h-[220px] flex-col overflow-hidden sm:col-span-6 lg:col-span-5">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[148px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -280,7 +291,7 @@ export default function DashboardPage() {
             </div>
 
             {recentActivity.length > 0 ? (
-              <ul className="mt-2 max-h-44 flex-1 space-y-2 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
+              <ul className="mt-2 max-h-24 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
                 {recentActivity.map((b, i) => {
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
                   const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
@@ -320,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-4">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[148px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -344,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[92px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -378,35 +389,33 @@ export default function DashboardPage() {
           {/* ── Row 2 ── */}
 
           {/* 3D 아바타 */}
-          <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4">
             <div className="flex flex-col items-center">
-              <div className="h-44 w-full overflow-hidden">
+              <div className="flex h-52 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
-                  className="avatar-float h-full w-full"
+                  className="avatar-float h-full w-auto max-w-full"
                 />
               </div>
               <button className={`mt-2 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
-                today && healthScore >= 60
+                liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
-                  : today && healthScore > 0
-                  ? "bg-amber-50 text-amber-600 ring-amber-200 hover:bg-amber-100"
+                  : liveIsBad
+                  ? "bg-rose-50 text-rose-600 ring-rose-200 hover:bg-rose-100"
+                  : rawScore !== null && healthScore > 0
+                  ? healthScore >= 60
+                    ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
+                    : "bg-amber-50 text-amber-600 ring-amber-200 hover:bg-amber-100"
                   : "bg-zinc-50 text-zinc-500 ring-zinc-200 hover:bg-zinc-100"
               }`}>
-                {today && rawScore !== null
-                  ? healthScore >= 60
-                    ? "정확한 자세입니다 👍"
-                    : healthScore > 0
-                    ? "자세를 교정해주세요 ⚠️"
-                  : "자세 데이터 수집 중..."
-                  : "자세 데이터 수집 중..."}
+                {avatarStatusText}
               </button>
               <div className="mt-2 w-full rounded-lg px-3 py-2 text-center ring-1 ring-zinc-100">
                 <div className="text-[10px] font-semibold text-zinc-400">실시간 감지 상태</div>
                 <div className={`mt-1 text-xs font-bold ${
-                  liveDetection?.state === "GOOD_POSTURE"
+                  liveIsGood
                     ? "text-emerald-500"
-                    : liveDetection
+                    : liveIsBad
                     ? "text-rose-500"
                     : "text-zinc-400"
                 }`}>
@@ -423,7 +432,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 일간 스크린타임 */}
-          <Card className="col-span-12 flex flex-col lg:col-span-6">
+          <Card className="col-span-12 flex min-h-0 flex-col lg:col-span-5">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="text-xs font-bold text-zinc-900">일간 스크린타임</div>
               <div className="flex items-center gap-3 text-[10px]">
@@ -452,7 +461,7 @@ export default function DashboardPage() {
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
+                <div className="flex h-20 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
                     const total = slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount;
                     const goodH = total > 0 ? (slot.goodPostureCount / total) * 100 : 0;
@@ -481,7 +490,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-3">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
@@ -490,8 +499,8 @@ export default function DashboardPage() {
               {/* 도넛 차트 (단색) */}
               <div className="relative shrink-0">
                 {(() => {
-                  const size = 130;
-                  const r = 48;
+                  const size = 112;
+                  const r = 42;
                   const circ = 2 * Math.PI * r;
                   const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
@@ -620,7 +629,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 주간 스크린타임 */}
-          <Card className="col-span-12 flex flex-col sm:col-span-6 lg:col-span-9">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-9">
             <div className="flex shrink-0 items-center justify-between">
               <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
               <button className="text-zinc-400 transition hover:text-[#2563EB]" aria-label="주간 상세">
@@ -658,14 +667,14 @@ export default function DashboardPage() {
               {(() => {
                 const values = weeklyValues;
                 const W = 700;
-                const H = 120;
+                const H = 92;
                 const step = values.length > 1 ? W / (values.length - 1) : 0;
                 const coords = values.map((v, i) => [i * step, H - (v / 100) * H] as [number, number]);
                 const line = coords.map(([x, y], i) => (i === 0 ? `M${x},${y}` : `L${x},${y}`)).join(" ");
                 const dayLabels = weekly?.days.map((d) => DAY_KR[new Date(d.date).getDay()]) ?? ["월", "화", "수", "목", "금", "토", "일"];
                 return (
                   <>
-                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-28 w-full">
+                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-20 w-full">
                       <line x1="0" y1={H} x2={W} y2={H} stroke="#e4e4e7" strokeWidth="1" />
                       <path d={line} fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       {coords.map(([x, y], i) => (

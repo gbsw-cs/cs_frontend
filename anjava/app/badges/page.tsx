@@ -44,14 +44,33 @@ export default function BadgesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getAllBadges(), getBadges(), getBadgesProgress()])
-      .then(([master, earned, prog]) => {
+    let active = true;
+
+    getAllBadges()
+      .then((master) => {
+        if (!active) return;
         setMasterBadges(master);
-        setEarnedBadges(earned);
-        setProgress(prog.categories);
+        return Promise.allSettled([getBadges(), getBadgesProgress()] as const);
+      })
+      .then((results) => {
+        if (!active || !results) return;
+
+        const [earned, prog] = results;
+        if (earned.status === "fulfilled") {
+          setEarnedBadges(earned.value);
+        }
+        if (prog.status === "fulfilled") {
+          setProgress(prog.value.categories);
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "데이터를 불러올 수 없습니다."))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const earnedMap = new Map(earnedBadges.map((b) => [b.code, b]));

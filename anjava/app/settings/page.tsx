@@ -333,14 +333,11 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-40 flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-zinc-500">
-                <span>☀️</span>
-                <span>다크모드</span>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="mt-40 flex items-center justify-center rounded-2xl bg-zinc-50 px-4 py-3">
+              <div className="flex items-center gap-3" aria-label="UI theme">
+                <SunIcon active={!darkMode} />
                 <Toggle on={darkMode} onChange={setDarkMode} />
-                <span className="text-base">🌙</span>
+                <MoonIcon active={darkMode} />
               </div>
             </div>
           </section>
@@ -705,6 +702,52 @@ function StartButton({ href, label = "시작" }: { href?: string; label?: string
     );
   }
   return <button className={className}>{label}</button>;
+}
+
+function SunIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={active ? "text-amber-400" : "text-zinc-300"}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={active ? "text-[#2563EB]" : "text-zinc-300"}
+      aria-hidden="true"
+    >
+      <path d="M12 3a6 6 0 0 0 9 7.5A9 9 0 1 1 12 3Z" />
+    </svg>
+  );
 }
 
 function Toggle({
