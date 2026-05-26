@@ -11,6 +11,24 @@ const DURATION_MS = 10_000
 const INTERVAL_MS = 200
 
 interface Landmark { x: number; y: number; z: number }
+type PoseLandmark = Partial<Landmark> & { visibility?: number }
+type PoseLandmarker = {
+  detectForVideo(video: HTMLVideoElement, timestamp: number): {
+    worldLandmarks?: PoseLandmark[][]
+    landmarks?: PoseLandmark[][]
+  }
+}
+type ChromeRuntimeWindow = Window & {
+  chrome?: {
+    runtime?: {
+      sendMessage: (
+        extensionId: string,
+        message: unknown,
+        responseCallback?: () => void,
+      ) => void
+    }
+  }
+}
 interface Frame {
   timestamp: string
   visibility: number
@@ -24,8 +42,9 @@ interface Frame {
 
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
-function lm(arr: any[] | undefined, i: number): Landmark {
-  return arr?.[i] ? { x: arr[i].x, y: arr[i].y, z: arr[i].z } : EMPTY
+function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
+  const point = arr?.[i]
+  return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z } : EMPTY
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -44,7 +63,7 @@ function WebcamTest() {
 
   const videoRef   = useRef<HTMLVideoElement>(null)
   const canvasRef  = useRef<HTMLCanvasElement>(null)
-  const detectorRef = useRef<any>(null)
+  const detectorRef = useRef<PoseLandmarker | null>(null)
   const framesRef  = useRef<Frame[]>([])
 
   const [phase, setPhase]       = useState<Phase>("cam")
@@ -112,8 +131,8 @@ function WebcamTest() {
       if (elapsed >= DURATION_MS) { upload(); return }
 
       ctx.drawImage(video, 0, 0)
-      let pts: any[] | undefined
-      let ptsNorm: any[] | undefined
+      let pts: PoseLandmark[] | undefined
+      let ptsNorm: PoseLandmark[] | undefined
       try {
         if (detectorRef.current) {
           const result = detectorRef.current.detectForVideo(video, performance.now())
@@ -198,10 +217,11 @@ function WebcamTest() {
       const baselineData = await res.json().catch(() => null)
 
       // 확장프로그램으로 데이터 전송
-      if (extId && typeof window !== "undefined" && (window as any).chrome?.runtime?.sendMessage) {
+      const chromeRuntime = (window as ChromeRuntimeWindow).chrome?.runtime
+      if (extId && chromeRuntime?.sendMessage) {
         try {
           await new Promise<void>((resolve) => {
-            ;(window as any).chrome.runtime.sendMessage(
+            chromeRuntime.sendMessage(
               extId,
               { type: "BASELINE_DONE", baselineData },
               () => resolve()

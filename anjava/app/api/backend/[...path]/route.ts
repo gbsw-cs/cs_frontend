@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_API_URL || "http://cs-backend.p-e.kr/api";
+const BACKEND = process.env.BACKEND_API_URL || "https://cs-backend.p-e.kr/api";
+const FORWARDED_REQUEST_HEADERS = [
+  "accept",
+  "authorization",
+  "content-type",
+] as const;
+const FORWARDED_RESPONSE_HEADERS = [
+  "content-type",
+  "set-cookie",
+] as const;
 
 type Context = { params: Promise<{ path: string[] }> };
 
@@ -9,9 +18,11 @@ async function proxy(req: NextRequest, ctx: Context) {
   const url = new URL(`${BACKEND}/${path.join("/")}`);
   req.nextUrl.searchParams.forEach((v, k) => url.searchParams.set(k, v));
 
-  const reqHeaders = new Headers(req.headers);
-  reqHeaders.delete("host");
-  reqHeaders.delete("expect");
+  const reqHeaders = new Headers();
+  for (const header of FORWARDED_REQUEST_HEADERS) {
+    const value = req.headers.get(header);
+    if (value) reqHeaders.set(header, value);
+  }
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   const body = hasBody ? await req.text() : undefined;
@@ -23,9 +34,11 @@ async function proxy(req: NextRequest, ctx: Context) {
     redirect: "manual",
   });
 
-  const resHeaders = new Headers(res.headers);
-  resHeaders.delete("content-encoding");
-  resHeaders.delete("content-length");
+  const resHeaders = new Headers();
+  for (const header of FORWARDED_RESPONSE_HEADERS) {
+    const value = res.headers.get(header);
+    if (value) resHeaders.set(header, value);
+  }
 
   return new NextResponse(res.body, {
     status: res.status,

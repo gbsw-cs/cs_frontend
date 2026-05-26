@@ -15,7 +15,7 @@ type ApiError = {
   validationErrors?: string[];
 };
 
-export type Tokens = { accessToken: string; refreshToken: string };
+export type Tokens = { accessToken: string; refreshToken?: string };
 export type Me = {
   id: string;
   email: string;
@@ -118,7 +118,11 @@ function deleteRefreshCookie() {
 export function saveTokens(t: Tokens) {
   if (typeof window === "undefined") return;
   localStorage.setItem(ACCESS_KEY, t.accessToken);
-  setRefreshCookie(t.refreshToken);
+  if (t.refreshToken) {
+    setRefreshCookie(t.refreshToken);
+  } else {
+    deleteRefreshCookie();
+  }
   // 혹시 남아있을 수 있는 옛 localStorage 리프레시 토큰 제거
   localStorage.removeItem(REFRESH_COOKIE);
 }
@@ -201,6 +205,7 @@ async function rawRequest<T>(
       ...init,
       headers,
       signal: controller.signal,
+      credentials: "include",
     });
   } catch (e) {
     const err = e as Error & { name?: string };
@@ -289,12 +294,9 @@ export function signup(
 
 export function refresh() {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return Promise.reject(new Error("리프레시 토큰이 없습니다."));
-  }
   return rawRequest<Tokens>(
     "/auth/refresh",
-    { method: "POST", body: JSON.stringify({ refreshToken }) },
+    { method: "POST", body: JSON.stringify(refreshToken ? { refreshToken } : {}) },
     false,
   );
 }

@@ -11,34 +11,11 @@ const VIDEO_CONSTRAINTS = {
 };
 const DETECT_INTERVAL_MS = 1000;
 const BATCH_FRAME_COUNT = 10;
+const BASELINE_RETRY_COOLDOWN_MS = 30_000;
 
-type Baseline = {
-  neck_forward: number;
-  shoulder_diff: number;
-  brightness: number;
-  shoulder_width: number;
-  shoulder_z: number;
-  issued_at: string;
-  expires_at: string;
-  signature: string;
-  env_fingerprint: {
-    shoulder_width: number;
-    nose_y: number;
-    brightness: number;
-  };
-};
-
-function readBaseline() {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("aiBaseline");
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    const baseline = (parsed.data?.baseline ?? parsed.baseline ?? parsed) as Baseline;
-    return baseline?.signature ? baseline : null;
-  } catch {
-    return null;
-  }
+function isBaselineReady() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("aiBaselineReady") === "1";
 }
 
 function findDetectedLabels(value: unknown, prefix = ""): string[] {
@@ -84,6 +61,25 @@ const TOAST_STYLE = `
     pointer-events: auto;
   }
   #anjava-web-toast.out { animation: anjava-web-out 0.24s ease forwards; }
+  #anjava-web-toast .anjava-web-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px 10px; border-bottom: 1px solid #f4f4f5;
+  }
+  #anjava-web-toast .anjava-web-icon { font-size: 18px; flex-shrink: 0; }
+  #anjava-web-toast .anjava-web-title {
+    font-weight: 700; font-size: 13px; color: #2563eb; flex: 1;
+  }
+  #anjava-web-toast .anjava-web-close {
+    background: none; border: none; color: #a1a1aa; cursor: pointer;
+    font-size: 16px; padding: 0; line-height: 1;
+  }
+  #anjava-web-toast .anjava-web-body {
+    padding: 10px 14px 12px; font-size: 12.5px; color: #3f3f46; line-height: 1.55;
+  }
+  #anjava-web-toast .anjava-web-progress {
+    height: 3px; background: #2563eb;
+    animation: anjava-web-progress 6s linear forwards; transform-origin: left;
+  }
   @keyframes anjava-web-in {
     from { opacity: 0; transform: translateX(60px) scale(0.95); }
     to   { opacity: 1; transform: translateX(0) scale(1); }
@@ -99,6 +95,11 @@ const TOAST_STYLE = `
 
 let webToastTimer: ReturnType<typeof setTimeout> | null = null;
 
+function closePostureToast(el: HTMLElement) {
+  el.classList.add("out");
+  setTimeout(() => el.remove(), 240);
+}
+
 function showPostureToast(message: string) {
   if (typeof document === "undefined") return;
   if (!document.getElementById("anjava-web-style")) {
@@ -113,20 +114,30 @@ function showPostureToast(message: string) {
 
   const el = document.createElement("div");
   el.id = "anjava-web-toast";
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid #f4f4f5;">
-      <span style="font-size:18px;flex-shrink:0">⚠️</span>
-      <span style="font-weight:700;font-size:13px;color:#2563eb;flex:1">자세 교정 알림</span>
-      <button onclick="this.closest('#anjava-web-toast').remove()"
-        style="background:none;border:none;color:#a1a1aa;cursor:pointer;font-size:16px;padding:0;line-height:1">✕</button>
-    </div>
-    <div style="padding:10px 14px 12px;font-size:12.5px;color:#3f3f46;line-height:1.55">${message}</div>
-    <div style="height:3px;background:#2563eb;animation:anjava-web-progress 6s linear forwards;transform-origin:left"></div>
-  `;
+  const header = document.createElement("div");
+  header.className = "anjava-web-header";
+  const icon = document.createElement("span");
+  icon.className = "anjava-web-icon";
+  icon.textContent = "!";
+  const title = document.createElement("span");
+  title.className = "anjava-web-title";
+  title.textContent = "자세 교정 알림";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "anjava-web-close";
+  close.textContent = "x";
+  close.addEventListener("click", () => closePostureToast(el));
+  header.append(icon, title, close);
+
+  const body = document.createElement("div");
+  body.className = "anjava-web-body";
+  body.textContent = message;
+  const progress = document.createElement("div");
+  progress.className = "anjava-web-progress";
+  el.append(header, body, progress);
   document.body.appendChild(el);
   webToastTimer = setTimeout(() => {
-    el.classList.add("out");
-    setTimeout(() => el.remove(), 240);
+    closePostureToast(el);
   }, 6000);
 }
 
@@ -135,6 +146,7 @@ export default function WebcamView() {
   const analyzingRef = useRef(false);
   const framesRef = useRef<PostureFrame[]>([]);
   const lastStatusRef = useRef("");
+  const baselineRetryAtRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -148,16 +160,13 @@ export default function WebcamView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, frames }),
       });
-      if (!response.ok) return false;
-
-      const baselineResponse = await response.json().catch(() => null);
-      const baseline =
-        baselineResponse?.data?.baseline ??
-        baselineResponse?.baseline ??
-        baselineResponse;
-      if (!baseline?.signature) return false;
-
-      localStorage.setItem("aiBaseline", JSON.stringify(baseline));
+      if (!response.ok) {
+        baselineRetryAtRef.current = Date.now() + BASELINE_RETRY_COOLDOWN_MS;
+        const errorBody = await response.json().catch(() => null);
+        console.error("Baseline request failed", response.status, errorBody);
+        return false;
+      }
+      localStorage.setItem("aiBaselineReady", "1");
       localStorage.setItem("aiSessionId", id);
       return true;
     }
@@ -186,13 +195,14 @@ export default function WebcamView() {
             : `${Date.now()}`);
         localStorage.setItem("aiSessionId", id);
 
-        let baseline = readBaseline();
         // baseline 없으면 즉시 측정
-        if (!baseline) {
+        if (!isBaselineReady()) {
+          if (Date.now() < baselineRetryAtRef.current) {
+            setAiStatus("error");
+            return;
+          }
           const refreshed = await refreshBaseline(id, framesRef.current);
           if (!refreshed) { setAiStatus("idle"); return; }
-          baseline = readBaseline();
-          if (!baseline) { setAiStatus("idle"); return; }
         }
 
         const response = await fetch("/v1/posture/detect/batch", {
@@ -200,16 +210,16 @@ export default function WebcamView() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id,
-            frame,
-            baseline,
+            frames: framesRef.current,
             z_threshold: 0.07,
             shoulder_threshold: 0.05,
             round_shoulder_ratio: 0.12,
             round_shoulder_z_threshold: 0.05,
+            round_shoulder_absolute_max: 0,
+            round_shoulder_backup_z_threshold: 0,
             dark_mode: false,
             dark_abs_threshold: 60,
             dark_relative_ratio: 0.5,
-            frames: framesRef.current,
           }),
         });
         if (!response.ok) {
@@ -217,7 +227,7 @@ export default function WebcamView() {
           const code = errorBody?.error?.code;
           // baseline 없음 또는 환경 변화 → 재측정
           if (code === "E_ENVIRONMENT_DRIFT" || code === "E_INVALID_BASELINE") {
-            localStorage.removeItem("aiBaseline");
+            localStorage.removeItem("aiBaselineReady");
             const refreshed = await refreshBaseline(id, framesRef.current);
             setAiStatus(refreshed ? "idle" : "error");
             return;

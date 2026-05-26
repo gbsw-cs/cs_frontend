@@ -109,15 +109,15 @@ export default function DashboardPage() {
         getDashboardTimeline(date),
       ]).then(([t, w, d, tl]) => {
         if (t.status === "fulfilled") setToday(t.value);
-        else console.error("[dashboard] today 실패:", (t as any).reason);
+        else console.error("[dashboard] today 실패:", t.reason);
         if (w.status === "fulfilled") setWeekly(w.value);
-        else console.error("[dashboard] weekly 실패:", (w as any).reason);
+        else console.error("[dashboard] weekly 실패:", w.reason);
         if (d.status === "fulfilled") setDaily(d.value);
-        else console.error("[dashboard] daily 실패:", (d as any).reason);
+        else console.error("[dashboard] daily 실패:", d.reason);
         if (tl.status === "fulfilled") {
           console.log("[dashboard] timeline 응답:", tl.value);
           setTimeline(tl.value);
-        } else console.error("[dashboard] timeline 실패:", (tl as any).reason);
+        } else console.error("[dashboard] timeline 실패:", tl.reason);
       });
     };
 

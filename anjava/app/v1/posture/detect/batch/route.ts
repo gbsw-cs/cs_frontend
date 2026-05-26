@@ -4,9 +4,18 @@ import { appendDetectionResultCsv, appendSentPayloadCsv } from "../../../_lib/cs
 
 export const runtime = "nodejs";
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 function getPostureBatchUrl() {
-  const base = process.env.AI_API_BASE_URL ?? "http://localhost:8000";
-  return `${base.replace(/\/$/, "")}/v1/posture/detect/batch`;
+  const base = process.env.AI_API_BASE_URL;
+  if (base) return `${base.replace(/\/$/, "")}/v1/posture/detect/batch`;
+  if (process.env.AI_API_URL) {
+    return process.env.AI_API_URL
+      .replace(/\/v1\/posture\/detect\/?$/, "/v1/posture/detect/batch")
+      .replace(/\/posture\/detect\/?$/, "/posture/detect/batch");
+  }
+  const fallbackBase = "http://3.38.108.207/ai";
+  return `${fallbackBase}/v1/posture/detect/batch`;
 }
 
 function getPostureResult(data: unknown) {
@@ -28,6 +37,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const postureBatchUrl = getPostureBatchUrl();
   const payload = await request.json().catch(() => null);
   if (!payload?.id || !Array.isArray(payload.frames)) {
     return NextResponse.json(
@@ -38,12 +48,15 @@ export async function POST(request: NextRequest) {
 
   try {
     await appendSentPayloadCsv("posture_detect_batch", payload);
-    const response = await fetch(getPostureBatchUrl(), {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const response = await fetch(postureBatchUrl, {
       method: "POST",
       headers: buildAiHeaders(),
       body: JSON.stringify(payload),
       cache: "no-store",
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     const text = await response.text();
     let data: unknown = {};
@@ -70,9 +83,14 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(data, { status: response.status });
-  } catch {
+  } catch (err) {
+    console.error("[posture/detect/batch] fetch failed:", err);
+    const message =
+      err instanceof Error && err.name === "AbortError"
+        ? "AI posture detect 서버 응답 시간이 초과되었습니다."
+        : "AI posture detect 서버에 연결할 수 없습니다.";
     return NextResponse.json(
-      { message: "posture detect 서버에 연결할 수 없습니다." },
+      { message, code: "AI_POSTURE_UNAVAILABLE" },
       { status: 502 },
     );
   }

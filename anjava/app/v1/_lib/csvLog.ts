@@ -95,6 +95,10 @@ function csvValue(value: unknown) {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+function isCsvLoggingEnabled() {
+  return process.env.AI_CSV_LOG_ENABLED === "1";
+}
+
 function pointValues(point?: Point) {
   return [point?.x, point?.y, point?.z];
 }
@@ -156,6 +160,8 @@ export async function appendDetectionResultCsv(
   status: number,
   result: unknown,
 ) {
+  if (!isCsvLoggingEnabled()) return;
+
   const logDir = path.join(process.cwd(), "logs");
   const csvPath = path.join(logDir, "detected-posture-results.csv");
   const labels = findDetectedLabels(result);
@@ -188,6 +194,8 @@ export async function appendDetectionResultCsv(
 }
 
 export async function appendSentPayloadCsv(route: string, payload: SentPayload) {
+  if (!isCsvLoggingEnabled()) return;
+
   const logDir = path.join(process.cwd(), "logs");
   const csvPath = path.join(logDir, "sent-posture-data.csv");
   const frames = payload.frames?.length ? payload.frames : payload.frame ? [payload.frame] : [];

@@ -35,14 +35,16 @@
       "tabs"
     ],
     "externally_connectable": {
-      "matches": ["http://localhost:3000/*", "https://*/*"]
+      "matches": [
+        "http://localhost:3000/*",
+        "https://anjava.vercel.app/*"
+      ]
     },
     "host_permissions": [
-      "https://*/*",
-      "http://*/*"
+      "https://*/*"
     ],
     "content_security_policy": {
-      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://storage.googleapis.com http://cs-backend.p-e.kr http://3.38.108.207 ws://localhost:* http://localhost:*"
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://storage.googleapis.com https://cs-backend.p-e.kr http://cs-backend.p-e.kr http://3.38.108.207 http://localhost:*"
     }
   }
 }
