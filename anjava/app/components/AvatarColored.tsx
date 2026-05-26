@@ -1,28 +1,22 @@
 "use client";
 
-export const HOOD_COLOR_HEX: Record<string, string> = {
-  default: "#6ee7b7",
-  sky: "#7dd3fc",
-  violet: "#c4b5fd",
-  rose: "#fda4af",
-  amber: "#fcd34d",
-  orange: "#fdba74",
-  pink: "#f9a8d4",
-  zinc: "#d4d4d8",
-  // 기존 호환 색상
-  red:    "#f87171",
-  yellow: "#fde68a",
-  green:  "#6ee7b7",
-  blue:   "#93c5fd",
-  navy:   "#1e3a8a",
-  purple: "#c4b5fd",
-  gray:   "#d4d4d8",
-};
-
 type Props = {
   hoodColorId?: string;
   className?: string;
   style?: React.CSSProperties;
+};
+
+const AVATAR_IMAGE_BY_COLOR: Record<string, string> = {
+  default: "/avatar.png",
+  gray: "/avatar.png",
+  red: "/red.png",
+  orange: "/orange.png",
+  yellow: "/yellow.png",
+  green: "/green.png",
+  blue: "/blue.png",
+  darkblue: "/darkblue.png",
+  navy: "/darkblue.png",
+  purple: "/purple.png",
 };
 
 export default function AvatarColored({
@@ -30,7 +24,7 @@ export default function AvatarColored({
   className = "",
   style,
 }: Props) {
-  const hoodHex = HOOD_COLOR_HEX[hoodColorId] ?? HOOD_COLOR_HEX.default;
+  const src = AVATAR_IMAGE_BY_COLOR[hoodColorId] ?? AVATAR_IMAGE_BY_COLOR.default;
 
   return (
     <div
@@ -38,31 +32,7 @@ export default function AvatarColored({
       style={{ aspectRatio: "1023 / 1537", ...style }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/avatar-base.png" alt="아바타" className="block h-full w-full" />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full"
-        style={{
-          backgroundColor: hoodHex,
-          maskImage: "url('/avatar-clothes-mask.png')",
-          WebkitMaskImage: "url('/avatar-clothes-mask.png')",
-          maskPosition: "0 0",
-          WebkitMaskPosition: "0 0",
-          maskRepeat: "no-repeat",
-          WebkitMaskRepeat: "no-repeat",
-          maskSize: "100% 100%",
-          WebkitMaskSize: "100% 100%",
-          transition: "background-color 0.25s ease",
-        }}
-      />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/avatar-clothes-shading.png"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        style={{ mixBlendMode: "multiply" }}
-      />
+      <img src={src} alt="아바타" className="block h-full w-full object-contain" />
     </div>
   );
 }

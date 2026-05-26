@@ -409,7 +409,7 @@ export type MasterBadge = {
   code: string;
   name: string;
   description: string;
-  category: "POSTURE_TIME" | "STREAK" | "SPECIAL";
+  category: string;
   iconUrl: string | null;
   requirementValue: number;
 };

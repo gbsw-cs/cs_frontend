@@ -84,6 +84,12 @@ export default function BadgesPage() {
     },
     {},
   );
+  const categoryKeys = [
+    ...CATEGORY_ORDER,
+    ...masterBadges
+      .map((b) => b.category)
+      .filter((cat, index, arr) => !CATEGORY_ORDER.includes(cat) && arr.indexOf(cat) === index),
+  ];
 
   return (
     <div className="min-h-screen bg-zinc-50 px-4 py-8 sm:px-8 sm:py-12">
@@ -195,8 +201,8 @@ export default function BadgesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {CATEGORY_ORDER.map((cat) => {
-              const badges = categorized[cat] ?? [];
+            {categoryKeys.map((cat) => {
+              const badges = categorized[cat] ?? masterBadges.filter((b) => b.category === cat);
               if (badges.length === 0) return null;
               const catEarned = badges.filter((b) => earnedMap.has(b.code)).length;
               return (

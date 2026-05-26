@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_API_URL || "https://cs-backend.p-e.kr/api";
+const BACKEND = (process.env.BACKEND_API_URL || "http://cs-backend.p-e.kr/api")
+  .replace(/^https:\/\/cs-backend\.p-e\.kr\/api\/?$/, "http://cs-backend.p-e.kr/api");
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "authorization",

@@ -29,17 +29,17 @@ import {
   THEME_CHANGE_EVENT,
 } from "../components/ThemeBootstrap";
 
-type AvatarColor = { id: string; bg: string; hex: string; vivid: string };
+type AvatarColor = { id: string; label: string; hex: string };
 
 const AVATAR_COLORS: AvatarColor[] = [
-  { id: "red",    bg: "bg-red-100",    hex: "#ef4444", vivid: "#ef4444" },
-  { id: "orange", bg: "bg-orange-100", hex: "#f97316", vivid: "#f97316" },
-  { id: "yellow", bg: "bg-yellow-100", hex: "#eab308", vivid: "#eab308" },
-  { id: "green",  bg: "bg-green-100",  hex: "#22c55e", vivid: "#22c55e" },
-  { id: "blue",   bg: "bg-blue-100",   hex: "#3b82f6", vivid: "#3b82f6" },
-  { id: "navy",   bg: "bg-blue-900",   hex: "#1e3a8a", vivid: "#1e40af" },
-  { id: "purple", bg: "bg-purple-100", hex: "#a855f7", vivid: "#a855f7" },
-  { id: "gray",   bg: "bg-zinc-100",   hex: "#9ca3af", vivid: "#9ca3af" },
+  { id: "red", label: "빨강", hex: "#EF4444" },
+  { id: "orange", label: "주황", hex: "#F97316" },
+  { id: "yellow", label: "노랑", hex: "#FACC15" },
+  { id: "green", label: "초록", hex: "#22C55E" },
+  { id: "blue", label: "파랑", hex: "#60A5FA" },
+  { id: "darkblue", label: "남색", hex: "#1D4ED8" },
+  { id: "purple", label: "보라", hex: "#7C3AED" },
+  { id: "gray", label: "회색", hex: "#D9DCE5" },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -49,12 +49,13 @@ const DEFAULT_SETTINGS: UserSettings = {
   reportPushWay: "EMAIL",
   pushEnabled: true,
   soundEnabled: true,
-  avatarHoodColor: "green",
+  avatarHoodColor: "gray",
 };
 
 function getColorIdx(id: string) {
-  const idx = AVATAR_COLORS.findIndex((c) => c.id === id);
-  return idx < 0 ? 0 : idx;
+  const normalizedId = id === "navy" ? "darkblue" : id === "default" ? "gray" : id;
+  const idx = AVATAR_COLORS.findIndex((c) => c.id === normalizedId);
+  return idx < 0 ? AVATAR_COLORS.findIndex((c) => c.id === "gray") : idx;
 }
 
 export default function SettingsPage() {
@@ -326,7 +327,7 @@ export default function SettingsPage() {
                           ? "ring-2 ring-[#2563EB] ring-offset-2"
                           : ""
                       }`}
-                      aria-label={`색상 ${color.id}`}
+                      aria-label={`아바타 ${color.label}`}
                     />
                   ))}
                 </div>

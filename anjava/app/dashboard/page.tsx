@@ -236,12 +236,12 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[148px_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[176px_minmax(0,0.9fr)_minmax(0,0.78fr)]">
 
           {/* ── Row 1 ── */}
 
           {/* 프로필 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[148px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[176px]">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
@@ -277,7 +277,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[148px]">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[176px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             </div>
 
             {recentActivity.length > 0 ? (
-              <ul className="mt-2 max-h-24 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
+              <ul className="mt-2 max-h-32 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
                 {recentActivity.map((b, i) => {
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
                   const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
@@ -331,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[148px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[176px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[92px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[120px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -389,9 +389,9 @@ export default function DashboardPage() {
           {/* ── Row 2 ── */}
 
           {/* 3D 아바타 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4">
             <div className="flex flex-col items-center">
-              <div className="flex h-52 w-full justify-center overflow-hidden">
+              <div className="flex h-44 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
@@ -432,7 +432,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 일간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col lg:col-span-5">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden lg:col-span-5">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="text-xs font-bold text-zinc-900">일간 스크린타임</div>
               <div className="flex items-center gap-3 text-[10px]">
@@ -461,7 +461,7 @@ export default function DashboardPage() {
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex h-20 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
+                <div className="flex h-16 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
                     const total = slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount;
                     const goodH = total > 0 ? (slot.goodPostureCount / total) * 100 : 0;
@@ -490,7 +490,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-3">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
@@ -499,8 +499,8 @@ export default function DashboardPage() {
               {/* 도넛 차트 (단색) */}
               <div className="relative shrink-0">
                 {(() => {
-                  const size = 112;
-                  const r = 42;
+                  const size = 104;
+                  const r = 38;
                   const circ = 2 * Math.PI * r;
                   const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
@@ -629,7 +629,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 주간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-9">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-9">
             <div className="flex shrink-0 items-center justify-between">
               <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
               <button className="text-zinc-400 transition hover:text-[#2563EB]" aria-label="주간 상세">
@@ -667,14 +667,14 @@ export default function DashboardPage() {
               {(() => {
                 const values = weeklyValues;
                 const W = 700;
-                const H = 92;
+                const H = 76;
                 const step = values.length > 1 ? W / (values.length - 1) : 0;
                 const coords = values.map((v, i) => [i * step, H - (v / 100) * H] as [number, number]);
                 const line = coords.map(([x, y], i) => (i === 0 ? `M${x},${y}` : `L${x},${y}`)).join(" ");
                 const dayLabels = weekly?.days.map((d) => DAY_KR[new Date(d.date).getDay()]) ?? ["월", "화", "수", "목", "금", "토", "일"];
                 return (
                   <>
-                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-20 w-full">
+                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-16 w-full">
                       <line x1="0" y1={H} x2={W} y2={H} stroke="#e4e4e7" strokeWidth="1" />
                       <path d={line} fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       {coords.map(([x, y], i) => (
