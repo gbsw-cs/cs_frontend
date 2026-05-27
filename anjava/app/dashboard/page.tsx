@@ -495,9 +495,9 @@ export default function DashboardPage() {
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-1.5 flex items-center justify-between gap-2">
+            <div className="mt-0.5 flex items-start justify-between gap-2">
               {/* 좌측 리스트 */}
-              <div className="w-[152px] shrink-0 space-y-1 text-[10px]">
+              <div className="w-[152px] shrink-0 space-y-0.5 pt-0.5 text-[10px]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
                   <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
@@ -550,12 +550,12 @@ export default function DashboardPage() {
               const color = (n: number | null) =>
                 n === null ? "text-zinc-300" : n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
               return (
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div className="border-t border-zinc-200 pt-1.5 text-center">
+                <div className="mt-0 grid grid-cols-2 gap-2">
+                  <div className="border-t border-zinc-200 pt-1 text-center">
                     <div className="text-[10px] text-zinc-400">어제 대비</div>
                     <div className={`mt-0.5 text-xs font-bold ${color(yDiff)}`}>{fmt(yDiff)}</div>
                   </div>
-                  <div className="border-t border-zinc-200 pt-1.5 text-center">
+                  <div className="border-t border-zinc-200 pt-1 text-center">
                     <div className="text-[10px] text-zinc-400">지난주 대비</div>
                     <div className={`mt-0.5 text-xs font-bold ${color(wDiff)}`}>{fmt(wDiff)}</div>
                   </div>
