@@ -26,6 +26,7 @@ const EVENT_FLUSH_INTERVAL_MS = 30_000;
 
 type WebcamViewProps = {
   darkDetectionEnabled?: boolean;
+  pushEnabled?: boolean;
   soundEnabled?: boolean;
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
   onDashboardDataChanged?: () => void;
@@ -258,6 +259,7 @@ function showPostureToast(message: string, soundEnabled: boolean) {
 
 export default function WebcamView({
   darkDetectionEnabled = false,
+  pushEnabled = true,
   soundEnabled = true,
   onDetectionStateChange,
   onDashboardDataChanged,
@@ -509,7 +511,7 @@ export default function WebcamView({
           console.log("자세 감지됨", detectedLabels);
         }
         // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
-        if (msg && finalStatus !== lastStatusRef.current) {
+        if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
           showPostureToast(msg, soundEnabled);
           window.postMessage({ type: "ANJAVA_POSTURE_RELAY", state: finalStatus, message: msg }, "*");
         }
@@ -526,7 +528,7 @@ export default function WebcamView({
     analyzeFrame();
     const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [ready, darkDetectionEnabled, soundEnabled, flushQueuedEvents]);
+  }, [ready, darkDetectionEnabled, pushEnabled, soundEnabled, flushQueuedEvents]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">

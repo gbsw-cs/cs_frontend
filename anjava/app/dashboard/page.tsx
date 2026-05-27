@@ -424,6 +424,7 @@ export default function DashboardPage() {
             <div className="relative mt-1.5 h-[216px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
+                pushEnabled={me?.settings?.pushEnabled ?? true}
                 soundEnabled={me?.settings?.soundEnabled ?? true}
                 onDetectionStateChange={(state, message) => {
                   setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
