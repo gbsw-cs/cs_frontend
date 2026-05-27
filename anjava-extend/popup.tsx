@@ -47,7 +47,7 @@ function fmtDuration(ms: number) {
 function WebcamCircle() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [active, setActive] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState("")
   const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
@@ -60,9 +60,21 @@ function WebcamCircle() {
           v.onloadedmetadata = () => { v.play().catch(() => {}); setActive(true) }
         }
       })
-      .catch(() => setError(true))
+      .catch((e: DOMException) => {
+        console.error("[popup] 카메라 권한 확인 실패:", e.name, e.message, e)
+        setError(e.name || "CameraError")
+      })
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [])
+
+  const errorLabel =
+    error === "NotAllowedError"
+      ? "카메라 권한 필요"
+      : error === "NotFoundError" || error === "DevicesNotFoundError"
+      ? "카메라 없음"
+      : error === "NotReadableError" || error === "TrackStartError"
+      ? "카메라 사용 중"
+      : "카메라 오류"
 
   return (
     <div className="webcam-circle-wrap">
@@ -78,7 +90,7 @@ function WebcamCircle() {
         {!active && !error && <span className="webcam-circle-icon" style={{ fontSize: 24 }}>⏳</span>}
         {error && <span className="webcam-circle-icon">🚫</span>}
       </div>
-      <span className="webcam-circle-label">{active ? "● 라이브" : error ? "카메라 오류" : "연결 중..."}</span>
+      <span className="webcam-circle-label">{active ? "● 라이브" : error ? errorLabel : "연결 중..."}</span>
     </div>
   )
 }
@@ -112,6 +124,7 @@ export default function IndexPopup() {
   const [loginLoading, setLLoading]       = useState(false)
   const [loginError, setLError]           = useState("")
   const [offscreenActive, setOffscreenActive] = useState(false)
+  const [offscreenError, setOffscreenError] = useState("")
   const emailRef = useRef<HTMLInputElement>(null)
 
   // ── Init ─────────────────────────────────────────────────
@@ -132,6 +145,7 @@ export default function IndexPopup() {
       setIsPaused(res.isPaused === true)
       setPausedTotalMs(res.pausedTotalMs ?? 0)
       setOffscreenActive(res.offscreenActive === true)
+      setOffscreenError(res.offscreenError ?? "")
       setPhase("main")
 
       chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: any) => {
@@ -140,6 +154,28 @@ export default function IndexPopup() {
         if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
       })
     })
+  }, [])
+
+  useEffect(() => {
+    const listener = (msg: any) => {
+      if (msg?.type === "DETECTION_ACTIVE") {
+        setOffscreenActive(true)
+        setOffscreenError("")
+      }
+      if (msg?.type === "OFFSCREEN_CAMERA_ERROR") {
+        setOffscreenActive(false)
+        const name = msg.name ?? "UnknownError"
+        const detail =
+          name === "NotAllowedError"
+            ? "카메라 권한을 허용한 뒤 세션을 다시 시작해주세요."
+            : name === "NotReadableError" || name === "TrackStartError"
+            ? "카메라가 다른 앱에서 사용 중인지 확인해주세요."
+            : msg.message || "카메라를 시작하지 못했습니다."
+        setOffscreenError(`${name}: ${detail}`)
+      }
+    }
+    chrome.runtime.onMessage.addListener(listener)
+    return () => chrome.runtime.onMessage.removeListener(listener)
   }, [])
 
   useEffect(() => {
@@ -388,6 +424,9 @@ export default function IndexPopup() {
             </div>
             {sessionId && elapsed > 0 && (
               <p className="session-time">{fmtDuration(elapsed)}</p>
+            )}
+            {sessionId && !isPaused && offscreenError && (
+              <p className="error-text" style={{ marginTop: 8 }}>{offscreenError}</p>
             )}
             {sessionId ? (
               <div className="session-btns">

@@ -160,6 +160,7 @@ if (!(window as any)[WEB_RELAY_KEY]) {
       type: "POSTURE_ALERT_FROM_WEB",
       state: event.data.state,
       message: event.data.message,
+      soundEnabled: event.data.soundEnabled,
     }).catch(() => {})
   })
 }

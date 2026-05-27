@@ -231,7 +231,13 @@ export default function OffscreenPage() {
         video: { width: 640, height: 480, facingMode: "user" }
       })
     } catch (e) {
-      console.error("[offscreen] 웹캠 획득 실패:", e)
+      const err = e as DOMException
+      console.error("[offscreen] 웹캠 획득 실패:", err.name, err.message, err)
+      chrome.runtime.sendMessage({
+        type: "OFFSCREEN_CAMERA_ERROR",
+        name: err.name || "UnknownError",
+        message: err.message || String(err),
+      }).catch(() => {})
       return
     }
     if (cancelledRef.current) { stream.getTracks().forEach(t => t.stop()); return }

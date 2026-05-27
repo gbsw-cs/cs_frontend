@@ -137,6 +137,7 @@ const POSTURE_MESSAGES: Record<string, string> = {
   dark_env:           "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
+/*
 const TOAST_STYLE = `
   #anjava-web-toast {
     position: fixed; top: 20px; right: 20px;
@@ -181,81 +182,7 @@ const TOAST_STYLE = `
     to   { transform: scaleX(0); }
   }
 `;
-
-let webToastTimer: ReturnType<typeof setTimeout> | null = null;
-let audioContext: AudioContext | null = null;
-
-function closePostureToast(el: HTMLElement) {
-  el.classList.add("out");
-  setTimeout(() => el.remove(), 240);
-}
-
-function playNotificationSound() {
-  if (typeof window === "undefined" || !window.AudioContext) return;
-  try {
-    audioContext = audioContext ?? new window.AudioContext();
-    const ctx = audioContext;
-    const now = ctx.currentTime;
-    const gain = ctx.createGain();
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.18);
-  } catch {
-    // Browser autoplay policies can reject audio before user activation.
-  }
-}
-
-function showPostureToast(message: string, soundEnabled: boolean) {
-  if (typeof document === "undefined") return;
-  if (!document.getElementById("anjava-web-style")) {
-    const s = document.createElement("style");
-    s.id = "anjava-web-style";
-    s.textContent = TOAST_STYLE;
-    document.head.appendChild(s);
-  }
-  if (webToastTimer) { clearTimeout(webToastTimer); webToastTimer = null; }
-  const old = document.getElementById("anjava-web-toast");
-  if (old) old.remove();
-
-  const el = document.createElement("div");
-  el.id = "anjava-web-toast";
-  const header = document.createElement("div");
-  header.className = "anjava-web-header";
-  const icon = document.createElement("span");
-  icon.className = "anjava-web-icon";
-  icon.textContent = "!";
-  const title = document.createElement("span");
-  title.className = "anjava-web-title";
-  title.textContent = "자세 교정 알림";
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "anjava-web-close";
-  close.textContent = "x";
-  close.addEventListener("click", () => closePostureToast(el));
-  header.append(icon, title, close);
-
-  const body = document.createElement("div");
-  body.className = "anjava-web-body";
-  body.textContent = message;
-  const progress = document.createElement("div");
-  progress.className = "anjava-web-progress";
-  el.append(header, body, progress);
-  document.body.appendChild(el);
-  if (soundEnabled) {
-    playNotificationSound();
-  }
-  webToastTimer = setTimeout(() => {
-    closePostureToast(el);
-  }, 6000);
-}
+*/
 
 export default function WebcamView({
   darkDetectionEnabled = false,
@@ -510,10 +437,14 @@ export default function WebcamView({
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
         }
-        // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
+        // 상태가 바뀔 때마다 extension background toast 하나만 표시
         if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
-          showPostureToast(msg, soundEnabled);
-          window.postMessage({ type: "ANJAVA_POSTURE_RELAY", state: finalStatus, message: msg }, "*");
+          window.postMessage({
+            type: "ANJAVA_POSTURE_RELAY",
+            state: finalStatus,
+            message: msg,
+            soundEnabled,
+          }, "*");
         }
         recordStateChange(backendState, msg);
         lastStatusRef.current = finalStatus;

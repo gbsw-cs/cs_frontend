@@ -189,6 +189,7 @@ async function startOffscreenDetection(): Promise<void> {
     console.warn("[offscreen] 시작 불가 - userId 없음")
     return
   }
+  await chrome.storage.local.remove("offscreenError")
   pendingOffscreenData = {
     accessToken, userId: resolvedUserId, baselineData,
     sessionId: currentSessionId ?? "",
@@ -292,7 +293,7 @@ async function sendToActiveTab(msg: any): Promise<void> {
         const TID = "anjava-posture-toast", SID = "anjava-posture-style"
         if (!document.getElementById(SID)) {
           const s = document.createElement("style"); s.id = SID
-          s.textContent = `#${TID}{position:fixed;top:24px;right:24px;background:#fff;color:#18181b;padding:0;border-radius:18px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.5;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,.14),0 2px 8px rgba(0,0,0,.08);width:420px;overflow:hidden;border:1px solid rgba(0,0,0,.07);animation:anjava-in .32s cubic-bezier(.16,1,.3,1);pointer-events:auto}#${TID} .ah{display:flex;align-items:center;gap:10px;padding:16px 18px 13px;border-bottom:1px solid #f4f4f5}#${TID} .ai{font-size:22px;flex-shrink:0}#${TID} .at{font-weight:700;font-size:15px;color:#2563eb;flex:1}#${TID}.suc .at{color:#16a34a}#${TID} .ac{background:none;border:none;color:#a1a1aa;cursor:pointer;font-size:18px;padding:0;line-height:1}#${TID} .ac:hover{color:#52525b}#${TID} .ab{padding:13px 18px 15px;font-size:14px;color:#3f3f46;line-height:1.6}#${TID} .ap{height:4px;background:#2563eb;animation:anjava-progress 6s linear forwards;transform-origin:left}#${TID}.suc .ap{background:#16a34a}#${TID}.out{animation:anjava-out .24s ease forwards}@keyframes anjava-in{from{opacity:0;transform:translateX(60px) scale(.95)}to{opacity:1;transform:translateX(0) scale(1)}}@keyframes anjava-out{to{opacity:0;transform:translateX(60px) scale(.95)}}@keyframes anjava-progress{from{transform:scaleX(1)}to{transform:scaleX(0)}}`
+          s.textContent = `#${TID}{position:fixed;top:24px;right:24px;background:#fff;color:#18181b;padding:0;border-radius:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,sans-serif;font-size:14px;line-height:1.5;z-index:2147483647;box-shadow:0 18px 50px rgba(15,23,42,.18),0 4px 14px rgba(15,23,42,.08);width:min(400px,calc(100vw - 32px));overflow:hidden;border:1px solid rgba(228,228,231,.95);animation:anjava-in .28s cubic-bezier(.16,1,.3,1);pointer-events:auto}#${TID}:before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:#ef4444}#${TID}.suc:before{background:#22c55e}#${TID} .ah{display:flex;align-items:center;gap:12px;padding:16px 18px 10px}#${TID} .ai{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#fef2f2;color:#dc2626;font-size:18px;flex-shrink:0}#${TID}.suc .ai{background:#ecfdf5;color:#16a34a}#${TID} .at{font-weight:800;font-size:14px;color:#111827;flex:1;letter-spacing:0}#${TID} .ac{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;border-radius:999px;background:#f4f4f5;color:#71717a;cursor:pointer;font-size:15px;padding:0;line-height:1}#${TID} .ac:hover{background:#e4e4e7;color:#27272a}#${TID} .ab{padding:0 18px 16px 62px;font-size:13px;color:#52525b;line-height:1.55;word-break:keep-all}#${TID} .ap{height:3px;background:#ef4444;animation:anjava-progress 6s linear forwards;transform-origin:left}#${TID}.suc .ap{background:#22c55e}#${TID}.out{animation:anjava-out .22s ease forwards}@keyframes anjava-in{from{opacity:0;transform:translateX(28px) scale(.98)}to{opacity:1;transform:translateX(0) scale(1)}}@keyframes anjava-out{to{opacity:0;transform:translateX(28px) scale(.98)}}@keyframes anjava-progress{from{transform:scaleX(1)}to{transform:scaleX(0)}}`
           document.head.appendChild(s)
         }
         const old = document.getElementById(TID); if (old) old.remove()
@@ -436,15 +437,29 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local
       .get(["accessToken", "currentSessionId", "sessionStartedAt", "settings",
             "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
-            "profileImg", "userName", "offscreenActive"])
+            "profileImg", "userName", "offscreenActive", "offscreenError"])
       .then(sendResponse)
     return true
   }
 
   if (msg.type === "POSTURE_ALERT_FROM_WEB") {
-    // The web app already shows its own toast before relaying this message.
-    // Avoid creating a second extension toast for the same foreground event.
-    sendResponse({ ok: true, skipped: "foreground-web-toast" })
+    chrome.storage.local.get("settings").then(({ settings: s }) => {
+      if (s?.pushEnabled === false) {
+        sendResponse({ ok: true, skipped: "push-disabled" })
+        return
+      }
+      sendToActiveTab({
+        type: "POSTURE_ALERT",
+        state: msg.state,
+        message: msg.message,
+        soundEnabled: msg.soundEnabled ?? (s?.soundEnabled !== false),
+      })
+        .then(() => sendResponse({ ok: true }))
+        .catch((e) => {
+          console.error("[toast] web relay 처리 실패:", e)
+          sendResponse({ ok: false, error: String(e?.message ?? e) })
+        })
+    })
     return true
   }
 
@@ -467,7 +482,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "DETECTION_ACTIVE") {
-    chrome.storage.local.set({ offscreenActive: true })
+    chrome.storage.local.set({ offscreenActive: true, offscreenError: null })
+    sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "OFFSCREEN_CAMERA_ERROR") {
+    const name = msg.name ?? "UnknownError"
+    const detail =
+      name === "NotAllowedError"
+        ? "카메라 권한이 거부되었습니다. 확장 프로그램 팝업에서 카메라 권한을 허용한 뒤 세션을 다시 시작해주세요."
+        : name === "NotFoundError" || name === "DevicesNotFoundError"
+        ? "사용 가능한 카메라를 찾지 못했습니다."
+        : name === "NotReadableError" || name === "TrackStartError"
+        ? "카메라가 다른 앱에서 사용 중이거나 OS 권한이 차단되어 있습니다."
+        : msg.message || "카메라를 시작하지 못했습니다."
+    chrome.storage.local.set({
+      offscreenActive: false,
+      offscreenError: `${name}: ${detail}`,
+    })
     sendResponse({ ok: true })
     return true
   }
