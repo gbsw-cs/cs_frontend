@@ -15,7 +15,9 @@ const WebcamView = dynamic(() => import("../components/WebcamView"), {
 });
 
 import {
+  clearTokens,
   getBadges,
+  getAccessToken,
   getMe,
   setDarkDetection,
   type ApiBadge,
@@ -62,6 +64,7 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 type DailySlot = DailyDashboard["slots"][number];
+const REALTIME_DAILY_PREFIX = "dashboardRealtimeDaily:";
 
 function createEmptyDailySlots(): DailySlot[] {
   return Array.from({ length: 8 }, (_, i) => ({
@@ -71,6 +74,42 @@ function createEmptyDailySlots(): DailySlot[] {
     singleBadCount: 0,
     overlappingCount: 0,
   }));
+}
+
+function getRealtimeDailyKey(date = getKSTDate()) {
+  return `${REALTIME_DAILY_PREFIX}${date}`;
+}
+
+function normalizeDailySlots(value: unknown): DailySlot[] | null {
+  if (!Array.isArray(value) || value.length !== 8) return null;
+  const slots = value.map((slot, i) => {
+    if (!slot || typeof slot !== "object") return null;
+    const item = slot as Partial<DailySlot>;
+    return {
+      slotIndex: typeof item.slotIndex === "number" ? item.slotIndex : i,
+      startHour: typeof item.startHour === "number" ? item.startHour : i * 3,
+      goodPostureCount: typeof item.goodPostureCount === "number" ? item.goodPostureCount : 0,
+      singleBadCount: typeof item.singleBadCount === "number" ? item.singleBadCount : 0,
+      overlappingCount: typeof item.overlappingCount === "number" ? item.overlappingCount : 0,
+    };
+  });
+  return slots.every(Boolean) ? (slots as DailySlot[]) : null;
+}
+
+function loadStoredRealtimeSlots(date = getKSTDate()) {
+  if (typeof window === "undefined") return createEmptyDailySlots();
+  const raw = localStorage.getItem(getRealtimeDailyKey(date));
+  if (!raw) return createEmptyDailySlots();
+  try {
+    return normalizeDailySlots(JSON.parse(raw)) ?? createEmptyDailySlots();
+  } catch {
+    return createEmptyDailySlots();
+  }
+}
+
+function saveStoredRealtimeSlots(slots: DailySlot[], date = getKSTDate()) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(getRealtimeDailyKey(date), JSON.stringify(slots));
 }
 
 function getSlotTotal(slots: DailySlot[]) {
@@ -123,11 +162,17 @@ export default function DashboardPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
   const lastServerDailyTotalRef = useRef(0);
-  const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
+  const realtimeDateRef = useRef(getKSTDate());
+  const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => loadStoredRealtimeSlots());
 
   const loadDashboardData = useCallback(() => {
     const date = getKSTDate();
     const monday = getMondayKST();
+    if (realtimeDateRef.current !== date) {
+      realtimeDateRef.current = date;
+      lastServerDailyTotalRef.current = 0;
+      setRealtimeSlots(loadStoredRealtimeSlots(date));
+    }
     return Promise.allSettled([
       getDashboardToday(),
       getDashboardWeekly(monday),
@@ -141,7 +186,9 @@ export default function DashboardPage() {
       if (d.status === "fulfilled") {
         const nextServerTotal = getSlotTotal(d.value.slots);
         if (nextServerTotal > lastServerDailyTotalRef.current) {
-          setRealtimeSlots(createEmptyDailySlots());
+          const emptySlots = createEmptyDailySlots();
+          setRealtimeSlots(emptySlots);
+          saveStoredRealtimeSlots(emptySlots, date);
         }
         lastServerDailyTotalRef.current = nextServerTotal;
         setDaily(d.value);
@@ -176,6 +223,12 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    if (!getAccessToken()) {
+      clearTokens();
+      router.replace("/login");
+      return;
+    }
+
     getMe().then((m) => {
       setMe(m);
       setDarkMode(m.settings.darkDetectionEnabled);
@@ -408,7 +461,11 @@ export default function DashboardPage() {
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
-                  setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
+                  setRealtimeSlots((prev) => {
+                    const next = applyRealtimeDetection(prev, state);
+                    saveStoredRealtimeSlots(next);
+                    return next;
+                  });
                   setLiveDetection({
                     state,
                     message,

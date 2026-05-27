@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPostureFrame, type PostureFrame } from "../lib/poseFrame";
 import {
   endDetectionSession,
+  getCurrentDetectionSession,
   postDashboardTimeline,
   postSessionEvents,
   startDetectionSession,
@@ -53,6 +54,13 @@ const STATE_SEVERITY: Record<DetectionState, number> = {
 
 function toBackendState(finalStatus: string): DetectionState {
   return AI_STATUS_TO_BACKEND_STATE[finalStatus.toLowerCase()] ?? "GOOD_POSTURE";
+}
+
+function shouldPostTimeline(previous: DetectionState | null, next: DetectionState) {
+  if (previous === next) return false;
+  const wasWarning = previous !== null && previous !== "GOOD_POSTURE";
+  const isWarning = next !== "GOOD_POSTURE";
+  return isWarning || wasWarning;
 }
 
 function getKSTDateTime() {
@@ -270,7 +278,18 @@ export default function WebcamView({
         stateStartRef.current = Date.now();
       })
       .catch((e) => {
-        if (!isDuplicateSessionError(e)) {
+        if (cancelled) return;
+        if (isDuplicateSessionError(e)) {
+          getCurrentDetectionSession()
+            .then((session) => {
+              if (cancelled || !session?.sessionId) return;
+              sessionIdRef.current = session.sessionId;
+              stateStartRef.current = Date.now();
+            })
+            .catch((currentError) => {
+              console.error("Detection current session lookup failed", currentError);
+            });
+        } else {
           console.error("Detection session start failed", e);
         }
       });
@@ -360,17 +379,19 @@ export default function WebcamView({
       if (previous !== nextState) {
         stateStartRef.current = now;
         lastBackendStateRef.current = nextState;
-        const { date, time } = getKSTDateTime();
-        void postDashboardTimeline({
-          date,
-          time,
-          dominantState: nextState,
-          message,
-        }).then(() => {
-          onDashboardDataChangedRef.current?.();
-        }).catch((e) => {
-          console.error("Dashboard timeline upload failed", e);
-        });
+        if (shouldPostTimeline(previous, nextState)) {
+          const { date, time } = getKSTDateTime();
+          void postDashboardTimeline({
+            date,
+            time,
+            dominantState: nextState,
+            message,
+          }).then(() => {
+            onDashboardDataChangedRef.current?.();
+          }).catch((e) => {
+            console.error("Dashboard timeline upload failed", e);
+          });
+        }
       }
       onDetectionStateChangeRef.current?.(nextState, message);
     }

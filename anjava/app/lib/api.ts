@@ -617,6 +617,14 @@ export function startDetectionSession(startedAt = new Date().toISOString()) {
   );
 }
 
+export function getCurrentDetectionSession() {
+  return request<DetectionSession | null>(
+    "/sessions/current",
+    { method: "GET" },
+    true,
+  );
+}
+
 export function endDetectionSession(sessionId: string, endedAt = new Date().toISOString()) {
   return request<{
     sessionId: string;
