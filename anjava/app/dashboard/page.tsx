@@ -61,6 +61,47 @@ const STATE_LABEL: Record<string, string> = {
   DARK_ENV:           "어두운 환경 감지",
 };
 
+type DailySlot = DailyDashboard["slots"][number];
+
+function createEmptyDailySlots(): DailySlot[] {
+  return Array.from({ length: 8 }, (_, i) => ({
+    slotIndex: i,
+    startHour: i * 3,
+    goodPostureCount: 0,
+    singleBadCount: 0,
+    overlappingCount: 0,
+  }));
+}
+
+function getSlotTotal(slots: DailySlot[]) {
+  return slots.reduce(
+    (sum, slot) => sum + slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount,
+    0,
+  );
+}
+
+function getCurrentKSTSlotIndex() {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Seoul",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date()),
+  );
+  return Math.max(0, Math.min(7, Math.floor(hour / 3)));
+}
+
+function applyRealtimeDetection(slots: DailySlot[], state: DetectionState): DailySlot[] {
+  const slotIndex = getCurrentKSTSlotIndex();
+  return slots.map((slot, i) => {
+    if (i !== slotIndex) return slot;
+    if (state === "GOOD_POSTURE") {
+      return { ...slot, goodPostureCount: slot.goodPostureCount + 1 };
+    }
+    return { ...slot, singleBadCount: slot.singleBadCount + 1 };
+  });
+}
+
 // ── 컴포넌트 ──────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -81,6 +122,8 @@ export default function DashboardPage() {
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
+  const lastServerDailyTotalRef = useRef(0);
+  const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
 
   const loadDashboardData = useCallback(() => {
     const date = getKSTDate();
@@ -95,8 +138,14 @@ export default function DashboardPage() {
       else console.error("[dashboard] today 실패:", t.reason);
       if (w.status === "fulfilled") setWeekly(w.value);
       else console.error("[dashboard] weekly 실패:", w.reason);
-      if (d.status === "fulfilled") setDaily(d.value);
-      else console.error("[dashboard] daily 실패:", d.reason);
+      if (d.status === "fulfilled") {
+        const nextServerTotal = getSlotTotal(d.value.slots);
+        if (nextServerTotal > lastServerDailyTotalRef.current) {
+          setRealtimeSlots(createEmptyDailySlots());
+        }
+        lastServerDailyTotalRef.current = nextServerTotal;
+        setDaily(d.value);
+      } else console.error("[dashboard] daily 실패:", d.reason);
       if (tl.status === "fulfilled") {
         console.log("[dashboard] timeline 응답:", tl.value);
         setTimeline(tl.value);
@@ -142,12 +191,12 @@ export default function DashboardPage() {
   // ── 파생 데이터 ────────────────────────────────────────
 
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
-  const slots = daily?.slots ?? Array.from({ length: 8 }, (_, i) => ({
-    slotIndex: i,
-    startHour: i * 3,
-    goodPostureCount: 0,
-    singleBadCount: 0,
-    overlappingCount: 0,
+  const serverSlots = daily?.slots ?? createEmptyDailySlots();
+  const slots = serverSlots.map((slot, i) => ({
+    ...slot,
+    goodPostureCount: slot.goodPostureCount + (realtimeSlots[i]?.goodPostureCount ?? 0),
+    singleBadCount: slot.singleBadCount + (realtimeSlots[i]?.singleBadCount ?? 0),
+    overlappingCount: slot.overlappingCount + (realtimeSlots[i]?.overlappingCount ?? 0),
   }));
 
   // 슬롯 집계 (실시간 반영용)
@@ -165,7 +214,7 @@ export default function DashboardPage() {
   // 경고 횟수 - API 값 우선, 없으면 슬롯 기반 실시간 계산값 사용
   const apiWarnings = today?.warningCount
     ?? ((today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0));
-  const warningCount = apiWarnings > 0 ? apiWarnings : derivedWarnings;
+  const warningCount = Math.max(apiWarnings, derivedWarnings);
 
   // 총 이벤트 수
   const totalEventCount = slots.reduce(
@@ -359,6 +408,7 @@ export default function DashboardPage() {
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
+                  setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
                   setLiveDetection({
                     state,
                     message,
