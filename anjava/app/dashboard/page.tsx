@@ -658,28 +658,32 @@ export default function DashboardPage() {
 
               {/* 감지 항목 리스트 */}
               <ul className="mt-2 space-y-1.5">
-                {[
-                  { label: "자세 경고 총 횟수", count: warningCount },
-                  { label: "상태 판정", count: today ? (healthScore >= 40 ? 0 : 10) : undefined },
-                ].map(({ label, count }) => {
+                {(() => {
                   const status =
-                    count === undefined
-                      ? { text: "분석 중", dot: "bg-zinc-300", color: "text-zinc-400" }
-                      : count === 0
+                    warningCount === 0
                       ? { text: "상태 좋음", dot: "bg-emerald-400", color: "text-emerald-500" }
-                      : count < 5
+                      : warningCount < 5
                       ? { text: "주의", dot: "bg-amber-400", color: "text-amber-500" }
                       : { text: "경고", dot: "bg-rose-400", color: "text-rose-500" };
                   return (
-                    <li key={label} className="flex items-center justify-between text-[11px]">
-                      <span className="flex items-center gap-1.5 text-zinc-700">
-                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                        {label}
-                      </span>
-                      <span className={`text-[10px] font-medium ${status.color}`}>{status.text}</span>
-                    </li>
+                    <>
+                      <li className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5 text-zinc-700">
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                          자세 경고 총 횟수
+                        </span>
+                        <span className="text-[10px] font-semibold text-rose-500">{warningCount}</span>
+                      </li>
+                      <li className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5 text-zinc-700">
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                          상태 판정
+                        </span>
+                        <span className={`text-[10px] font-medium ${status.color}`}>{status.text}</span>
+                      </li>
+                    </>
                   );
-                })}
+                })()}
               </ul>
             </Card>
 
