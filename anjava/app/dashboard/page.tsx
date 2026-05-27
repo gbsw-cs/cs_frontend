@@ -68,6 +68,24 @@ type DailySlot = Pick<
   "slotIndex" | "startHour" | "goodPostureCount" | "singleBadCount" | "overlappingCount"
 >;
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function firstFiniteNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    const n = toFiniteNumber(value, NaN);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
 function createEmptyDailySlots(): DailySlot[] {
   return Array.from({ length: 8 }, (_, i) => ({
     slotIndex: i,
@@ -81,13 +99,13 @@ function createEmptyDailySlots(): DailySlot[] {
 function toDailySlots(daily: DailyDashboard | null): DailySlot[] {
   const slots = createEmptyDailySlots();
   if (!daily) return slots;
-  const slotIndex = Math.max(0, Math.min(7, daily.slotIndex));
+  const slotIndex = Math.max(0, Math.min(7, Math.trunc(toFiniteNumber(daily.slotIndex))));
   slots[slotIndex] = {
     slotIndex,
-    startHour: daily.startHour,
-    goodPostureCount: daily.goodPostureCount,
-    singleBadCount: daily.singleBadCount,
-    overlappingCount: daily.overlappingCount,
+    startHour: toFiniteNumber(daily.startHour, slotIndex * 3),
+    goodPostureCount: toFiniteNumber(daily.goodPostureCount),
+    singleBadCount: toFiniteNumber(daily.singleBadCount),
+    overlappingCount: toFiniteNumber(daily.overlappingCount),
   };
   return slots;
 }
@@ -228,9 +246,12 @@ export default function DashboardPage() {
   const serverSlots = toDailySlots(daily);
   const slots = serverSlots.map((slot, i) => ({
     ...slot,
-    goodPostureCount: slot.goodPostureCount + (realtimeSlots[i]?.goodPostureCount ?? 0),
-    singleBadCount: slot.singleBadCount + (realtimeSlots[i]?.singleBadCount ?? 0),
-    overlappingCount: slot.overlappingCount + (realtimeSlots[i]?.overlappingCount ?? 0),
+    goodPostureCount:
+      toFiniteNumber(slot.goodPostureCount) + toFiniteNumber(realtimeSlots[i]?.goodPostureCount),
+    singleBadCount:
+      toFiniteNumber(slot.singleBadCount) + toFiniteNumber(realtimeSlots[i]?.singleBadCount),
+    overlappingCount:
+      toFiniteNumber(slot.overlappingCount) + toFiniteNumber(realtimeSlots[i]?.overlappingCount),
   }));
 
   // 슬롯 집계 (실시간 반영용)
@@ -241,13 +262,16 @@ export default function DashboardPage() {
   const derivedWarnings = slotBad;
 
   // 건강 점수 - 슬롯 데이터 있으면 실시간 계산값 우선 (API는 세션 종료 후에만 갱신)
-  const apiScore: number | null = today?.postureScore ?? today?.healthScore ?? null;
+  const apiScore = firstFiniteNumber(today?.postureScore, today?.healthScore);
   const rawScore: number | null = slotTotal > 0 ? derivedScore : (apiScore ?? null);
   const healthScore = rawScore ?? 0;
 
   // 경고 횟수 - API 값 우선, 없으면 슬롯 기반 실시간 계산값 사용
-  const apiWarnings = today?.warningCount
-    ?? ((today?.breakdown?.turtleNeckCount ?? 0) + (today?.breakdown?.shoulderIssueCount ?? 0));
+  const apiWarnings = firstFiniteNumber(
+    today?.warningCount,
+    toFiniteNumber(today?.breakdown?.turtleNeckCount) +
+      toFiniteNumber(today?.breakdown?.shoulderIssueCount),
+  ) ?? 0;
   const warningCount = Math.max(apiWarnings, derivedWarnings);
 
   // 총 이벤트 수
@@ -283,20 +307,22 @@ export default function DashboardPage() {
     : timelineActivity;
 
   // 비교 통계 (null이면 데이터 없음)
-  const yDiff = today?.vsYesterday ?? null;
-  const wDiff = today?.vsLastWeek ?? null;
+  const yDiff = firstFiniteNumber(today?.vsYesterday);
+  const wDiff = firstFiniteNumber(today?.vsLastWeek);
 
   // 주간 통계 (초 단위 그대로 사용 → DurationStat에서 h/m 표시)
-  const turtleSec  = weekly?.turtleNeckTotalSec ?? 0;
-  const shoulderSec = weekly ? (weekly.roundShoulderTotalSec + weekly.shoulderAsymmetryTotalSec) : 0;
-  const asymSec    = weekly?.shoulderAsymmetryTotalSec ?? 0;
-  const darkSec    = weekly?.darkEnvTotalSec ?? 0;
+  const turtleSec  = toFiniteNumber(weekly?.turtleNeckTotalSec);
+  const shoulderSec = weekly
+    ? toFiniteNumber(weekly.roundShoulderTotalSec) + toFiniteNumber(weekly.shoulderAsymmetryTotalSec)
+    : 0;
+  const asymSec    = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
+  const darkSec    = toFiniteNumber(weekly?.darkEnvTotalSec);
   const goodPct    = slotTotal > 0
     ? Math.round((slotGood / slotTotal) * 100)
-    : (weekly ? Math.round(weekly.goodPostureRatio * 100) : 0);
+    : (weekly ? Math.round(toFiniteNumber(weekly.goodPostureRatio) * 100) : 0);
 
   // 주간 선형 차트 값
-  const weeklyValues = weekly?.days.map((d) => d.badPostureRatio * 100) ?? [30, 55, 40, 30, 35, 50, 35];
+  const weeklyValues = weekly?.days.map((d) => toFiniteNumber(d.badPostureRatio) * 100) ?? [30, 55, 40, 30, 35, 50, 35];
   const liveIsGood = liveDetection?.state === "GOOD_POSTURE";
   const liveIsBad = Boolean(liveDetection && !liveIsGood);
   const avatarStatusText = liveDetection

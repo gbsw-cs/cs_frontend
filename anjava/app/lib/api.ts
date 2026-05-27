@@ -559,6 +559,15 @@ export type DailyDashboard = {
   overlappingCount: number;
 };
 
+type RawDailyDashboard = Partial<DailyDashboard> & {
+  slots?: Partial<DailyDashboard>[];
+  turtleNeckCount?: number | string | null;
+  roundShoulderCount?: number | string | null;
+  shoulderAsymmetryCount?: number | string | null;
+  shoulderIssueCount?: number | string | null;
+  darkEnvCount?: number | string | null;
+};
+
 export type TimelineDashboard = {
   date: string;
   buckets: {
@@ -600,8 +609,42 @@ export function getDashboardWeekly(from: string) {
   return request<WeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true);
 }
 
+function toApiNumber(value: unknown, fallback = 0): number {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeDailyDashboard(raw: RawDailyDashboard): DailyDashboard {
+  const source = Array.isArray(raw.slots) ? raw.slots[0] ?? raw : raw;
+  const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
+  const singleBadCount =
+    source.singleBadCount !== undefined
+      ? toApiNumber(source.singleBadCount)
+      : toApiNumber(raw.turtleNeckCount) +
+        toApiNumber(raw.roundShoulderCount) +
+        toApiNumber(raw.shoulderAsymmetryCount) +
+        toApiNumber(raw.shoulderIssueCount) +
+        toApiNumber(raw.darkEnvCount);
+
+  return {
+    date: typeof source.date === "string" ? source.date : "",
+    slotIndex,
+    startHour: toApiNumber(source.startHour, slotIndex * 3),
+    endHour: toApiNumber(source.endHour, slotIndex * 3 + 3),
+    goodPostureCount: toApiNumber(source.goodPostureCount),
+    singleBadCount,
+    overlappingCount: toApiNumber(source.overlappingCount),
+  };
+}
+
 export function getDashboardDaily() {
-  return request<DailyDashboard>("/dashboard/daily", { method: "GET" }, true);
+  return request<RawDailyDashboard>("/dashboard/daily", { method: "GET" }, true)
+    .then(normalizeDailyDashboard);
 }
 
 export function getDashboardTimeline(date: string) {
