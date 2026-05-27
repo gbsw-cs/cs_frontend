@@ -4,25 +4,27 @@ import { Suspense, useEffect, useMemo } from "react";
 import { resolvePostAuthPath, saveTokens } from "../../lib/api";
 
 type CallbackResult =
-  | { kind: "ok"; accessToken: string; refreshToken: string }
+  | { kind: "ok"; accessToken: string; refreshToken?: string }
   | { kind: "error"; message: string };
 
 function parseCallback(params: URLSearchParams): CallbackResult {
   const err = params.get("error") ?? params.get("message");
   if (err) return { kind: "error", message: decodeURIComponent(err) };
 
-  const queryAccess = params.get("accessToken") ?? params.get("access_token");
+  const queryAccess =
+    params.get("accessToken") ?? params.get("access_token") ?? params.get("token");
   const queryRefresh = params.get("refreshToken") ?? params.get("refresh_token");
-  if (queryAccess && queryRefresh) {
-    return { kind: "ok", accessToken: queryAccess, refreshToken: queryRefresh };
+  if (queryAccess) {
+    return { kind: "ok", accessToken: queryAccess, refreshToken: queryRefresh ?? undefined };
   }
 
   if (typeof window !== "undefined" && window.location.hash) {
     const hash = new URLSearchParams(window.location.hash.slice(1));
-    const hashAccess = hash.get("accessToken") ?? hash.get("access_token");
+    const hashAccess =
+      hash.get("accessToken") ?? hash.get("access_token") ?? hash.get("token");
     const hashRefresh = hash.get("refreshToken") ?? hash.get("refresh_token");
-    if (hashAccess && hashRefresh) {
-      return { kind: "ok", accessToken: hashAccess, refreshToken: hashRefresh };
+    if (hashAccess) {
+      return { kind: "ok", accessToken: hashAccess, refreshToken: hashRefresh ?? undefined };
     }
   }
 
