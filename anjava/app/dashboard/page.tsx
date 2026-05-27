@@ -325,6 +325,30 @@ export default function DashboardPage() {
   const weeklyValues = weekly?.days.map((d) => toFiniteNumber(d.badPostureRatio) * 100) ?? [30, 55, 40, 30, 35, 50, 35];
   const liveIsGood = liveDetection?.state === "GOOD_POSTURE";
   const liveIsBad = Boolean(liveDetection && !liveIsGood);
+  const liveJudgementText = liveDetection
+    ? liveIsGood
+      ? "정상"
+      : (STATE_LABEL[liveDetection.state] ?? "자세 이상")
+    : rawScore !== null && healthScore >= 70
+    ? "정상"
+    : "분석 중";
+  const liveStatusTone = liveDetection
+    ? liveIsGood
+      ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
+      : { text: "주의 필요", color: "text-rose-500", ring: "ring-rose-300" }
+    : rawScore !== null
+    ? healthScore >= 70
+      ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
+      : healthScore >= 40
+      ? { text: "보통", color: "text-amber-500", ring: "ring-amber-300" }
+      : { text: "주의 필요", color: "text-rose-500", ring: "ring-rose-300" }
+    : { text: "분석 중", color: "text-zinc-400", ring: "ring-zinc-200" };
+  const liveJudgementTone =
+    liveJudgementText === "정상"
+      ? { dot: "bg-emerald-400", color: "text-emerald-500" }
+      : liveJudgementText === "분석 중"
+      ? { dot: "bg-zinc-300", color: "text-zinc-400" }
+      : { dot: "bg-rose-400", color: "text-rose-500" };
   const avatarStatusText = liveDetection
     ? liveIsGood
       ? "정확한 자세입니다 ✅"
@@ -680,58 +704,26 @@ export default function DashboardPage() {
               <div className="text-xs font-bold text-zinc-900">실시간 감지 상태</div>
 
               {/* 종합 상태 메시지 */}
-              {(() => {
-                const score = healthScore;
-                const tone =
-                  score >= 70
-                    ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
-                    : score >= 40
-                    ? { text: "보통", color: "text-amber-500", ring: "ring-amber-300" }
-                    : today
-                    ? { text: "주의 필요", color: "text-rose-500", ring: "ring-rose-300" }
-                    : { text: "분석 중", color: "text-zinc-400", ring: "ring-zinc-200" };
-                return (
-                  <div className={`mt-2 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold ring-2 ${tone.color} ${tone.ring}`}>
-                    {me?.name ?? "사용자"}님의 상태는 {tone.text}합니다.
-                  </div>
-                );
-              })()}
+              <div className={`mt-2 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold ring-2 ${liveStatusTone.color} ${liveStatusTone.ring}`}>
+                {me?.name ?? "사용자"}님의 상태는 {liveStatusTone.text}합니다.
+              </div>
 
               {/* 감지 항목 리스트 */}
               <ul className="mt-2 space-y-1.5">
-                {(() => {
-                  const judgementText = liveDetection
-                    ? liveDetection.state === "GOOD_POSTURE"
-                      ? "정상"
-                      : (STATE_LABEL[liveDetection.state] ?? "자세 이상")
-                    : healthScore >= 70
-                    ? "정상"
-                    : "분석 중";
-                  const status =
-                    judgementText === "정상"
-                      ? { dot: "bg-emerald-400", color: "text-emerald-500" }
-                      : judgementText === "분석 중"
-                      ? { dot: "bg-zinc-300", color: "text-zinc-400" }
-                      : { dot: "bg-rose-400", color: "text-rose-500" };
-                  return (
-                    <>
-                      <li className="flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1.5 text-zinc-700">
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                          자세 경고 총 횟수
-                        </span>
-                        <span className="text-[10px] font-semibold text-rose-500">{warningCount}</span>
-                      </li>
-                      <li className="flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1.5 text-zinc-700">
-                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                        상태 판정
-                      </span>
-                        <span className={`text-[10px] font-medium ${status.color}`}>{judgementText}</span>
-                      </li>
-                    </>
-                  );
-                })()}
+                <li className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-zinc-700">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${liveJudgementTone.dot}`} />
+                    자세 경고 총 횟수
+                  </span>
+                  <span className="text-[10px] font-semibold text-rose-500">{warningCount}</span>
+                </li>
+                <li className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-zinc-700">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${liveJudgementTone.dot}`} />
+                    상태 판정
+                  </span>
+                  <span className={`text-[10px] font-medium ${liveJudgementTone.color}`}>{liveJudgementText}</span>
+                </li>
               </ul>
             </Card>
 
