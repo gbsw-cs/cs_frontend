@@ -600,7 +600,7 @@ export default function DashboardPage() {
                     <svg width={size} height={size} viewBox="0 0 120 120">
                       <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="15" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
                       {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="15" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
-                      {badLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="15" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${badLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {badLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="15" strokeLinecap="round" strokeDasharray={`${badLen} ${circ}`} strokeDashoffset={-goodLen} transform={`rotate(${rotation} 60 60)`} />}
                     </svg>
                   );
                 })()}
