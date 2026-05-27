@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getAccessToken, login, resolvePostAuthPath, saveTokens } from "../lib/api";
+import { clearTokens, getAccessToken, getMe, login, resolvePostAuthPath, saveTokens } from "../lib/api";
 import { SocialLoginButtons } from "../components/SocialLoginButtons";
 import { validatePassword } from "../lib/validation";
 
@@ -17,9 +17,20 @@ export default function LoginPage() {
   const passwordError = validatePassword(password);
 
   useEffect(() => {
-    if (getAccessToken()) {
-      router.replace("/dashboard");
-    }
+    if (!getAccessToken()) return;
+
+    let cancelled = false;
+    getMe()
+      .then(() => {
+        if (!cancelled) router.replace("/dashboard");
+      })
+      .catch(() => {
+        clearTokens();
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function onSubmit(e: React.FormEvent) {

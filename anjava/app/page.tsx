@@ -4,15 +4,26 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { getAccessToken } from "./lib/api";
+import { clearTokens, getAccessToken, getMe } from "./lib/api";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (getAccessToken()) {
-      router.replace("/dashboard");
-    }
+    if (!getAccessToken()) return;
+
+    let cancelled = false;
+    getMe()
+      .then(() => {
+        if (!cancelled) router.replace("/dashboard");
+      })
+      .catch(() => {
+        clearTokens();
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   return (
