@@ -18,15 +18,6 @@ type ApiError = {
 };
 
 export type Tokens = { accessToken: string; refreshToken?: string };
-type TokenResponse =
-  | Tokens
-  | {
-      access_token?: string;
-      refresh_token?: string;
-      token?: string;
-      tokens?: TokenResponse;
-      data?: TokenResponse;
-    };
 export type Me = {
   id: string;
   email: string;
@@ -93,37 +84,7 @@ const ONBOARDING_PREFIX = "onboarding:";
 
 export function getAccessToken() {
   if (typeof window === "undefined") return null;
-  const token = localStorage.getItem(ACCESS_KEY);
-  if (!token || token === "undefined" || token === "null") return null;
-  return token;
-}
-
-function normalizeTokens(value: TokenResponse): Tokens | null {
-  const nested = "data" in value && value.data
-    ? normalizeTokens(value.data)
-    : "tokens" in value && value.tokens
-    ? normalizeTokens(value.tokens)
-    : null;
-  if (nested) return nested;
-
-  const accessToken =
-    "accessToken" in value && typeof value.accessToken === "string"
-      ? value.accessToken
-      : "access_token" in value && typeof value.access_token === "string"
-      ? value.access_token
-      : "token" in value && typeof value.token === "string"
-      ? value.token
-      : null;
-  if (!accessToken) return null;
-
-  const refreshToken =
-    "refreshToken" in value && typeof value.refreshToken === "string"
-      ? value.refreshToken
-      : "refresh_token" in value && typeof value.refresh_token === "string"
-      ? value.refresh_token
-      : undefined;
-
-  return { accessToken, refreshToken };
+  return localStorage.getItem(ACCESS_KEY);
 }
 
 export function getRefreshToken() {
@@ -156,15 +117,11 @@ function deleteRefreshCookie() {
   document.cookie = `${REFRESH_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
 }
 
-export function saveTokens(t: TokenResponse) {
+export function saveTokens(t: Tokens) {
   if (typeof window === "undefined") return;
-  const tokens = normalizeTokens(t);
-  if (!tokens) {
-    throw new Error("로그인 응답에서 accessToken을 찾지 못했습니다.");
-  }
-  localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-  if (tokens.refreshToken) {
-    setRefreshCookie(tokens.refreshToken);
+  localStorage.setItem(ACCESS_KEY, t.accessToken);
+  if (t.refreshToken) {
+    setRefreshCookie(t.refreshToken);
   } else {
     deleteRefreshCookie();
   }
@@ -289,7 +246,7 @@ async function rawRequest<T>(
   return json as T;
 }
 
-let refreshing: Promise<TokenResponse> | null = null;
+let refreshing: Promise<Tokens> | null = null;
 
 async function request<T>(
   path: string,
@@ -318,7 +275,7 @@ async function request<T>(
 }
 
 export function login(email: string, password: string) {
-  return request<TokenResponse>("/auth/login", {
+  return request<Tokens>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -330,7 +287,7 @@ export function signup(
   name: string,
   profileImg?: string,
 ) {
-  return request<TokenResponse>("/auth/signup", {
+  return request<Tokens>("/auth/signup", {
     method: "POST",
     body: JSON.stringify({
       email,
@@ -343,7 +300,7 @@ export function signup(
 
 export function refresh() {
   const refreshToken = getRefreshToken();
-  return rawRequest<TokenResponse>(
+  return rawRequest<Tokens>(
     "/auth/refresh",
     { method: "POST", body: JSON.stringify(refreshToken ? { refreshToken } : {}) },
     false,
