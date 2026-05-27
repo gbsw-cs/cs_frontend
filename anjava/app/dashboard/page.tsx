@@ -490,14 +490,14 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[190px] lg:self-end">
-            <div className="flex items-center gap-2">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[185px] lg:self-end">
+            <div className="mt-1 flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-0.5 flex items-start justify-between gap-2">
+            <div className="mt-0.5 flex items-start justify-end gap-1">
               {/* 좌측 리스트 */}
-              <div className="w-[152px] shrink-0 space-y-0.5 pt-[5px] text-[10px]">
+              <div className="w-[146px] shrink-0 space-y-0.5 pt-[9px] text-[10px]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
                   <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
