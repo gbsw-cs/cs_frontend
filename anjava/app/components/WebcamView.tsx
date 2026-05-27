@@ -26,6 +26,7 @@ const EVENT_FLUSH_INTERVAL_MS = 30_000;
 
 type WebcamViewProps = {
   darkDetectionEnabled?: boolean;
+  soundEnabled?: boolean;
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
   onDashboardDataChanged?: () => void;
 };
@@ -181,13 +182,37 @@ const TOAST_STYLE = `
 `;
 
 let webToastTimer: ReturnType<typeof setTimeout> | null = null;
+let audioContext: AudioContext | null = null;
 
 function closePostureToast(el: HTMLElement) {
   el.classList.add("out");
   setTimeout(() => el.remove(), 240);
 }
 
-function showPostureToast(message: string) {
+function playNotificationSound() {
+  if (typeof window === "undefined" || !window.AudioContext) return;
+  try {
+    audioContext = audioContext ?? new window.AudioContext();
+    const ctx = audioContext;
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.18);
+  } catch {
+    // Browser autoplay policies can reject audio before user activation.
+  }
+}
+
+function showPostureToast(message: string, soundEnabled: boolean) {
   if (typeof document === "undefined") return;
   if (!document.getElementById("anjava-web-style")) {
     const s = document.createElement("style");
@@ -223,6 +248,9 @@ function showPostureToast(message: string) {
   progress.className = "anjava-web-progress";
   el.append(header, body, progress);
   document.body.appendChild(el);
+  if (soundEnabled) {
+    playNotificationSound();
+  }
   webToastTimer = setTimeout(() => {
     closePostureToast(el);
   }, 6000);
@@ -230,6 +258,7 @@ function showPostureToast(message: string) {
 
 export default function WebcamView({
   darkDetectionEnabled = false,
+  soundEnabled = true,
   onDetectionStateChange,
   onDashboardDataChanged,
 }: WebcamViewProps) {
@@ -481,7 +510,7 @@ export default function WebcamView({
         }
         // 상태가 바뀔 때마다 toast (나쁜 자세로 전환 시)
         if (msg && finalStatus !== lastStatusRef.current) {
-          showPostureToast(msg);
+          showPostureToast(msg, soundEnabled);
           window.postMessage({ type: "ANJAVA_POSTURE_RELAY", state: finalStatus, message: msg }, "*");
         }
         recordStateChange(backendState, msg);
@@ -497,7 +526,7 @@ export default function WebcamView({
     analyzeFrame();
     const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [ready, darkDetectionEnabled, flushQueuedEvents]);
+  }, [ready, darkDetectionEnabled, soundEnabled, flushQueuedEvents]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">
