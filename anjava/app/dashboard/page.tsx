@@ -390,14 +390,14 @@ export default function DashboardPage() {
 
           {/* 3D 아바타 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
-            <div className="-mt-2 flex flex-col items-center">
-              <div className="flex h-40 w-full justify-center overflow-hidden">
+            <div className="-mt-3 flex flex-col items-center">
+              <div className="flex h-36 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
                 />
               </div>
-              <button className={`mt-0.5 w-full rounded-full py-1.5 text-xs font-semibold ring-1 transition ${
+              <button className={`mt-0 w-full rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
                 liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
@@ -410,9 +410,9 @@ export default function DashboardPage() {
               }`}>
                 {avatarStatusText}
               </button>
-              <div className="mt-1 w-full rounded-lg px-3 py-2 text-center ring-1 ring-zinc-100">
-                <div className="text-[10px] font-semibold text-zinc-400">실시간 감지 상태</div>
-                <div className={`mt-1 text-xs font-bold ${
+              <div className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
+                <div className="text-[9px] font-semibold text-zinc-400">실시간 감지 상태</div>
+                <div className={`mt-0.5 text-[11px] font-bold ${
                   liveIsGood
                     ? "text-emerald-500"
                     : liveIsBad
@@ -422,9 +422,9 @@ export default function DashboardPage() {
                   {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : "분석 대기 중"}
                 </div>
                 {liveDetection?.message ? (
-                  <div className="mt-1 truncate text-[10px] text-zinc-500">{liveDetection.message}</div>
+                  <div className="mt-0.5 truncate text-[9px] text-zinc-500">{liveDetection.message}</div>
                 ) : null}
-                <div className="mt-1 text-[9px] text-zinc-300">
+                <div className="mt-0.5 text-[8px] text-zinc-300">
                   {liveDetection ? `${liveDetection.updatedAt} 갱신` : "웹캠 연결 후 자동 갱신"}
                 </div>
               </div>
@@ -490,17 +490,37 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[172px] lg:self-end">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[190px] lg:self-end">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-2 flex items-center gap-3">
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              {/* 좌측 리스트 */}
+              <div className="w-[152px] shrink-0 space-y-1 text-[10px]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
+                  <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />자세 경고 총 횟수</span>
+                  <span className="text-[11px] font-bold text-rose-500">
+                    {warningCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />상태 판정</span>
+                  <span className="text-[11px] font-bold text-amber-500">
+                    {today ? (healthScore >= 40 ? 0 : 10) : 0}
+                  </span>
+                </div>
+              </div>
+
               {/* 도넛 차트 (단색) */}
               <div className="relative shrink-0">
                 {(() => {
-                  const size = 88;
-                  const r = 32;
+                  const size = 116;
+                  const r = 38;
                   const circ = 2 * Math.PI * r;
                   const gapDeg = 60;
                   const usable = circ * (1 - gapDeg / 360);
@@ -511,35 +531,15 @@ export default function DashboardPage() {
                   const rotation = 90 + gapDeg / 2;
                   return (
                     <svg width={size} height={size} viewBox="0 0 120 120">
-                      <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
-                      {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
-                      {badLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="14" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${badLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="15" strokeLinecap="round" strokeDasharray={`${usable} ${gapLen}`} transform={`rotate(${rotation} 60 60)`} />
+                      {goodLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#4ade80" strokeWidth="15" strokeLinecap="round" strokeDasharray={`${goodLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
+                      {badLen > 0 && <circle cx="60" cy="60" r={r} fill="none" stroke="#f87171" strokeWidth="15" strokeLinecap="round" strokeDasharray={`0 ${goodLen} ${badLen} ${circ}`} transform={`rotate(${rotation} 60 60)`} />}
                     </svg>
                   );
                 })()}
-                <span className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-zinc-900">
+                <span className="absolute inset-0 flex items-center justify-center text-4xl font-bold text-zinc-900">
                   {rawScore !== null ? healthScore : "—"}
                 </span>
-              </div>
-
-              {/* 우측 리스트 */}
-              <div className="flex-1 space-y-1.5 text-[11px]">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
-                  <span className="text-xs font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-rose-400" />자세 경고 총 횟수</span>
-                  <span className="text-xs font-bold text-rose-500">
-                    {warningCount}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />상태 판정</span>
-                  <span className="text-xs font-bold text-amber-500">
-                    {today ? (healthScore >= 40 ? 0 : 10) : 0}
-                  </span>
-                </div>
               </div>
             </div>
 
