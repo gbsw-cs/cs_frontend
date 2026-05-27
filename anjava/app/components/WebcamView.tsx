@@ -78,6 +78,25 @@ function isBaselineReady() {
   return localStorage.getItem("aiBaselineReady") === "1";
 }
 
+function clearStoredBaseline() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("aiBaseline");
+  localStorage.removeItem("aiBaselineReady");
+}
+
+function getApiErrorCode(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const error = (value as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
+function isDuplicateSessionError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return /이미 진행 중인 세션|already.*session|session.*already/i.test(error.message);
+}
+
 function findDetectedLabels(value: unknown, prefix = ""): string[] {
   if (!value || typeof value !== "object") return [];
 
@@ -251,7 +270,9 @@ export default function WebcamView({
         stateStartRef.current = Date.now();
       })
       .catch((e) => {
-        console.error("Detection session start failed", e);
+        if (!isDuplicateSessionError(e)) {
+          console.error("Detection session start failed", e);
+        }
       });
 
     async function flushEvents() {
@@ -412,10 +433,15 @@ export default function WebcamView({
         });
         if (!response.ok) {
           const errorBody = await response.json().catch(() => null);
-          const code = errorBody?.error?.code;
-          // baseline 없음 또는 환경 변화 → 재측정
-          if (code === "E_ENVIRONMENT_DRIFT" || code === "E_INVALID_BASELINE") {
-            localStorage.removeItem("aiBaselineReady");
+          const code = getApiErrorCode(errorBody);
+          // baseline 없음, 만료, 변조 또는 환경 변화 → 저장값 폐기 후 재측정
+          if (
+            code === "E_ENVIRONMENT_DRIFT" ||
+            code === "E_INVALID_BASELINE" ||
+            code === "E_BASELINE_EXPIRED" ||
+            code === "E_BASELINE_TAMPERED"
+          ) {
+            clearStoredBaseline();
             const refreshed = await refreshBaseline(id, framesRef.current);
             setAiStatus(refreshed ? "idle" : "error");
             return;
