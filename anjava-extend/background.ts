@@ -239,15 +239,56 @@ const TOAST_MESSAGES: Record<string, string> = {
   GOOD_POSTURE:       "자세가 교정되었어요! 바른 자세를 유지해보세요.",
 }
 
+async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
+  const activeFocused = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  const activeTabs = activeFocused.length > 0
+    ? activeFocused
+    : await chrome.tabs.query({ active: true })
+  const httpTabs = activeTabs.filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
+  if (httpTabs.length > 0) return httpTabs
+
+  const allTabs = await chrome.tabs.query({})
+  return allTabs
+    .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
+    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+    .slice(0, 1)
+}
+
 async function sendToActiveTab(msg: any): Promise<void> {
-  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  const tabs = await getToastTargetTabs()
+  if (tabs.length === 0) {
+    console.warn("[toast] 주입 가능한 HTTP/HTTPS 탭이 없습니다.")
+    return
+  }
+  const tasks: Promise<unknown>[] = []
   for (const tab of tabs) {
     if (!tab?.id || !tab.url?.match(/^https?:\/\//)) continue
     const isGood = msg.state === "GOOD_POSTURE"
     const text = TOAST_MESSAGES[msg.state as string] ?? msg.message ?? "자세를 확인해주세요."
-    chrome.scripting.executeScript({
+    const soundEnabled = msg.soundEnabled !== false
+    tasks.push(chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (toastText: string, successMode: boolean) => {
+      func: (toastText: string, successMode: boolean, shouldPlaySound: boolean) => {
+        const playTone = () => {
+          if (!shouldPlaySound) return
+          try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+            if (!AudioCtx) return
+            const ctx = new AudioCtx()
+            const oscillator = ctx.createOscillator()
+            const gain = ctx.createGain()
+            oscillator.type = "sine"
+            oscillator.frequency.setValueAtTime(successMode ? 660 : 880, ctx.currentTime)
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02)
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22)
+            oscillator.connect(gain)
+            gain.connect(ctx.destination)
+            oscillator.start()
+            oscillator.stop(ctx.currentTime + 0.24)
+            window.setTimeout(() => ctx.close().catch(() => {}), 400)
+          } catch {}
+        }
         const TID = "anjava-posture-toast", SID = "anjava-posture-style"
         if (!document.getElementById(SID)) {
           const s = document.createElement("style"); s.id = SID
@@ -266,11 +307,13 @@ async function sendToActiveTab(msg: any): Promise<void> {
         const bdy = document.createElement("div"); bdy.className = "ab"; bdy.textContent = toastText
         const bar = document.createElement("div"); bar.className = "ap"
         el.append(hdr, bdy, bar); document.body.appendChild(el)
+        playTone()
         setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 240) }, 6000)
       },
-      args: [text, isGood]
-    }).catch((e) => console.error("[toast] 주입 실패:", tab.url, e))
+      args: [text, isGood, soundEnabled]
+    }).catch((e) => console.error("[toast] 주입 실패:", tab.url, e)))
   }
+  await Promise.allSettled(tasks)
 }
 
 async function showNotification(): Promise<void> {
@@ -399,8 +442,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT_FROM_WEB") {
-    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
-    sendResponse({ ok: true })
+    // The web app already shows its own toast before relaying this message.
+    // Avoid creating a second extension toast for the same foreground event.
+    sendResponse({ ok: true, skipped: "foreground-web-toast" })
     return true
   }
 
@@ -555,44 +599,46 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT") {
-    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
     postTimeline(msg.state, msg.message)
     chrome.storage.local.get("settings").then(({ settings: s }) => {
-      if (s?.pushEnabled !== false) {
-        chrome.notifications.create("posture-detect", {
-          type: "basic",
-          iconUrl: getNotificationIcon(),
-          title: "자세 경고",
-          message: msg.message,
-          priority: 2,
-          silent: s?.soundEnabled === false
-        })
+      if (s?.pushEnabled === false) {
+        sendResponse({ success: true, skipped: "push-disabled" })
+        return
       }
+      sendToActiveTab({
+        type: "POSTURE_ALERT",
+        state: msg.state,
+        message: msg.message,
+        soundEnabled: s?.soundEnabled !== false,
+      })
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => {
+          console.error("[toast] posture alert 처리 실패:", e)
+          sendResponse({ success: false, error: String(e?.message ?? e) })
+        })
     })
-    sendResponse({ success: true })
     return true
   }
 
   if (msg.type === "POSTURE_ALERT_OFFSCREEN") {
     postTimeline(msg.state, msg.message)
-    // 토스트는 나쁜 자세·좋은 자세 회복 모두 표시
-    sendToActiveTab({ type: "POSTURE_ALERT", state: msg.state, message: msg.message })
-    // 시스템 알림·소리는 나쁜 자세일 때만
-    if (msg.state !== "GOOD_POSTURE") {
-      chrome.storage.local.get("settings").then(({ settings: s }) => {
-        if (s?.pushEnabled !== false) {
-          chrome.notifications.create("posture-offscreen", {
-            type: "basic",
-            iconUrl: getNotificationIcon(),
-            title: "자세 경고",
-            message: msg.message,
-            priority: 2,
-            silent: s?.soundEnabled === false
-          })
-        }
+    chrome.storage.local.get("settings").then(({ settings: s }) => {
+      if (s?.pushEnabled === false) {
+        sendResponse({ success: true, skipped: "push-disabled" })
+        return
+      }
+      sendToActiveTab({
+        type: "POSTURE_ALERT",
+        state: msg.state,
+        message: msg.message,
+        soundEnabled: s?.soundEnabled !== false,
       })
-    }
-    sendResponse({ success: true })
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => {
+          console.error("[toast] offscreen alert 처리 실패:", e)
+          sendResponse({ success: false, error: String(e?.message ?? e) })
+        })
+    })
     return true
   }
 
