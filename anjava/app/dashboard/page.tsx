@@ -63,7 +63,10 @@ const STATE_LABEL: Record<string, string> = {
   DARK_ENV:           "어두운 환경 감지",
 };
 
-type DailySlot = DailyDashboard["slots"][number];
+type DailySlot = Pick<
+  DailyDashboard,
+  "slotIndex" | "startHour" | "goodPostureCount" | "singleBadCount" | "overlappingCount"
+>;
 
 function createEmptyDailySlots(): DailySlot[] {
   return Array.from({ length: 8 }, (_, i) => ({
@@ -73,6 +76,20 @@ function createEmptyDailySlots(): DailySlot[] {
     singleBadCount: 0,
     overlappingCount: 0,
   }));
+}
+
+function toDailySlots(daily: DailyDashboard | null): DailySlot[] {
+  const slots = createEmptyDailySlots();
+  if (!daily) return slots;
+  const slotIndex = Math.max(0, Math.min(7, daily.slotIndex));
+  slots[slotIndex] = {
+    slotIndex,
+    startHour: daily.startHour,
+    goodPostureCount: daily.goodPostureCount,
+    singleBadCount: daily.singleBadCount,
+    overlappingCount: daily.overlappingCount,
+  };
+  return slots;
 }
 
 function getSlotTotal(slots: DailySlot[]) {
@@ -139,7 +156,7 @@ export default function DashboardPage() {
     return Promise.allSettled([
       getDashboardToday(),
       getDashboardWeekly(monday),
-      getDashboardDaily(date),
+      getDashboardDaily(),
       getDashboardTimeline(date),
     ]).then(([t, w, d, tl]) => {
       if (t.status === "fulfilled") setToday(t.value);
@@ -147,7 +164,7 @@ export default function DashboardPage() {
       if (w.status === "fulfilled") setWeekly(w.value);
       else console.error("[dashboard] weekly 실패:", w.reason);
       if (d.status === "fulfilled") {
-        const nextServerTotal = getSlotTotal(d.value.slots);
+        const nextServerTotal = getSlotTotal(toDailySlots(d.value));
         if (nextServerTotal > lastServerDailyTotalRef.current) {
           setRealtimeSlots(createEmptyDailySlots());
         }
@@ -208,7 +225,7 @@ export default function DashboardPage() {
   // ── 파생 데이터 ────────────────────────────────────────
 
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
-  const serverSlots = daily?.slots ?? createEmptyDailySlots();
+  const serverSlots = toDailySlots(daily);
   const slots = serverSlots.map((slot, i) => ({
     ...slot,
     goodPostureCount: slot.goodPostureCount + (realtimeSlots[i]?.goodPostureCount ?? 0),

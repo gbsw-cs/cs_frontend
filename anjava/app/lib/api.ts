@@ -551,13 +551,12 @@ export type WeeklyDashboard = {
 
 export type DailyDashboard = {
   date: string;
-  slots: {
-    slotIndex: number;
-    startHour: number;
-    goodPostureCount: number;
-    singleBadCount: number;
-    overlappingCount: number;
-  }[];
+  slotIndex: number;
+  startHour: number;
+  endHour: number;
+  goodPostureCount: number;
+  singleBadCount: number;
+  overlappingCount: number;
 };
 
 export type TimelineDashboard = {
@@ -601,8 +600,8 @@ export function getDashboardWeekly(from: string) {
   return request<WeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true);
 }
 
-export function getDashboardDaily(date: string) {
-  return request<DailyDashboard>(`/dashboard/daily?date=${date}`, { method: "GET" }, true);
+export function getDashboardDaily() {
+  return request<DailyDashboard>("/dashboard/daily", { method: "GET" }, true);
 }
 
 export function getDashboardTimeline(date: string) {
