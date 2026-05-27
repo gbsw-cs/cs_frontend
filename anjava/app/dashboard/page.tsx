@@ -659,12 +659,19 @@ export default function DashboardPage() {
               {/* 감지 항목 리스트 */}
               <ul className="mt-2 space-y-1.5">
                 {(() => {
+                  const judgementText = liveDetection
+                    ? liveDetection.state === "GOOD_POSTURE"
+                      ? "정상"
+                      : (STATE_LABEL[liveDetection.state] ?? "자세 이상")
+                    : healthScore >= 70
+                    ? "정상"
+                    : "분석 중";
                   const status =
-                    warningCount === 0
-                      ? { text: "상태 좋음", dot: "bg-emerald-400", color: "text-emerald-500" }
-                      : warningCount < 5
-                      ? { text: "주의", dot: "bg-amber-400", color: "text-amber-500" }
-                      : { text: "경고", dot: "bg-rose-400", color: "text-rose-500" };
+                    judgementText === "정상"
+                      ? { dot: "bg-emerald-400", color: "text-emerald-500" }
+                      : judgementText === "분석 중"
+                      ? { dot: "bg-zinc-300", color: "text-zinc-400" }
+                      : { dot: "bg-rose-400", color: "text-rose-500" };
                   return (
                     <>
                       <li className="flex items-center justify-between text-[11px]">
@@ -676,10 +683,10 @@ export default function DashboardPage() {
                       </li>
                       <li className="flex items-center justify-between text-[11px]">
                         <span className="flex items-center gap-1.5 text-zinc-700">
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                          상태 판정
-                        </span>
-                        <span className={`text-[10px] font-medium ${status.color}`}>{status.text}</span>
+                        <span className={`inline-block h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                        상태 판정
+                      </span>
+                        <span className={`text-[10px] font-medium ${status.color}`}>{judgementText}</span>
                       </li>
                     </>
                   );
