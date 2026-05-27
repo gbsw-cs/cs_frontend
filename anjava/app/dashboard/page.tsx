@@ -495,9 +495,9 @@ export default function DashboardPage() {
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-0.5 flex items-start justify-start gap-1">
+            <div className="mt-0.5 flex items-start justify-between gap-1">
               {/* 좌측 리스트 */}
-              <div className="w-[146px] shrink-0 space-y-0.5 pt-[9px] text-[10px]">
+              <div className="ml-[10px] mt-[5px] w-[146px] shrink-0 space-y-0.5 pt-[9px] text-[10px]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
                   <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
@@ -517,7 +517,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 도넛 차트 (단색) */}
-              <div className="relative -mt-2 shrink-0">
+              <div className="relative -mt-2 mr-[10px] shrink-0">
                 {(() => {
                   const size = 116;
                   const r = 38;
