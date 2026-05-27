@@ -364,19 +364,15 @@ export default function DashboardPage() {
                   const icon =
                     isGoodState
                       ? "✅"
-                      : b.dominantState === "TURTLE_NECK"
-                      ? "⚠️"
-                      : (b.dominantState === "SHOULDER_ISSUE" || b.dominantState === "ROUND_SHOULDER" || b.dominantState === "SHOULDER_ASYMMETRY")
-                      ? "🚨"
-                      : "🌙";
+                      : b.dominantState === "DARK_ENV"
+                      ? "🌙"
+                      : "⚠️";
                   const dotColor =
                     isGoodState
                       ? "bg-emerald-400"
-                      : b.dominantState === "TURTLE_NECK"
-                      ? "bg-amber-400"
-                      : (b.dominantState === "SHOULDER_ISSUE" || b.dominantState === "ROUND_SHOULDER" || b.dominantState === "SHOULDER_ASYMMETRY")
-                      ? "bg-rose-400"
-                      : "bg-zinc-400";
+                      : b.dominantState === "DARK_ENV"
+                      ? "bg-zinc-400"
+                      : "bg-amber-400";
                   const label = `${STATE_LABEL[b.dominantState] ?? "자세 이상 발생"} ${icon}`;
                   return (
                     <li key={i} className="flex items-center gap-2 text-[11px]">

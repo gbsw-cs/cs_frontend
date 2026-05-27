@@ -32,17 +32,17 @@ const ISSUE_LABELS: Record<string, string> = {
 };
 
 const ISSUE_COLORS: Record<string, string> = {
-  TURTLE_NECK:        "bg-rose-400",
+  TURTLE_NECK:        "bg-amber-400",
   ROUND_SHOULDER:     "bg-amber-400",
-  SHOULDER_ASYMMETRY: "bg-orange-400",
+  SHOULDER_ASYMMETRY: "bg-amber-400",
   DARK_ENV:           "bg-slate-400",
   GOOD_POSTURE:       "bg-emerald-400",
 };
 
 const ISSUE_BAR_COLORS: Record<string, string> = {
-  TURTLE_NECK:        "#fb7185",
+  TURTLE_NECK:        "#fbbf24",
   ROUND_SHOULDER:     "#fbbf24",
-  SHOULDER_ASYMMETRY: "#fb923c",
+  SHOULDER_ASYMMETRY: "#fbbf24",
   DARK_ENV:           "#94a3b8",
   GOOD_POSTURE:       "#34d399",
 };
