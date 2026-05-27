@@ -331,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-4 lg:h-[280px]">
+          <Card className="col-span-12 flex min-h-0 flex-col px-2.5 py-2.5 sm:col-span-6 sm:px-3 sm:py-3 lg:col-span-4 lg:h-[264px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[236px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-2 h-[216px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -447,7 +447,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-2 flex items-stretch gap-3">
+            <div className="mt-5 flex items-stretch gap-3">
               {/* 좌측: 총 이벤트 수 */}
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
@@ -660,7 +660,7 @@ export default function DashboardPage() {
             </div>
 
             {/* 선형 차트 */}
-            <div className="relative mt-2 flex flex-col">
+            <div className="relative mt-5 flex flex-col">
               <div className="absolute left-0 top-0 text-[9px] leading-tight text-zinc-400">
                 비정상<br />자세 비율
               </div>
@@ -681,7 +681,7 @@ export default function DashboardPage() {
                         <circle key={i} cx={x} cy={y} r="4" fill="#e4e4e7" stroke="#ffffff" strokeWidth="1.5" />
                       ))}
                     </svg>
-                    <div className="mt-1 flex shrink-0 justify-between px-1 text-[10px] font-medium text-zinc-500">
+                    <div className="mt-2 flex shrink-0 justify-between px-1 text-[10px] font-medium text-zinc-500">
                       {dayLabels.map((d, i) => <span key={i}>{d}</span>)}
                     </div>
                   </>
