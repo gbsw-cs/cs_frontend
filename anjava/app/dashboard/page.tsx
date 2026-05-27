@@ -587,7 +587,7 @@ export default function DashboardPage() {
                     </svg>
                   );
                 })()}
-                <span className="absolute inset-0 flex items-center justify-center text-4xl font-bold text-zinc-900">
+                <span className="absolute left-0 top-0 flex h-[116px] w-[116px] items-center justify-center text-3xl font-bold leading-none text-zinc-900">
                   {rawScore !== null ? healthScore : "—"}
                 </span>
               </div>
