@@ -331,7 +331,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col px-2.5 py-2.5 sm:col-span-6 sm:px-3 sm:py-3 lg:col-span-4 lg:h-[264px]">
+          <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-[250px]">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-2 h-[216px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-1.5 h-[216px] w-full overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 onDetectionStateChange={(state, message) => {
@@ -495,7 +495,7 @@ export default function DashboardPage() {
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
 
-            <div className="mt-0.5 flex items-start justify-end gap-1">
+            <div className="mt-0.5 flex items-start justify-start gap-1">
               {/* 좌측 리스트 */}
               <div className="w-[146px] shrink-0 space-y-0.5 pt-[9px] text-[10px]">
                 <div className="flex items-center justify-between gap-2">
