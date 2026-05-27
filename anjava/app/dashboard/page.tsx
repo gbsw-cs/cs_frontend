@@ -390,14 +390,14 @@ export default function DashboardPage() {
 
           {/* 3D 아바타 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
-            <div className="-mt-3 flex flex-col items-center">
+            <div className="-mt-5 flex flex-col items-center">
               <div className="flex h-36 w-full justify-center overflow-hidden">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
                 />
               </div>
-              <button className={`mt-0 w-full rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
+              <button className={`-mt-1 w-full rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
                 liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
@@ -410,7 +410,7 @@ export default function DashboardPage() {
               }`}>
                 {avatarStatusText}
               </button>
-              <div className="mt-0.5 w-full rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
+              <div className="mt-2 w-full rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
                 <div className="text-[9px] font-semibold text-zinc-400">실시간 감지 상태</div>
                 <div className={`mt-0.5 text-[11px] font-bold ${
                   liveIsGood
@@ -497,7 +497,7 @@ export default function DashboardPage() {
 
             <div className="mt-0.5 flex items-start justify-between gap-2">
               {/* 좌측 리스트 */}
-              <div className="w-[152px] shrink-0 space-y-0.5 pt-0.5 text-[10px]">
+              <div className="w-[152px] shrink-0 space-y-0.5 pt-[5px] text-[10px]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
                   <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
@@ -517,7 +517,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 도넛 차트 (단색) */}
-              <div className="relative shrink-0">
+              <div className="relative -mt-2 shrink-0">
                 {(() => {
                   const size = 116;
                   const r = 38;
