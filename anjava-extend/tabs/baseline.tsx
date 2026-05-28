@@ -72,7 +72,7 @@ export default function BaselinePage() {
     console.log("[baseline-tab] WASM 경로:", wasmPath)
     const vision = await FilesetResolver.forVisionTasks(wasmPath)
     console.log("[baseline-tab] FilesetResolver 완료")
-    const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+    const MODEL = chrome.runtime.getURL("assets/mediapipe-wasm/pose_landmarker_lite.task")
     const opts = (delegate: "GPU" | "CPU") => ({
       baseOptions: { modelAssetPath: MODEL, delegate },
       runningMode: "VIDEO" as const,
