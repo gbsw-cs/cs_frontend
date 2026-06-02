@@ -1,12 +1,12 @@
 "use client";
 import { googleLoginUrl } from "../lib/api";
 
+const GOOGLE_AUTH_CALLBACK_URL =
+  "http://cs-backend.p-e.kr/api/auth/google/callback";
+
 export function SocialLoginButtons({ label = "간편 로그인" }: { label?: string }) {
   function onGoogleLogin() {
-    const returnTo =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/auth/callback`
-        : "";
+    const returnTo = GOOGLE_AUTH_CALLBACK_URL;
     const url = returnTo
       ? `${googleLoginUrl()}?redirect=${encodeURIComponent(returnTo)}`
       : googleLoginUrl();
