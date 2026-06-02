@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearTokens, getAccessToken, getMe, login, resolvePostAuthPath, saveTokens } from "../lib/api";
 import { SocialLoginButtons } from "../components/SocialLoginButtons";
+import { syncWebPushTokenIfEnabled } from "../lib/fcm";
 import { validatePassword } from "../lib/validation";
 
 export default function LoginPage() {
@@ -41,6 +42,7 @@ export default function LoginPage() {
     try {
       const tokens = await login(email, password);
       saveTokens(tokens);
+      void syncWebPushTokenIfEnabled();
       const path = await resolvePostAuthPath();
       router.push(path);
     } catch (err) {

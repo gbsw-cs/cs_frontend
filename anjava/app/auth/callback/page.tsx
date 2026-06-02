@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { resolvePostAuthPath, saveTokens } from "../../lib/api";
+import { syncWebPushTokenIfEnabled } from "../../lib/fcm";
 
 type CallbackResult =
   | { kind: "code"; code: string }
@@ -67,6 +68,7 @@ function CallbackInner() {
         }
 
         saveTokens({ accessToken, refreshToken });
+        void syncWebPushTokenIfEnabled();
         const path = await resolvePostAuthPath();
         if (!cancelled) router.replace(path);
       } catch (e) {

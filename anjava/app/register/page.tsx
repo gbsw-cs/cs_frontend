@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { resolvePostAuthPath, saveTokens, sendEmailCode, signup, uploadImageToCloudinary, verifyEmailCode } from "../lib/api";
 import { SocialLoginButtons } from "../components/SocialLoginButtons";
+import { syncWebPushTokenIfEnabled } from "../lib/fcm";
 import { validatePassword, validatePasswordConfirm } from "../lib/validation";
 
 export default function RegisterPage() {
@@ -101,6 +102,7 @@ export default function RegisterPage() {
       }
       const tokens = await signup(email, password, name, img);
       saveTokens(tokens);
+      void syncWebPushTokenIfEnabled();
       const path = await resolvePostAuthPath({ forceGuide: true });
       router.push(path);
     } catch (err) {

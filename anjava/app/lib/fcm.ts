@@ -1,24 +1,62 @@
-import { deleteToken, getMessaging, getToken, isSupported } from "firebase/messaging";
+import {
+  deleteToken,
+  getMessaging,
+  getToken,
+  isSupported,
+  onMessage,
+  type MessagePayload,
+} from "firebase/messaging";
 import { initializeApp, type FirebaseOptions } from "firebase/app";
-import { deletePushToken, registerPushToken } from "./api";
+import { deletePushToken, getMySettings, registerPushToken } from "./api";
 
 const DEVICE_ID_KEY = "anjavaPushDeviceId";
+const FIREBASE_CONFIG: Required<
+  Pick<FirebaseOptions, "apiKey" | "authDomain" | "projectId" | "storageBucket" | "messagingSenderId" | "appId">
+> & { measurementId: string } = {
+  apiKey: "AIzaSyB9QbJ1OeudBnGgaKjGYa2tYtnNbJKNogA",
+  authDomain: "anjava-52950.firebaseapp.com",
+  projectId: "anjava-52950",
+  storageBucket: "anjava-52950.firebasestorage.app",
+  messagingSenderId: "56363432316",
+  appId: "1:56363432316:web:01983736728ba677cdccf9",
+  measurementId: "G-TMEM3K29LC",
+};
 
 let firebaseApp: ReturnType<typeof initializeApp> | null = null;
+let foregroundMessageListenerReady = false;
 
-function getFirebaseConfig(): FirebaseOptions | null {
+type SyncWebPushTokenOptions = {
+  requestPermission?: boolean;
+};
+
+type SyncWebPushTokenResult =
+  | { ok: true; token: string; deviceId: string }
+  | {
+      ok: false;
+      reason:
+        | "server"
+        | "unsupported"
+        | "permission-default"
+        | "permission-denied"
+        | "empty-token"
+        | "token-request-failed"
+        | "token-registration-failed";
+    };
+
+function getFirebaseConfig(): FirebaseOptions {
   const config = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? FIREBASE_CONFIG.apiKey,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? FIREBASE_CONFIG.authDomain,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? FIREBASE_CONFIG.projectId,
+    storageBucket:
+      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? FIREBASE_CONFIG.storageBucket,
+    messagingSenderId:
+      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
+      FIREBASE_CONFIG.messagingSenderId,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? FIREBASE_CONFIG.appId,
+    measurementId:
+      process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? FIREBASE_CONFIG.measurementId,
   };
-
-  if (!config.apiKey || !config.projectId || !config.messagingSenderId || !config.appId) {
-    return null;
-  }
 
   return config;
 }
@@ -50,42 +88,109 @@ async function getServiceWorkerRegistration(config: FirebaseOptions) {
     if (typeof value === "string" && value) params.set(key, value);
   }
 
-  return navigator.serviceWorker.register(`/firebase-messaging-sw.js?${params.toString()}`);
+  return navigator.serviceWorker.register(`/firebase-messaging-sw.js?${params.toString()}`, {
+    scope: "/",
+  });
 }
 
-export async function syncWebPushToken() {
+function getNotificationContent(payload: MessagePayload) {
+  const notification = payload.notification ?? {};
+  const data = payload.data ?? {};
+  return {
+    title: notification.title ?? data.title ?? "Anjava 알림",
+    options: {
+      body: notification.body ?? data.body ?? "자세 상태를 확인해주세요.",
+      icon: notification.icon ?? "/logo.png",
+      badge: "/logo.png",
+      data: {
+        url: data.url ?? "/dashboard",
+        ...data,
+      },
+    } satisfies NotificationOptions,
+  };
+}
+
+function setupForegroundMessageListener(registration: ServiceWorkerRegistration) {
+  if (foregroundMessageListenerReady) return;
+  foregroundMessageListenerReady = true;
+
+  onMessage(getMessaging(getApp(getFirebaseConfig())), (payload) => {
+    if (Notification.permission !== "granted") return;
+    const { title, options } = getNotificationContent(payload);
+    void registration.showNotification(title, options);
+  });
+}
+
+async function isMessagingSupported() {
+  try {
+    return await isSupported();
+  } catch {
+    return false;
+  }
+}
+
+export async function syncWebPushToken(
+  options: SyncWebPushTokenOptions = { requestPermission: true },
+): Promise<SyncWebPushTokenResult> {
   if (typeof window === "undefined") return { ok: false, reason: "server" };
   if (!("Notification" in window) || !("serviceWorker" in navigator)) {
     return { ok: false, reason: "unsupported" };
   }
-  if (!(await isSupported())) return { ok: false, reason: "unsupported" };
+  if (!(await isMessagingSupported())) return { ok: false, reason: "unsupported" };
 
   const config = getFirebaseConfig();
   const vapidKey = getVapidKey();
-  if (!config || !vapidKey) return { ok: false, reason: "missing-config" };
-
   const permission =
     Notification.permission === "granted"
       ? "granted"
-      : await Notification.requestPermission();
+      : options.requestPermission
+        ? await Notification.requestPermission()
+        : Notification.permission;
+
+  if (permission === "default") return { ok: false, reason: "permission-default" };
   if (permission !== "granted") return { ok: false, reason: "permission-denied" };
 
   const registration = await getServiceWorkerRegistration(config);
-  const token = await getToken(getMessaging(getApp(config)), {
-    vapidKey,
-    serviceWorkerRegistration: registration,
-  });
+  let token = "";
+  try {
+    token = await getToken(getMessaging(getApp(config)), {
+      ...(vapidKey ? { vapidKey } : {}),
+      serviceWorkerRegistration: registration,
+    });
+  } catch {
+    return { ok: false, reason: "token-request-failed" };
+  }
   if (!token) return { ok: false, reason: "empty-token" };
 
   const deviceId = getDeviceId();
-  await registerPushToken({
-    token,
-    platform: "web",
-    deviceId,
-    userAgent: navigator.userAgent,
-  });
+  try {
+    await registerPushToken({
+      token,
+      platform: "web",
+      deviceId,
+      userAgent: navigator.userAgent,
+    });
+  } catch {
+    return { ok: false, reason: "token-registration-failed" };
+  }
 
-  return { ok: true, token };
+  setupForegroundMessageListener(registration);
+
+  return { ok: true, token, deviceId };
+}
+
+export async function syncWebPushTokenIfEnabled() {
+  if (typeof window === "undefined") return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+  try {
+    const settings = await getMySettings();
+    if (settings.pushEnabled) {
+      await syncWebPushToken({ requestPermission: false });
+    }
+  } catch {
+    // Push token sync must not block login/navigation.
+  }
 }
 
 export async function deleteWebPushToken() {
@@ -97,7 +202,9 @@ export async function deleteWebPushToken() {
   }
 
   const config = getFirebaseConfig();
-  if (config && (await isSupported())) {
+  if (await isMessagingSupported()) {
     await deleteToken(getMessaging(getApp(config))).catch(() => {});
   }
+
+  localStorage.removeItem(DEVICE_ID_KEY);
 }
