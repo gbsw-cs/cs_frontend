@@ -20,6 +20,7 @@ import {
   uploadImageToCloudinary,
   withdraw,
 } from "../lib/api";
+import { deleteWebPushToken, syncWebPushToken } from "../lib/fcm";
 import { validatePassword } from "../lib/validation";
 import AvatarColored from "../components/AvatarColored";
 import {
@@ -106,6 +107,9 @@ export default function SettingsPage() {
         const s = data.settings ?? DEFAULT_SETTINGS;
         setSettings(s);
         cacheSettings(s);
+        if (s.pushEnabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          void syncWebPushToken();
+        }
       })
       .catch(() => router.push("/login"));
   }, [router]);
@@ -138,6 +142,15 @@ export default function SettingsPage() {
       const updated = await updateMySettings(patch);
       setSettings(updated);
       cacheSettings(updated);
+      if (patch.pushEnabled === true) {
+        void syncWebPushToken().catch((error) => {
+          console.error("[push] FCM 토큰 등록 실패:", error);
+          flash("푸시 알림 등록에 실패했습니다");
+        });
+      }
+      if (patch.pushEnabled === false) {
+        void deleteWebPushToken();
+      }
     } catch (e) {
       setSettings(previous);
       cacheSettings(previous);
@@ -171,6 +184,7 @@ export default function SettingsPage() {
 
   async function handleLogout() {
     try {
+      await deleteWebPushToken();
       await logout();
     } catch {
       /* 서버 에러여도 로컬 토큰은 이미 정리됨 */

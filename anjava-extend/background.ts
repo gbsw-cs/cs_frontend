@@ -1,5 +1,6 @@
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
+const FCM_SENDER_ID = process.env.PLASMO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? ""
 
 const BREAK_TIPS = [
   "잠시 일어나서 스트레칭 해주세요!",
@@ -69,6 +70,58 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
     throw err
   }
   return (json.data ?? json) as T
+}
+
+function getExtensionDeviceId(): Promise<string> {
+  return chrome.storage.local.get("pushDeviceId").then(({ pushDeviceId }) => {
+    if (typeof pushDeviceId === "string" && pushDeviceId) return pushDeviceId
+    const id = crypto.randomUUID?.() ?? `extension-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    return chrome.storage.local.set({ pushDeviceId: id }).then(() => id)
+  })
+}
+
+function registerGcmToken(): Promise<string | null> {
+  if (!FCM_SENDER_ID || !chrome.gcm?.register) return Promise.resolve(null)
+  return new Promise((resolve, reject) => {
+    chrome.gcm.register([FCM_SENDER_ID], (registrationId) => {
+      const error = chrome.runtime.lastError
+      if (error) {
+        reject(new Error(error.message))
+        return
+      }
+      resolve(registrationId || null)
+    })
+  })
+}
+
+function unregisterGcmToken(): Promise<void> {
+  if (!chrome.gcm?.unregister) return Promise.resolve()
+  return new Promise((resolve) => {
+    chrome.gcm.unregister(() => resolve())
+  })
+}
+
+async function syncExtensionPushToken(enabled: boolean): Promise<void> {
+  const deviceId = await getExtensionDeviceId()
+
+  if (!enabled) {
+    await apiCall(`/users/me/push-tokens/${encodeURIComponent(deviceId)}`, { method: "DELETE" }).catch(() => {})
+    await unregisterGcmToken()
+    return
+  }
+
+  const token = await registerGcmToken()
+  if (!token) return
+
+  await apiCall("/users/me/push-tokens", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      platform: "extension",
+      deviceId,
+      userAgent: navigator.userAgent,
+    }),
+  })
 }
 
 // ─── Session ─────────────────────────────────────────────────
@@ -240,6 +293,17 @@ const TOAST_MESSAGES: Record<string, string> = {
   GOOD_POSTURE:       "자세가 교정되었어요! 바른 자세를 유지해보세요.",
 }
 
+type NotificationSettings = {
+  pushEnabled?: boolean
+  soundEnabled?: boolean
+}
+
+type TabWithLastAccessed = chrome.tabs.Tab & { lastAccessed?: number }
+
+function getTabLastAccessed(tab: chrome.tabs.Tab): number {
+  return (tab as TabWithLastAccessed).lastAccessed ?? 0
+}
+
 async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
   const activeFocused = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
   const activeTabs = activeFocused.length > 0
@@ -251,7 +315,7 @@ async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
   const allTabs = await chrome.tabs.query({})
   return allTabs
     .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
-    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+    .sort((a, b) => getTabLastAccessed(b) - getTabLastAccessed(a))
     .slice(0, 1)
 }
 
@@ -317,6 +381,51 @@ async function sendToActiveTab(msg: any): Promise<void> {
   await Promise.allSettled(tasks)
 }
 
+function getPostureAlertMessage(state: unknown, fallback: unknown): string {
+  const key = typeof state === "string" ? state : ""
+  const message = typeof fallback === "string" ? fallback : ""
+  return TOAST_MESSAGES[key] ?? message ?? "자세를 확인해주세요."
+}
+
+function shouldShowSystemPostureNotification(state: unknown, message: string): boolean {
+  return state !== "GOOD_POSTURE" && message.trim().length > 0
+}
+
+async function showPostureSystemNotification(msg: any, settings: NotificationSettings): Promise<void> {
+  const message = getPostureAlertMessage(msg.state, msg.message)
+  if (!shouldShowSystemPostureNotification(msg.state, message)) return
+
+  await chrome.notifications.create(`posture-${Date.now()}`, {
+    type: "basic",
+    iconUrl: getNotificationIcon(),
+    title: "자세 교정 알림",
+    message,
+    priority: 2,
+    silent: settings.soundEnabled === false,
+  })
+}
+
+async function deliverPostureAlert(msg: any, settings: NotificationSettings): Promise<void> {
+  const soundEnabled = msg.soundEnabled ?? (settings.soundEnabled !== false)
+  const alert = {
+    type: "POSTURE_ALERT",
+    state: msg.state,
+    message: getPostureAlertMessage(msg.state, msg.message),
+    soundEnabled,
+  }
+
+  const results = await Promise.allSettled([
+    showPostureSystemNotification(alert, { ...settings, soundEnabled }),
+    sendToActiveTab(alert),
+  ])
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("[notification] 자세 알림 처리 실패:", result.reason)
+    }
+  }
+}
+
 async function showNotification(): Promise<void> {
   const { settings } = await chrome.storage.local.get("settings")
   const s = settings || {}
@@ -379,6 +488,29 @@ chrome.runtime.onSuspend.addListener(async () => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === BREAK_ALARM) showNotification()
+})
+
+chrome.gcm?.onMessage?.addListener((message) => {
+  chrome.storage.local.get("settings").then(({ settings: s }) => {
+    if (s?.pushEnabled === false) return
+
+    const data = (message.data ?? {}) as Record<string, unknown>
+    const title = typeof data.title === "string" ? data.title : "Anjava 알림"
+    const body = typeof data.body === "string"
+      ? data.body
+      : typeof data.message === "string"
+      ? data.message
+      : "자세 상태를 확인해주세요."
+
+    chrome.notifications.create(`fcm-${Date.now()}`, {
+      type: "basic",
+      iconUrl: getNotificationIcon(),
+      title,
+      message: body,
+      priority: 2,
+      silent: s?.soundEnabled === false,
+    })
+  })
 })
 
 // ─── Timeline ────────────────────────────────────────────────
@@ -448,15 +580,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: true, skipped: "push-disabled" })
         return
       }
-      sendToActiveTab({
-        type: "POSTURE_ALERT",
-        state: msg.state,
-        message: msg.message,
-        soundEnabled: msg.soundEnabled ?? (s?.soundEnabled !== false),
-      })
+      deliverPostureAlert(msg, s ?? {})
         .then(() => sendResponse({ ok: true }))
         .catch((e) => {
-          console.error("[toast] web relay 처리 실패:", e)
+          console.error("[notification] web relay 처리 실패:", e)
           sendResponse({ ok: false, error: String(e?.message ?? e) })
         })
     })
@@ -584,6 +711,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "LOGOUT") {
     Promise.resolve()
       .then(() => stopOffscreenDetection().catch(() => {}))
+      .then(() => syncExtensionPushToken(false).catch(() => {}))
       .then(() => endSession())
       .then(() =>
         chrome.storage.local.remove([
@@ -611,6 +739,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             soundEnabled: next.soundEnabled
           })
         })
+        await syncExtensionPushToken(next.pushEnabled)
         if (next.darkDetectionEnabled !== undefined) {
           await apiCall("/users/me/dark-detection", {
             method: "PATCH",
@@ -638,15 +767,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ success: true, skipped: "push-disabled" })
         return
       }
-      sendToActiveTab({
-        type: "POSTURE_ALERT",
-        state: msg.state,
-        message: msg.message,
-        soundEnabled: s?.soundEnabled !== false,
-      })
+      deliverPostureAlert(msg, s ?? {})
         .then(() => sendResponse({ success: true }))
         .catch((e) => {
-          console.error("[toast] posture alert 처리 실패:", e)
+          console.error("[notification] posture alert 처리 실패:", e)
           sendResponse({ success: false, error: String(e?.message ?? e) })
         })
     })
@@ -660,15 +784,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ success: true, skipped: "push-disabled" })
         return
       }
-      sendToActiveTab({
-        type: "POSTURE_ALERT",
-        state: msg.state,
-        message: msg.message,
-        soundEnabled: s?.soundEnabled !== false,
-      })
+      deliverPostureAlert(msg, s ?? {})
         .then(() => sendResponse({ success: true }))
         .catch((e) => {
-          console.error("[toast] offscreen alert 처리 실패:", e)
+          console.error("[notification] offscreen alert 처리 실패:", e)
           sendResponse({ success: false, error: String(e?.message ?? e) })
         })
     })
@@ -678,7 +797,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "FETCH_USER_SETTINGS") {
     apiCall<any>("/users/me", { method: "GET" })
       .then((me) =>
-        chrome.storage.local.get("settings").then(({ settings: local }) => {
+        chrome.storage.local.get("settings").then(async ({ settings: local }) => {
           const merged = {
             postureInterval: local?.postureInterval ?? 30,
             breakInterval: local?.breakInterval ?? 60,
@@ -686,6 +805,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             soundEnabled: me.settings.soundEnabled ?? true,
             darkDetectionEnabled: me.settings.darkDetectionEnabled ?? false
           }
+          await syncExtensionPushToken(merged.pushEnabled).catch((e) =>
+            console.error("[push] extension FCM 토큰 동기화 실패:", e)
+          )
           chrome.storage.local.set({ settings: merged, userId: me.id, profileImg: me.profileImg ?? "", userName: me.name ?? "" })
           sendResponse({ settings: merged, name: me.name, profileImg: me.profileImg ?? "" })
         })

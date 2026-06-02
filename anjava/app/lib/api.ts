@@ -76,6 +76,15 @@ export type UserSettings = {
 
 export type UserSettingsPatch = Partial<Omit<UserSettings, "darkDetectionEnabled">>;
 
+export type PushTokenPlatform = "web" | "extension";
+
+export type PushTokenPayload = {
+  token: string;
+  platform: PushTokenPlatform;
+  deviceId: string;
+  userAgent?: string;
+};
+
 const ACCESS_KEY = "accessToken";
 const REFRESH_COOKIE = "refreshToken";
 const REFRESH_DAYS = 30;
@@ -351,6 +360,22 @@ export function updateMySettings(patch: UserSettingsPatch) {
   return request<UserSettings>(
     "/users/me/settings",
     { method: "PATCH", body: JSON.stringify(patch) },
+    true,
+  );
+}
+
+export function registerPushToken(payload: PushTokenPayload) {
+  return request<null>(
+    "/users/me/push-tokens",
+    { method: "POST", body: JSON.stringify(payload) },
+    true,
+  );
+}
+
+export function deletePushToken(deviceId: string) {
+  return request<null>(
+    `/users/me/push-tokens/${encodeURIComponent(deviceId)}`,
+    { method: "DELETE" },
     true,
   );
 }

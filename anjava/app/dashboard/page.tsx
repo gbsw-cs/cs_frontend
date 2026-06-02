@@ -51,7 +51,7 @@ const WEEKDAY_KR: Record<string, string> = {
   MON: "월요일", TUE: "화요일", WED: "수요일", THU: "목요일",
   FRI: "금요일", SAT: "토요일", SUN: "일요일",
 };
-const DAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEK_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
 const STATE_LABEL: Record<string, string> = {
   GOOD_POSTURE:       "자세 교정 완료",
@@ -86,6 +86,19 @@ function firstFiniteNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function formatDuration(sec: number | null): string {
+  if (sec === null) return "—";
+  const safeSec = Math.max(0, Math.round(sec));
+  const h = Math.floor(safeSec / 3600);
+  const m = Math.round((safeSec % 3600) / 60);
+  if (h > 0) return `${h}h ${m > 0 ? `${m}m` : ""}`.trim();
+  return `${m}m`;
+}
+
 function createEmptyDailySlots(): DailySlot[] {
   return Array.from({ length: 8 }, (_, i) => ({
     slotIndex: i,
@@ -110,11 +123,57 @@ function toDailySlots(daily: DailyDashboard | null): DailySlot[] {
   return slots;
 }
 
-function getSlotTotal(slots: DailySlot[]) {
-  return slots.reduce(
-    (sum, slot) => sum + slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount,
-    0,
-  );
+function mergeMaxDailySlots(previous: DailySlot[], next: DailySlot[]): DailySlot[] {
+  return createEmptyDailySlots().map((emptySlot, i) => {
+    const previousSlot = previous[i] ?? emptySlot;
+    const nextSlot = next[i] ?? emptySlot;
+    return {
+      slotIndex: i,
+      startHour: toFiniteNumber(nextSlot.startHour, toFiniteNumber(previousSlot.startHour, i * 3)),
+      goodPostureCount: Math.max(
+        toFiniteNumber(previousSlot.goodPostureCount),
+        toFiniteNumber(nextSlot.goodPostureCount),
+      ),
+      singleBadCount: Math.max(
+        toFiniteNumber(previousSlot.singleBadCount),
+        toFiniteNumber(nextSlot.singleBadCount),
+      ),
+      overlappingCount: Math.max(
+        toFiniteNumber(previousSlot.overlappingCount),
+        toFiniteNumber(nextSlot.overlappingCount),
+      ),
+    };
+  });
+}
+
+function settleRealtimeSlots(
+  realtime: DailySlot[],
+  previousServer: DailySlot[],
+  nextServer: DailySlot[],
+): DailySlot[] {
+  return createEmptyDailySlots().map((emptySlot, i) => {
+    const realtimeSlot = realtime[i] ?? emptySlot;
+    const previousSlot = previousServer[i] ?? emptySlot;
+    const nextSlot = nextServer[i] ?? emptySlot;
+    return {
+      ...realtimeSlot,
+      goodPostureCount: Math.max(
+        0,
+        toFiniteNumber(realtimeSlot.goodPostureCount) -
+          Math.max(0, toFiniteNumber(nextSlot.goodPostureCount) - toFiniteNumber(previousSlot.goodPostureCount)),
+      ),
+      singleBadCount: Math.max(
+        0,
+        toFiniteNumber(realtimeSlot.singleBadCount) -
+          Math.max(0, toFiniteNumber(nextSlot.singleBadCount) - toFiniteNumber(previousSlot.singleBadCount)),
+      ),
+      overlappingCount: Math.max(
+        0,
+        toFiniteNumber(realtimeSlot.overlappingCount) -
+          Math.max(0, toFiniteNumber(nextSlot.overlappingCount) - toFiniteNumber(previousSlot.overlappingCount)),
+      ),
+    };
+  });
 }
 
 function getCurrentKSTSlotIndex() {
@@ -146,7 +205,6 @@ export default function DashboardPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [today, setToday] = useState<TodayDashboard | null>(null);
   const [weekly, setWeekly] = useState<WeeklyDashboard | null>(null);
-  const [daily, setDaily] = useState<DailyDashboard | null>(null);
   const [timeline, setTimeline] = useState<TimelineDashboard | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [darkPending, setDarkPending] = useState(false);
@@ -159,8 +217,9 @@ export default function DashboardPage() {
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
-  const lastServerDailyTotalRef = useRef(0);
+  const serverDailySlotsRef = useRef<DailySlot[]>(createEmptyDailySlots());
   const realtimeDateRef = useRef(getKSTDate());
+  const [serverDailySlots, setServerDailySlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
   const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
 
   const loadDashboardData = useCallback(() => {
@@ -168,7 +227,8 @@ export default function DashboardPage() {
     const monday = getMondayKST();
     if (realtimeDateRef.current !== date) {
       realtimeDateRef.current = date;
-      lastServerDailyTotalRef.current = 0;
+      serverDailySlotsRef.current = createEmptyDailySlots();
+      setServerDailySlots(createEmptyDailySlots());
       setRealtimeSlots(createEmptyDailySlots());
     }
     return Promise.allSettled([
@@ -182,12 +242,11 @@ export default function DashboardPage() {
       if (w.status === "fulfilled") setWeekly(w.value);
       else console.error("[dashboard] weekly 실패:", w.reason);
       if (d.status === "fulfilled") {
-        const nextServerTotal = getSlotTotal(toDailySlots(d.value));
-        if (nextServerTotal > lastServerDailyTotalRef.current) {
-          setRealtimeSlots(createEmptyDailySlots());
-        }
-        lastServerDailyTotalRef.current = nextServerTotal;
-        setDaily(d.value);
+        const previousServerSlots = serverDailySlotsRef.current;
+        const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
+        setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
+        serverDailySlotsRef.current = nextServerSlots;
+        setServerDailySlots(nextServerSlots);
       } else console.error("[dashboard] daily 실패:", d.reason);
       if (tl.status === "fulfilled") {
         console.log("[dashboard] timeline 응답:", tl.value);
@@ -243,8 +302,7 @@ export default function DashboardPage() {
   // ── 파생 데이터 ────────────────────────────────────────
 
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
-  const serverSlots = toDailySlots(daily);
-  const slots = serverSlots.map((slot, i) => ({
+  const slots = serverDailySlots.map((slot, i) => ({
     ...slot,
     goodPostureCount:
       toFiniteNumber(slot.goodPostureCount) + toFiniteNumber(realtimeSlots[i]?.goodPostureCount),
@@ -310,19 +368,65 @@ export default function DashboardPage() {
   const yDiff = firstFiniteNumber(today?.vsYesterday);
   const wDiff = firstFiniteNumber(today?.vsLastWeek);
 
-  // 주간 통계 (초 단위 그대로 사용 → DurationStat에서 h/m 표시)
-  const turtleSec  = toFiniteNumber(weekly?.turtleNeckTotalSec);
-  const shoulderSec = weekly
-    ? toFiniteNumber(weekly.roundShoulderTotalSec) + toFiniteNumber(weekly.shoulderAsymmetryTotalSec)
-    : 0;
-  const asymSec    = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
-  const darkSec    = toFiniteNumber(weekly?.darkEnvTotalSec);
-  const goodPct    = slotTotal > 0
+  // 주간 통계
+  const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec);
+  const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec);
+  const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
+  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
+  const badPostureSec = turtleSec + roundShoulderSec + asymSec;
+  const goodPct = slotTotal > 0
     ? Math.round((slotGood / slotTotal) * 100)
-    : (weekly ? Math.round(toFiniteNumber(weekly.goodPostureRatio) * 100) : 0);
+    : weekly
+    ? Math.round(clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100))
+    : 0;
+  const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
+  const weeklyBadRatio = weeklyGoodRatio === null ? null : Math.max(0, 1 - weeklyGoodRatio);
+  const weeklyScreenSec =
+    weekly && badPostureSec > 0 && weeklyBadRatio !== null && weeklyBadRatio > 0
+      ? Math.round(badPostureSec / weeklyBadRatio)
+      : null;
+  const weeklyGoodSec =
+    weeklyScreenSec === null ? null : Math.max(0, weeklyScreenSec - badPostureSec);
+  const weeklyRiskPct = weeklyScreenSec && weeklyScreenSec > 0
+    ? clampPercent(Math.round((badPostureSec / weeklyScreenSec) * 100))
+    : weeklyBadRatio === null
+    ? 0
+    : clampPercent(Math.round(weeklyBadRatio * 100));
 
   // 주간 선형 차트 값
-  const weeklyValues = weekly?.days.map((d) => toFiniteNumber(d.badPostureRatio) * 100) ?? [30, 55, 40, 30, 35, 50, 35];
+  const mondayKST = getMondayKST();
+  const weeklyDays = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(`${mondayKST}T00:00:00+09:00`);
+    date.setDate(date.getDate() + i);
+    const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
+    const day = weekly?.days.find((item) => item.date === dateKey);
+    return {
+      date: dateKey,
+      badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
+    };
+  });
+  const weeklyValues = weeklyDays.map((d) =>
+    d.badPostureRatio === null ? null : clampPercent(d.badPostureRatio * 100),
+  );
+  const weeklyFilledValues = weeklyValues.filter((value): value is number => value !== null);
+  const weeklyFilledDays = weeklyFilledValues.length;
+  const weeklyAvgBadPct =
+    weeklyFilledDays > 0
+      ? Math.round(weeklyFilledValues.reduce((sum, value) => sum + value, 0) / weeklyFilledDays)
+      : 0;
+  const worstWeekday =
+    weekly?.worstWeekday ??
+    weeklyDays.reduce<{ index: number; value: number } | null>((worst, day, index) => {
+      if (day.badPostureRatio === null) return worst;
+      const value = day.badPostureRatio;
+      return !worst || value > worst.value ? { index, value } : worst;
+    }, null);
+  const worstWeekdayLabel =
+    typeof worstWeekday === "string"
+      ? WEEKDAY_KR[worstWeekday] ?? "—"
+      : worstWeekday
+      ? WEEK_LABELS[worstWeekday.index]
+      : "—";
   const liveIsGood = liveDetection?.state === "GOOD_POSTURE";
   const liveIsBad = Boolean(liveDetection && !liveIsGood);
   const liveJudgementText = liveDetection
@@ -416,11 +520,6 @@ export default function DashboardPage() {
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
                 <div className="mt-0.5 text-[10px] text-zinc-400">오늘 감지 이력을 확인해보세요.</div>
               </div>
-              <button className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:text-[#2563EB]" aria-label="타임라인 상세">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
 
             {recentActivity.length > 0 ? (
@@ -571,11 +670,6 @@ export default function DashboardPage() {
                 <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />양호</span>
                 <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />경고</span>
                 <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />위험</span>
-                <button className="ml-0.5 text-zinc-400 transition hover:text-[#2563EB]" aria-label="일간 상세">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M13 5l7 7-7 7" />
-                  </svg>
-                </button>
               </div>
             </div>
 
@@ -741,28 +835,46 @@ export default function DashboardPage() {
 
           {/* 주간 스크린타임 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-9">
-            <div className="flex shrink-0 items-center justify-between">
-              <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
-              <button className="text-zinc-400 transition hover:text-[#2563EB]" aria-label="주간 상세">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
-              </button>
+            <div className="flex shrink-0 items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
+                <div className="mt-0.5 text-[10px] text-zinc-400">이번 주 감지 시간과 자세 위험도를 요약합니다.</div>
+              </div>
+              <div className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
+                {weeklyFilledDays}/7일 기록
+              </div>
             </div>
 
-            {/* 통계 카드 행 */}
-            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-6">
-              <div className="col-span-2 rounded-lg ring-1 ring-zinc-100 sm:col-span-4">
-                <div className="grid grid-cols-2 divide-x divide-zinc-100 sm:grid-cols-4">
-                  <DurationStat label="거북목 지속 시간" sec={turtleSec} />
-                  <DurationStat label="라운드 숄더 지속 시간" sec={shoulderSec} />
-                  <DurationStat label="자세 비대칭 지속 시간" sec={asymSec} />
-                  <DurationStat label="어둠 코딩 지속 시간" sec={darkSec} />
+            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr]">
+              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-3 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+                <div className="text-[10px] font-medium text-[#2563EB]">총 감지 스크린타임</div>
+                <div className="mt-1 text-2xl font-bold text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
+                <div className="mt-1 text-[10px] text-zinc-400">
+                  {weeklyScreenSec === null ? "주간 비율과 지속시간이 쌓이면 계산됩니다." : `비정상 자세 ${weeklyRiskPct}%`}
                 </div>
               </div>
+              <WeeklyMetric label="정자세 시간" value={formatDuration(weeklyGoodSec)} tone="good" />
+              <WeeklyMetric label="자세 경고 시간" value={formatDuration(badPostureSec)} tone="bad" />
+              <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
+            </div>
+
+            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
+              <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
+              <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
+              <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
+              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+                <div className="text-[10px] text-zinc-400">평균 위험도</div>
+                <div className="mt-1 text-base font-bold text-zinc-900">{weeklyAvgBadPct}%</div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                  <div className="h-full rounded-full bg-rose-400" style={{ width: `${weeklyAvgBadPct}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2">
               <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
                 <div className="text-[10px] text-zinc-400">최악 요일</div>
-                <div className="text-lg font-bold text-rose-500">{weekly?.worstWeekday ? (WEEKDAY_KR[weekly.worstWeekday] ?? "—") : "—"}</div>
+                <div className="text-lg font-bold text-rose-500">{worstWeekdayLabel}</div>
               </div>
               <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
                 <div className="text-[10px] text-zinc-400">정자세 비율</div>
@@ -770,32 +882,42 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 선형 차트 */}
-            <div className="relative mt-5 flex flex-col">
-              <div className="absolute left-0 top-0 text-[9px] leading-tight text-zinc-400">
-                비정상<br />자세 비율
+            <div className="mt-4 flex min-h-0 flex-1 flex-col">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[10px] font-semibold text-zinc-500">요일별 비정상 자세 비율</div>
+                <div className="text-[9px] text-zinc-400">낮을수록 좋음</div>
               </div>
               {(() => {
                 const values = weeklyValues;
-                const W = 700;
-                const H = 76;
-                const step = values.length > 1 ? W / (values.length - 1) : 0;
-                const coords = values.map((v, i) => [i * step, H - (v / 100) * H] as [number, number]);
-                const line = coords.map(([x, y], i) => (i === 0 ? `M${x},${y}` : `L${x},${y}`)).join(" ");
-                const dayLabels = weekly?.days.map((d) => DAY_KR[new Date(d.date).getDay()]) ?? ["월", "화", "수", "목", "금", "토", "일"];
+                const dayLabels = WEEK_LABELS;
                 return (
-                  <>
-                    <svg viewBox={`0 0 ${W} ${H + 4}`} preserveAspectRatio="none" className="h-16 w-full">
-                      <line x1="0" y1={H} x2={W} y2={H} stroke="#e4e4e7" strokeWidth="1" />
-                      <path d={line} fill="none" stroke="#d4d4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      {coords.map(([x, y], i) => (
-                        <circle key={i} cx={x} cy={y} r="4" fill="#e4e4e7" stroke="#ffffff" strokeWidth="1.5" />
-                      ))}
-                    </svg>
-                    <div className="mt-2 flex shrink-0 justify-between px-1 text-[10px] font-medium text-zinc-500">
-                      {dayLabels.map((d, i) => <span key={i}>{d}</span>)}
-                    </div>
-                  </>
+                  <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-2">
+                    {values.map((value, i) => {
+                      const height = value === null ? 6 : Math.max(8, Math.round(value));
+                      const tone =
+                        value === null
+                          ? "bg-zinc-200"
+                          : value >= 60
+                          ? "bg-rose-400"
+                          : value >= 35
+                          ? "bg-amber-400"
+                          : "bg-emerald-400";
+                      return (
+                        <div key={dayLabels[i]} className="flex min-h-[92px] flex-col items-center justify-end gap-1.5">
+                          <div className="text-[9px] font-semibold text-zinc-400">
+                            {value === null ? "—" : `${Math.round(value)}%`}
+                          </div>
+                          <div className="flex h-14 w-full items-end rounded-full bg-zinc-100 px-1">
+                            <div
+                              className={`w-full rounded-full transition-all ${tone}`}
+                              style={{ height: `${height}%` }}
+                            />
+                          </div>
+                          <div className="text-[10px] font-medium text-zinc-500">{dayLabels[i]}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 );
               })()}
             </div>
@@ -815,14 +937,33 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-function DurationStat({ label, sec }: { label: string; sec: number }) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  const display = h > 0 ? `${h}h ${m > 0 ? m + "m" : ""}`.trim() : `${m}m`;
+function WeeklyMetric({ label, value, tone }: { label: string; value: string; tone: "good" | "bad" | "dark" }) {
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-500"
+      : tone === "bad"
+      ? "text-rose-500"
+      : "text-zinc-700";
   return (
-    <div className="px-2 py-2">
-      <div className="truncate text-[9px] text-zinc-400">{label}</div>
-      <div className="text-base font-bold text-zinc-900">{display}</div>
+    <div className="rounded-xl px-3 py-3 ring-1 ring-zinc-100">
+      <div className="text-[10px] text-zinc-400">{label}</div>
+      <div className={`mt-1 text-lg font-bold ${toneClass}`}>{value}</div>
+    </div>
+  );
+}
+
+function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
+  const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
+  return (
+    <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+      <div className="flex items-center justify-between gap-2">
+        <div className="truncate text-[10px] text-zinc-400">{label}</div>
+        <div className="text-[10px] font-semibold text-zinc-500">{pct}%</div>
+      </div>
+      <div className="mt-1 text-sm font-bold text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

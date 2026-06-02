@@ -28,6 +28,7 @@
   "manifest": {
     "permissions": [
       "alarms",
+      "gcm",
       "notifications",
       "offscreen",
       "scripting",
