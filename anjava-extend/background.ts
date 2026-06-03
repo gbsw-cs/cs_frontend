@@ -3,12 +3,12 @@ const API_BASE = `${WEB_URL}/api/backend`
 const FCM_SENDER_ID = process.env.PLASMO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? ""
 
 const BREAK_TIPS = [
-  "잠시 일어나서 스트레칭 해주세요!",
-  "눈을 감고 10초간 쉬어주세요",
-  "물 한 잔 마시면서 쉬어가세요",
-  "목과 어깨를 돌려 긴장을 풀어주세요",
-  "창밖을 보며 눈의 피로를 풀어주세요",
-  "제자리에서 가볍게 기지개를 켜주세요"
+  "?? ???? ???? ????!",
+  "?? ?? 10?? ?????.",
+  "? ? ? ???? ?????.",
+  "?? ??? ?? ??? ?????.",
+  "??? ?? ?? ??? ?????.",
+  "????? ??? ???? ????."
 ]
 
 const BREAK_ALARM = "break-reminder"
@@ -281,16 +281,16 @@ async function stopOffscreenDetection(): Promise<void> {
 
 // ─── Notifications ───────────────────────────────────────────
 const TOAST_MESSAGES: Record<string, string> = {
-  TURTLE_NECK:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
-  turtle_neck:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
-  SHOULDER_ISSUE:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-  ROUND_SHOULDER:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-  round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
-  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
-  shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
-  DARK_ENV:           "어두운 환경이 감지되었어요! 밝기를 높여주세요.",
-  dark_env:           "어두운 환경이 감지되었어요! 밝기를 높여주세요.",
-  GOOD_POSTURE:       "자세가 교정되었어요! 바른 자세를 유지해보세요.",
+  TURTLE_NECK:        "??? ??? ?????. ?? ??? ?????.",
+  turtle_neck:        "??? ??? ?????. ?? ??? ?????.",
+  SHOULDER_ISSUE:     "?? ?? ??? ?????. ??? ?? ????.",
+  ROUND_SHOULDER:     "?????? ?????. ??? ?? ????.",
+  round_shoulder:     "?????? ?????. ??? ?? ????.",
+  SHOULDER_ASYMMETRY: "?? ???? ?????. ?? ??? ?????.",
+  shoulder_tilted:    "?? ???? ?????. ?? ??? ?????.",
+  DARK_ENV:           "??? ??? ?????. ?? ??? ?????.",
+  dark_env:           "??? ??? ?????. ?? ??? ?????.",
+  GOOD_POSTURE:       "??? ?????. ?? ??? ??????.",
 }
 
 type NotificationSettings = {
@@ -322,62 +322,16 @@ async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
 async function sendToActiveTab(msg: any): Promise<void> {
   const tabs = await getToastTargetTabs()
   if (tabs.length === 0) {
-    console.warn("[toast] 주입 가능한 HTTP/HTTPS 탭이 없습니다.")
+    console.warn("[toast] ?? ??? HTTP/HTTPS ?? ????.")
     return
   }
-  const tasks: Promise<unknown>[] = []
-  for (const tab of tabs) {
-    if (!tab?.id || !tab.url?.match(/^https?:\/\//)) continue
-    const isGood = msg.state === "GOOD_POSTURE"
-    const text = TOAST_MESSAGES[msg.state as string] ?? msg.message ?? "자세를 확인해주세요."
-    const soundEnabled = msg.soundEnabled !== false
-    tasks.push(chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (toastText: string, successMode: boolean, shouldPlaySound: boolean) => {
-        const playTone = () => {
-          if (!shouldPlaySound) return
-          try {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-            if (!AudioCtx) return
-            const ctx = new AudioCtx()
-            const oscillator = ctx.createOscillator()
-            const gain = ctx.createGain()
-            oscillator.type = "sine"
-            oscillator.frequency.setValueAtTime(successMode ? 660 : 880, ctx.currentTime)
-            gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-            gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02)
-            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22)
-            oscillator.connect(gain)
-            gain.connect(ctx.destination)
-            oscillator.start()
-            oscillator.stop(ctx.currentTime + 0.24)
-            window.setTimeout(() => ctx.close().catch(() => {}), 400)
-          } catch {}
-        }
-        const TID = "anjava-posture-toast", SID = "anjava-posture-style"
-        if (!document.getElementById(SID)) {
-          const s = document.createElement("style"); s.id = SID
-          s.textContent = `#${TID}{position:fixed;top:24px;right:24px;background:#fff;color:#18181b;padding:0;border-radius:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,sans-serif;font-size:14px;line-height:1.5;z-index:2147483647;box-shadow:0 18px 50px rgba(15,23,42,.18),0 4px 14px rgba(15,23,42,.08);width:min(400px,calc(100vw - 32px));overflow:hidden;border:1px solid rgba(228,228,231,.95);animation:anjava-in .28s cubic-bezier(.16,1,.3,1);pointer-events:auto}#${TID}:before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:#ef4444}#${TID}.suc:before{background:#22c55e}#${TID} .ah{display:flex;align-items:center;gap:12px;padding:16px 18px 10px}#${TID} .ai{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:#fef2f2;color:#dc2626;font-size:18px;flex-shrink:0}#${TID}.suc .ai{background:#ecfdf5;color:#16a34a}#${TID} .at{font-weight:800;font-size:14px;color:#111827;flex:1;letter-spacing:0}#${TID} .ac{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:0;border-radius:999px;background:#f4f4f5;color:#71717a;cursor:pointer;font-size:15px;padding:0;line-height:1}#${TID} .ac:hover{background:#e4e4e7;color:#27272a}#${TID} .ab{padding:0 18px 16px 62px;font-size:13px;color:#52525b;line-height:1.55;word-break:keep-all}#${TID} .ap{height:3px;background:#ef4444;animation:anjava-progress 6s linear forwards;transform-origin:left}#${TID}.suc .ap{background:#22c55e}#${TID}.out{animation:anjava-out .22s ease forwards}@keyframes anjava-in{from{opacity:0;transform:translateX(28px) scale(.98)}to{opacity:1;transform:translateX(0) scale(1)}}@keyframes anjava-out{to{opacity:0;transform:translateX(28px) scale(.98)}}@keyframes anjava-progress{from{transform:scaleX(1)}to{transform:scaleX(0)}}`
-          document.head.appendChild(s)
-        }
-        const old = document.getElementById(TID); if (old) old.remove()
-        const el = document.createElement("div"); el.id = TID
-        if (successMode) el.classList.add("suc")
-        const hdr = document.createElement("div"); hdr.className = "ah"
-        const ico = document.createElement("span"); ico.className = "ai"; ico.textContent = successMode ? "✅" : "⚠️"
-        const ttl = document.createElement("span"); ttl.className = "at"; ttl.textContent = "자세 교정 알림"
-        const cls = document.createElement("button"); cls.className = "ac"; cls.textContent = "✕"
-        cls.onclick = () => { el.classList.add("out"); setTimeout(() => el.remove(), 240) }
-        hdr.append(ico, ttl, cls)
-        const bdy = document.createElement("div"); bdy.className = "ab"; bdy.textContent = toastText
-        const bar = document.createElement("div"); bar.className = "ap"
-        el.append(hdr, bdy, bar); document.body.appendChild(el)
-        playTone()
-        setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 240) }, 6000)
-      },
-      args: [text, isGood, soundEnabled]
-    }).catch((e) => console.error("[toast] 주입 실패:", tab.url, e)))
-  }
+
+  const tasks = tabs
+    .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
+    .map((tab) => chrome.tabs.sendMessage(tab.id!, msg).catch((e) => {
+      console.warn("[toast] content script ??? ?? ??:", tab.url, e)
+    }))
+
   await Promise.allSettled(tasks)
 }
 

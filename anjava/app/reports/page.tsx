@@ -16,6 +16,7 @@ import {
   type ReportDetail,
   type ReportStatus,
 } from "../lib/api";
+import AppToast from "../components/AppToast";
 
 const STATUS_CONFIG: Record<ReportStatus, { label: string; cls: string }> = {
   PENDING: { label: "대기 중", cls: "bg-amber-50 text-amber-600 ring-1 ring-amber-200" },
@@ -321,9 +322,7 @@ export default function ReportsPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl bg-zinc-900 px-5 py-3 text-sm text-white shadow-xl">
-          {toast}
-        </div>
+        <AppToast message={toast} />
       )}
     </div>
   );

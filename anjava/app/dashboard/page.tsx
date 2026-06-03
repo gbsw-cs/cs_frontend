@@ -395,13 +395,16 @@ export default function DashboardPage() {
 
   // 주간 선형 차트 값
   const mondayKST = getMondayKST();
+  const todayKST = getKSTDate();
   const weeklyDays = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(`${mondayKST}T00:00:00+09:00`);
     date.setDate(date.getDate() + i);
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
-    const day = weekly?.days.find((item) => item.date === dateKey);
+    const isFuture = dateKey > todayKST;
+    const day = isFuture ? undefined : weekly?.days.find((item) => item.date === dateKey);
     return {
       date: dateKey,
+      isFuture,
       badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
     };
   });
@@ -464,7 +467,7 @@ export default function DashboardPage() {
     : "자세 데이터 수집 중...";
 
   return (
-    <div className="h-screen overflow-hidden bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3">
+    <div className="h-dvh overflow-hidden bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3">
       <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col">
         {/* Top badge */}
         <div className="mb-2 flex shrink-0 justify-center">
@@ -473,12 +476,12 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[204px_240px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-hidden lg:grid-rows-[190px_220px_minmax(0,1fr)]">
 
           {/* ── Row 1 ── */}
 
           {/* 프로필 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-[204px]">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-full">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
@@ -514,7 +517,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-[204px]">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-full">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -559,7 +562,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-[250px]">
+          <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-full">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -583,7 +586,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-1.5 h-[216px] w-full overflow-hidden rounded-xl">
+            <div className="relative mt-1.5 min-h-0 flex-1 overflow-hidden rounded-xl">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 pushEnabled={me?.settings?.pushEnabled ?? true}
@@ -716,7 +719,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-[185px] lg:self-end">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-full lg:self-end">
             <div className="mt-1 flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
             </div>
@@ -845,11 +848,11 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr]">
-              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-3 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr]">
+              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-2 ring-1 ring-[#2563EB]/15 lg:col-span-1">
                 <div className="text-[10px] font-medium text-[#2563EB]">총 감지 스크린타임</div>
-                <div className="mt-1 text-2xl font-bold text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
-                <div className="mt-1 text-[10px] text-zinc-400">
+                <div className="mt-0.5 text-xl font-bold text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
+                <div className="mt-0.5 truncate text-[10px] text-zinc-400">
                   {weeklyScreenSec === null ? "주간 비율과 지속시간이 쌓이면 계산됩니다." : `비정상 자세 ${weeklyRiskPct}%`}
                 </div>
               </div>
@@ -858,32 +861,32 @@ export default function DashboardPage() {
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-6">
               <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
               <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
               <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
-              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+              <div className="rounded-lg px-3 py-1.5 ring-1 ring-zinc-100">
                 <div className="text-[10px] text-zinc-400">평균 위험도</div>
-                <div className="mt-1 text-base font-bold text-zinc-900">{weeklyAvgBadPct}%</div>
+                <div className="mt-0.5 text-sm font-bold text-zinc-900">{weeklyAvgBadPct}%</div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
                   <div className="h-full rounded-full bg-rose-400" style={{ width: `${weeklyAvgBadPct}%` }} />
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 grid shrink-0 grid-cols-2 gap-2">
-              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
+              <div className="rounded-lg px-3 py-1.5 ring-1 ring-zinc-100">
                 <div className="text-[10px] text-zinc-400">최악 요일</div>
-                <div className="text-lg font-bold text-rose-500">{worstWeekdayLabel}</div>
+                <div className="text-sm font-bold text-rose-500">{worstWeekdayLabel}</div>
               </div>
-              <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+              <div className="rounded-lg px-3 py-1.5 ring-1 ring-zinc-100">
                 <div className="text-[10px] text-zinc-400">정자세 비율</div>
-                <div className="text-lg font-bold text-[#2563EB]">{goodPct}%</div>
+                <div className="text-sm font-bold text-[#2563EB]">{goodPct}%</div>
               </div>
             </div>
 
-            <div className="mt-4 flex min-h-0 flex-1 flex-col">
-              <div className="mb-2 flex items-center justify-between">
+            <div className="mt-2 flex min-h-0 flex-1 flex-col">
+              <div className="mb-1.5 flex items-center justify-between">
                 <div className="text-[10px] font-semibold text-zinc-500">요일별 비정상 자세 비율</div>
                 <div className="text-[9px] text-zinc-400">낮을수록 좋음</div>
               </div>
@@ -893,9 +896,12 @@ export default function DashboardPage() {
                 return (
                   <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-2">
                     {values.map((value, i) => {
+                      const isFuture = weeklyDays[i]?.isFuture;
                       const height = value === null ? 6 : Math.max(8, Math.round(value));
                       const tone =
-                        value === null
+                        isFuture
+                          ? "bg-zinc-100"
+                          : value === null
                           ? "bg-zinc-200"
                           : value >= 60
                           ? "bg-rose-400"
@@ -903,11 +909,11 @@ export default function DashboardPage() {
                           ? "bg-amber-400"
                           : "bg-emerald-400";
                       return (
-                        <div key={dayLabels[i]} className="flex min-h-[92px] flex-col items-center justify-end gap-1.5">
+                        <div key={dayLabels[i]} className="flex min-h-[64px] flex-col items-center justify-end gap-1">
                           <div className="text-[9px] font-semibold text-zinc-400">
                             {value === null ? "—" : `${Math.round(value)}%`}
                           </div>
-                          <div className="flex h-14 w-full items-end rounded-full bg-zinc-100 px-1">
+                          <div className="flex h-10 w-full items-end rounded-full bg-zinc-100 px-1">
                             <div
                               className={`w-full rounded-full transition-all ${tone}`}
                               style={{ height: `${height}%` }}
@@ -945,9 +951,9 @@ function WeeklyMetric({ label, value, tone }: { label: string; value: string; to
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="rounded-xl px-3 py-3 ring-1 ring-zinc-100">
+    <div className="rounded-xl px-3 py-2 ring-1 ring-zinc-100">
       <div className="text-[10px] text-zinc-400">{label}</div>
-      <div className={`mt-1 text-lg font-bold ${toneClass}`}>{value}</div>
+      <div className={`mt-0.5 text-base font-bold ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -955,12 +961,12 @@ function WeeklyMetric({ label, value, tone }: { label: string; value: string; to
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg px-3 py-2 ring-1 ring-zinc-100">
+    <div className="rounded-lg px-3 py-1.5 ring-1 ring-zinc-100">
       <div className="flex items-center justify-between gap-2">
         <div className="truncate text-[10px] text-zinc-400">{label}</div>
         <div className="text-[10px] font-semibold text-zinc-500">{pct}%</div>
       </div>
-      <div className="mt-1 text-sm font-bold text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-0.5 text-xs font-bold text-zinc-900">{formatDuration(sec)}</div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>

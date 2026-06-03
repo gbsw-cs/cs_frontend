@@ -384,9 +384,7 @@ function Slide3() {
           </p>
         </div>
       </div>
-      <div className="flex aspect-square w-full max-w-[260px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400 ring-1 ring-zinc-100">
-        관련 도움되는 이미지
-      </div>
+      <PermissionIllustration />
     </div>
   );
 }
@@ -394,9 +392,7 @@ function Slide3() {
 function Slide4() {
   return (
     <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
-      <div className="flex aspect-square w-full max-w-[260px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400 ring-1 ring-zinc-100">
-        관련 도움되는 이미지
-      </div>
+      <CameraPositionIllustration />
       <div>
         <h2 className="text-2xl font-bold text-zinc-900 sm:text-3xl">최적의 위치 찾기</h2>
         <p className="mt-3 text-sm leading-relaxed text-zinc-500">
@@ -418,6 +414,63 @@ function Slide4() {
             title="충분한 조명"
             desc="얼굴이 선명하게 보이도록 확보"
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PermissionIllustration() {
+  return (
+    <div className="relative flex aspect-square w-full max-w-[280px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-zinc-50 p-5 ring-1 ring-zinc-100">
+      <div className="absolute left-5 top-5 h-2 w-2 rounded-full bg-emerald-400" />
+      <div className="w-full rounded-2xl bg-white p-4 shadow-[0_14px_40px_rgba(37,99,235,0.14)] ring-1 ring-blue-100">
+        <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
+          <div className="h-3 w-3 rounded-full bg-rose-300" />
+          <div className="h-3 w-3 rounded-full bg-amber-300" />
+          <div className="h-3 w-3 rounded-full bg-emerald-300" />
+        </div>
+        <div className="mt-4 rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-100">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2563EB]/10 text-[#2563EB]">
+              <Camera size={19} />
+            </div>
+            <div className="min-w-0">
+              <div className="h-2.5 w-24 rounded-full bg-zinc-300" />
+              <div className="mt-2 h-2 w-32 rounded-full bg-zinc-200" />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <div className="h-8 w-14 rounded-lg bg-zinc-200" />
+            <div className="flex h-8 w-16 items-center justify-center rounded-lg bg-[#2563EB] text-[10px] font-bold text-white">
+              Allow
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CameraPositionIllustration() {
+  return (
+    <div className="relative flex aspect-square w-full max-w-[280px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-blue-50 p-5 ring-1 ring-zinc-100">
+      <div className="absolute bottom-7 h-3 w-40 rounded-full bg-zinc-200" />
+      <div className="relative flex h-52 w-44 flex-col items-center rounded-[2rem] bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.12)] ring-1 ring-zinc-100">
+        <div className="flex h-28 w-full items-center justify-center rounded-2xl bg-zinc-900">
+          <div className="relative h-20 w-16">
+            <div className="absolute left-1/2 top-0 h-8 w-8 -translate-x-1/2 rounded-full bg-[#F4C7A1]" />
+            <div className="absolute left-1/2 top-9 h-11 w-14 -translate-x-1/2 rounded-t-3xl bg-[#2563EB]" />
+            <div className="absolute left-[9px] top-11 h-8 w-1.5 rotate-12 rounded-full bg-[#F4C7A1]" />
+            <div className="absolute right-[9px] top-11 h-8 w-1.5 -rotate-12 rounded-full bg-[#F4C7A1]" />
+          </div>
+        </div>
+        <div className="mt-4 flex w-full items-center justify-between text-[10px] font-semibold text-zinc-500">
+          <span>50-70cm</span>
+          <span className="text-[#2563EB]">Eye level</span>
+        </div>
+        <div className="mt-3 h-2 w-full rounded-full bg-zinc-100">
+          <div className="h-full w-3/4 rounded-full bg-[#2563EB]" />
         </div>
       </div>
     </div>

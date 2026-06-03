@@ -22,6 +22,7 @@ import {
 } from "../lib/api";
 import { deleteWebPushToken, syncWebPushToken } from "../lib/fcm";
 import { validatePassword } from "../lib/validation";
+import AppToast from "../components/AppToast";
 import AvatarColored from "../components/AvatarColored";
 import {
   applyUiTheme,
@@ -631,9 +632,7 @@ export default function SettingsPage() {
       </div>
 
       {toast && (
-        <div className="pointer-events-none fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-zinc-900/90 px-4 py-2 text-xs font-medium text-white shadow-lg">
-          {toast}
-        </div>
+        <AppToast message={toast} avatarColorId={settings.avatarHoodColor} />
       )}
     </div>
   );
