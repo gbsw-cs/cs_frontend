@@ -12,13 +12,14 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Monitor,
   MousePointerClick,
   Settings,
   ShieldCheck,
   Sliders,
 } from "lucide-react";
 
-const TOTAL = 3;
+const TOTAL = 4;
 const STORE_URL =
   process.env.NEXT_PUBLIC_EXTENSION_STORE_URL ??
   "https://chromewebstore.google.com/detail/anjava-extend/ieiojonlbjdkdlpjlcfealifodahjfal";
@@ -56,6 +57,7 @@ export default function ExtensionGuidePage() {
               {step === 1 && <Slide1 storeUrl={STORE_URL} />}
               {step === 2 && <Slide2 storeUrl={STORE_URL} />}
               {step === 3 && <Slide3 />}
+              {step === 4 && <Slide4 />}
             </div>
           </div>
 
@@ -192,6 +194,31 @@ function Slide3() {
   );
 }
 
+function Slide4() {
+  return (
+    <div className="grid w-full max-w-[840px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_300px] md:gap-12">
+      <div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB]/10 text-[#2563EB]">
+          <Bell size={22} />
+        </div>
+        <h2 className="mt-5 text-2xl font-bold text-zinc-900 sm:text-3xl">3. 알림이 안 보일 때 확인하기</h2>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+          Discord나 전체화면 앱을 켜둔 상태에서는 Windows 알림 설정 때문에 배너가 숨겨질 수 있습니다.
+        </p>
+        <div className="mt-5 grid gap-2.5">
+          <SetupRow label="Windows 알림" desc="설정 → 시스템 → 알림에서 Chrome 알림을 허용하세요." />
+          <SetupRow label="방해 금지" desc="집중 지원 또는 방해 금지를 꺼주세요." />
+          <SetupRow label="Chrome 사이트 권한" desc="주소창 왼쪽 아이콘 → 사이트 설정 → 알림을 허용하세요." />
+          <SetupRow label="알림 배너" desc="Windows 알림의 Chrome 항목에서 알림 배너 표시를 켜세요." />
+          <SetupRow label="Discord 전체화면" desc="전체화면 모드에서는 알림 배너가 숨겨질 수 있어요." />
+        </div>
+      </div>
+
+      <NotificationSettingsVisual />
+    </div>
+  );
+}
+
 function GuideVisual({ title }: { title: string }) {
   return (
     <div className="mx-auto w-full max-w-[280px] rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
@@ -269,11 +296,62 @@ function PermissionVisual() {
   );
 }
 
+function NotificationSettingsVisual() {
+  return (
+    <div className="mx-auto w-full max-w-[300px] rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
+      <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2563EB]/10 text-[#2563EB]">
+            <Monitor size={19} />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-zinc-900">Windows 알림</div>
+            <div className="mt-0.5 text-[11px] text-zinc-400">Chrome 배너 허용</div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2.5">
+          <VisualToggle label="Chrome 알림" on />
+          <VisualToggle label="방해 금지" />
+          <VisualToggle label="알림 배너" on />
+        </div>
+        <div className="mt-4 rounded-xl bg-[#2563EB]/5 px-3 py-2 text-[11px] leading-relaxed text-[#2563EB] ring-1 ring-[#2563EB]/15">
+          Discord를 보고 있어도 Windows 알림 배너가 화면 구석에 표시됩니다.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VisualCheck({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2">
       <CheckCircle2 size={14} className="text-emerald-500" />
       <span className="text-[11px] font-semibold text-zinc-600">{label}</span>
+    </div>
+  );
+}
+
+function VisualToggle({ label, on = false }: { label: string; on?: boolean }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2">
+      <span className="text-[11px] font-semibold text-zinc-600">{label}</span>
+      <span className={`relative h-5 w-9 rounded-full ${on ? "bg-[#2563EB]" : "bg-zinc-300"}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm ${on ? "left-[18px]" : "left-0.5"}`} />
+      </span>
+    </div>
+  );
+}
+
+function SetupRow({ label, desc }: { label: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-zinc-100">
+      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2563EB]/10">
+        <Check size={12} className="text-[#2563EB]" strokeWidth={2.6} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[13px] font-semibold text-zinc-800">{label}</div>
+        <div className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">{desc}</div>
+      </div>
     </div>
   );
 }

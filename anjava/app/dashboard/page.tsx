@@ -99,6 +99,11 @@ function formatDuration(sec: number | null): string {
   return `${m}m`;
 }
 
+function formatMonthDay(dateKey: string): string {
+  const [, month, day] = dateKey.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
 function createEmptyDailySlots(): DailySlot[] {
   return Array.from({ length: 8 }, (_, i) => ({
     slotIndex: i,
@@ -413,6 +418,7 @@ export default function DashboardPage() {
   );
   const weeklyFilledValues = weeklyValues.filter((value): value is number => value !== null);
   const weeklyFilledDays = weeklyFilledValues.length;
+  const weeklyDateRangeLabel = `${formatMonthDay(mondayKST)}~${formatMonthDay(todayKST)}`;
   const weeklyAvgBadPct =
     weeklyFilledDays > 0
       ? Math.round(weeklyFilledValues.reduce((sum, value) => sum + value, 0) / weeklyFilledDays)
@@ -844,7 +850,7 @@ export default function DashboardPage() {
                 <div className="mt-0.5 text-[10px] text-zinc-400">이번 주 감지 시간과 자세 위험도를 요약합니다.</div>
               </div>
               <div className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
-                {weeklyFilledDays}/7일 기록
+                {weeklyDateRangeLabel} 기록
               </div>
             </div>
 
