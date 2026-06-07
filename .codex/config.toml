@@ -13,6 +13,10 @@ Before completion, run available package scripts from the affected subproject.
 Use npm in anjava/ and pnpm in anjava-extend/. Prefer lint, test, and build in
 that order when those scripts exist. Also run typecheck and test:e2e when those
 scripts exist and are relevant. Never claim a command passed unless it was run.
+For Anjava web work, preserve auth redirects, webcam guide, extension guide,
+dashboard data loading, and settings behavior. For Anjava extension work,
+preserve popup login, chrome.storage.local state, baseline handoff, offscreen
+detection, notifications, content-script toasts, and backend timeline sync.
 """
 
 [agents]

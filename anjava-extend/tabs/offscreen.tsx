@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react"
 
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
+const DEBUG_ENABLED = process.env.PLASMO_PUBLIC_DEBUG === "1"
 
 const SEVERITY: Record<string, number> = {
   TURTLE_NECK: 2,
@@ -24,6 +25,34 @@ interface DetectionEvent {
 }
 
 interface Landmark { x: number; y: number; z: number }
+type PoseLandmark = Partial<Landmark> & { visibility?: number }
+type PoseDetector = {
+  detectForVideo(video: HTMLVideoElement, timestamp: number): {
+    worldLandmarks?: PoseLandmark[][]
+    landmarks?: PoseLandmark[][]
+  }
+}
+type OffscreenMessage =
+  | {
+      type: "START_DETECTION"
+      accessToken: string
+      userId: string
+      baselineData?: unknown
+      sessionId?: string
+      settings?: { darkDetectionEnabled?: boolean }
+    }
+  | { type: "STOP_DETECTION" }
+  | { type: "UPDATE_SETTINGS"; settings?: { darkDetectionEnabled?: boolean } }
+type EventFlushResponse = {
+  data?: { accepted?: number }
+}
+type BaselinePayload = {
+  data?: {
+    baseline?: {
+      brightness?: number
+    }
+  }
+}
 interface Frame {
   timestamp: string; visibility: number
   nose: Landmark; left_ear: Landmark; right_ear: Landmark
@@ -32,9 +61,13 @@ interface Frame {
 
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
-function lm(arr: any[] | undefined, i: number): Landmark {
+function debugLog(...args: unknown[]): void {
+  if (DEBUG_ENABLED) console.log(...args)
+}
+
+function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
   if (!arr?.[i]) return EMPTY
-  return { x: arr[i].x, y: arr[i].y, z: Math.max(-2, arr[i].z) }
+  return { x: arr[i].x ?? EMPTY.x, y: arr[i].y ?? EMPTY.y, z: Math.max(-2, arr[i].z ?? EMPTY.z) }
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -45,9 +78,14 @@ function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): nu
   return Math.round(sum / (d.length / 4))
 }
 
+function getBaselineBrightness(baselineData: unknown): number | null {
+  const brightness = (baselineData as BaselinePayload | undefined)?.data?.baseline?.brightness
+  return typeof brightness === "number" ? brightness : null
+}
+
 export default function OffscreenPage() {
   const streamRef         = useRef<MediaStream | null>(null)
-  const detectorRef       = useRef<any>(null)
+  const detectorRef       = useRef<PoseDetector | null>(null)
   const cancelledRef      = useRef(false)
   const framesRef         = useRef<Frame[]>([])
   const lastAlertMsRef    = useRef(0)
@@ -65,7 +103,11 @@ export default function OffscreenPage() {
   const batchTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    const handleMessage = (msg: any, _sender: any, sendResponse: any) => {
+    const handleMessage = (
+      msg: OffscreenMessage,
+      _sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: { ok: boolean }) => void,
+    ) => {
       if (msg?.type === "START_DETECTION") {
         darkModeRef.current = msg.settings?.darkDetectionEnabled ?? false
         sessionIdRef.current = msg.sessionId ?? ""
@@ -163,13 +205,13 @@ export default function OffscreenPage() {
         signal: controller.signal,
       })
       clearTimeout(timeoutId)
-      const body = await res.json().catch(() => ({}))
+      const body = await res.json().catch(() => ({})) as EventFlushResponse
       if (res.ok) {
         chrome.runtime.sendMessage({
           type: "FLUSH_RESULT",
           ok: true,
           count: events.length,
-          accepted: (body as any)?.data?.accepted ?? events.length,
+          accepted: body.data?.accepted ?? events.length,
           sessionId: currentSessionId,
         }).catch(() => {})
       } else {
@@ -182,13 +224,14 @@ export default function OffscreenPage() {
           sessionId: currentSessionId,
         }).catch(() => {})
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       eventQueueRef.current.unshift(...events)
+      const message = e instanceof Error ? e.message : "네트워크 오류"
       chrome.runtime.sendMessage({
         type: "FLUSH_RESULT",
         ok: false,
         status: 0,
-        body: e?.message ?? "네트워크 오류",
+        body: message,
         sessionId: currentSessionId,
       }).catch(() => {})
     }
@@ -205,7 +248,7 @@ export default function OffscreenPage() {
     detectorRef.current = null
   }
 
-  async function startDetection(accessToken: string, userId: string, baselineData: any) {
+  async function startDetection(accessToken: string, userId: string, baselineData: unknown) {
     accessTokenRef.current = accessToken   // tick에서 storage 재접근 불필요
     cancelledRef.current = false
     framesRef.current = []
@@ -288,14 +331,14 @@ export default function OffscreenPage() {
 
       const rawBrightness = calcBrightness(ctx, canvas.width, canvas.height)
       if (!calibrated) {
-        const storedBrightness: number | null = baselineData?.data?.baseline?.brightness ?? null
+        const storedBrightness = getBaselineBrightness(baselineData)
         if (storedBrightness !== null && rawBrightness > 0)
           brightnessOffset = rawBrightness - storedBrightness
         calibrated = true
       }
 
-      let pts: any[] | undefined
-      let ptsNorm: any[] | undefined
+      let pts: PoseLandmark[] | undefined
+      let ptsNorm: PoseLandmark[] | undefined
       try {
         if (detectorRef.current) {
           const result = detectorRef.current.detectForVideo(vid, performance.now())
@@ -338,7 +381,7 @@ export default function OffscreenPage() {
               const code = errJson?.error?.code
               if (code === "E_ENVIRONMENT_DRIFT") {
                 calibrated = false; brightnessOffset = 0
-                console.log("[offscreen] 환경 변화 감지 → 재보정")
+                debugLog("[offscreen] 환경 변화 감지 → 재보정")
               } else if (code === "E_INVALID_BASELINE") {
                 console.warn("[offscreen] baseline 없음 → 베이스라인 재측정 필요")
                 chrome.runtime.sendMessage({ type: "BASELINE_REQUIRED" }).catch(() => {})

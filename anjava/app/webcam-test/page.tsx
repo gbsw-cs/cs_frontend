@@ -9,6 +9,7 @@ const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
 const DURATION_MS = 10_000
 const INTERVAL_MS = 200
+const DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG === "1"
 
 interface Landmark { x: number; y: number; z: number }
 type PoseLandmark = Partial<Landmark> & { visibility?: number }
@@ -42,6 +43,10 @@ interface Frame {
 
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
+function debugLog(...args: unknown[]): void {
+  if (DEBUG_ENABLED) console.log(...args)
+}
+
 function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
   const point = arr?.[i]
   return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z } : EMPTY
@@ -72,20 +77,30 @@ function WebcamTest() {
 
   // 웹캠 시작
   useEffect(() => {
+    let mounted = true
+    let streamRef: MediaStream | null = null
+    const video = videoRef.current
+
     navigator.mediaDevices
       .getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } })
       .then((stream) => {
-        if (!videoRef.current) return
-        videoRef.current.srcObject = stream
-        videoRef.current.onloadedmetadata = () => setPhase("ready")
+        streamRef = stream
+        if (!mounted || !video) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+        video.srcObject = stream
+        video.onloadedmetadata = () => setPhase("ready")
       })
       .catch(() => {
+        if (!mounted) return
         setErrMsg("카메라 접근 권한이 필요합니다.")
         setPhase("error")
       })
     return () => {
-      const v = videoRef.current
-      if (v?.srcObject) (v.srcObject as MediaStream).getTracks().forEach(t => t.stop())
+      mounted = false
+      streamRef?.getTracks().forEach(t => t.stop())
+      if (video?.srcObject) video.srcObject = null
     }
   }, [])
 
@@ -149,8 +164,8 @@ function WebcamTest() {
         const rShoulderZ  = pts[12]?.z?.toFixed(4)
         const noseZNorm   = ptsNorm?.[0]?.z?.toFixed(4)
         const lSNorm      = ptsNorm?.[11]?.z?.toFixed(4)
-        console.log(`[frame ${framesRef.current.length}] world z → nose:${noseZ} lShoulder:${lShoulderZ} rShoulder:${rShoulderZ}`)
-        console.log(`[frame ${framesRef.current.length}] norm  z → nose:${noseZNorm} lShoulder:${lSNorm}`)
+        debugLog(`[frame ${framesRef.current.length}] world z → nose:${noseZ} lShoulder:${lShoulderZ} rShoulder:${rShoulderZ}`)
+        debugLog(`[frame ${framesRef.current.length}] norm  z → nose:${noseZNorm} lShoulder:${lSNorm}`)
       }
 
       framesRef.current.push({
@@ -191,7 +206,7 @@ function WebcamTest() {
       if (frames.length === 0) throw new Error("수집된 프레임이 없습니다.")
 
       const validCount = frames.filter(f => f.visibility >= 0.8).length
-      console.log(`[webcam-test] 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%)`)
+      debugLog(`[webcam-test] 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%)`)
 
       const res = await fetch(`/v1/baseline/cal`, {
         method: "POST",

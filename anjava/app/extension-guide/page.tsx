@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { markOnboardingComplete } from "../lib/api";
 import {
   Bell,
@@ -23,10 +23,40 @@ const TOTAL = 5;
 const STORE_URL =
   process.env.NEXT_PUBLIC_EXTENSION_STORE_URL ??
   "https://chromewebstore.google.com/detail/anjava-extend/ieiojonlbjdkdlpjlcfealifodahjfal";
+const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "";
+
+type ExtensionInstallStatus = "unknown" | "installed" | "missing" | "unconfigured";
+type ChromeRuntimeWindow = Window & {
+  chrome?: {
+    runtime?: {
+      sendMessage: (
+        extensionId: string,
+        message: unknown,
+        responseCallback?: (response?: { ok?: boolean }) => void,
+      ) => void
+    }
+  }
+}
 
 export default function ExtensionGuidePage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [extensionStatus, setExtensionStatus] = useState<ExtensionInstallStatus>(
+    EXTENSION_ID ? "unknown" : "unconfigured",
+  );
+
+  useEffect(() => {
+    if (!EXTENSION_ID) return;
+    const runtime = (window as ChromeRuntimeWindow).chrome?.runtime;
+    if (!runtime?.sendMessage) {
+      window.setTimeout(() => setExtensionStatus("missing"), 0);
+      return;
+    }
+
+    runtime.sendMessage(EXTENSION_ID, { type: "PING" }, (response) => {
+      setExtensionStatus(response?.ok ? "installed" : "missing");
+    });
+  }, []);
 
   function onNext() {
     if (step < TOTAL) {
@@ -57,7 +87,7 @@ export default function ExtensionGuidePage() {
               {step === 1 && <Slide1 storeUrl={STORE_URL} />}
               {step === 2 && <Slide2 storeUrl={STORE_URL} />}
               {step === 3 && <Slide3 />}
-              {step === 4 && <Slide4 storeUrl={STORE_URL} />}
+              {step === 4 && <Slide4 storeUrl={STORE_URL} extensionStatus={extensionStatus} />}
               {step === 5 && <Slide5 />}
             </div>
           </div>
@@ -195,7 +225,13 @@ function Slide3() {
   );
 }
 
-function Slide4({ storeUrl }: { storeUrl: string }) {
+function Slide4({
+  storeUrl,
+  extensionStatus,
+}: {
+  storeUrl: string
+  extensionStatus: ExtensionInstallStatus
+}) {
   return (
     <div className="grid w-full max-w-[860px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_300px] md:gap-12">
       <div>
@@ -213,6 +249,7 @@ function Slide4({ storeUrl }: { storeUrl: string }) {
           <SetupRow label="자세 다시측정하기" desc="팝업의 측정 버튼을 눌러 10초 베이스라인 측정을 완료합니다." />
           <SetupRow label="세션 시작하기" desc="측정 완료 후 팝업에서 세션을 시작하면 자세 감지와 알림이 동작합니다." />
         </div>
+        <ExtensionStatusBadge status={extensionStatus} />
         <a
           href={storeUrl}
           target="_blank"
@@ -224,7 +261,7 @@ function Slide4({ storeUrl }: { storeUrl: string }) {
         </a>
       </div>
 
-      <ActivationVisual />
+      <ActivationVisual extensionStatus={extensionStatus} />
     </div>
   );
 }
@@ -357,7 +394,7 @@ function NotificationSettingsVisual() {
   );
 }
 
-function ActivationVisual() {
+function ActivationVisual({ extensionStatus }: { extensionStatus: ExtensionInstallStatus }) {
   return (
     <div className="mx-auto w-full max-w-[300px] rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
       <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
@@ -371,7 +408,7 @@ function ActivationVisual() {
           </div>
         </div>
         <div className="mt-4 space-y-2">
-          <VisualCheck label="Anjava extend 설치" />
+          <VisualCheck label={extensionStatus === "installed" ? "Anjava extend 설치 확인됨" : "Anjava extend 설치"} />
           <VisualCheck label="확장 팝업 로그인" />
           <VisualCheck label="10초 베이스라인 측정" />
           <VisualCheck label="감지 세션 시작" />
@@ -380,6 +417,23 @@ function ActivationVisual() {
           세션이 시작되면 자세 이상 알림과 대시보드 기록이 함께 업데이트됩니다.
         </div>
       </div>
+    </div>
+  );
+}
+
+function ExtensionStatusBadge({ status }: { status: ExtensionInstallStatus }) {
+  const copy =
+    status === "installed"
+      ? { text: "확장 프로그램 설치가 확인됐습니다.", cls: "bg-emerald-50 text-emerald-700 ring-emerald-100" }
+      : status === "missing"
+      ? { text: "확장이 감지되지 않았습니다. 설치 후 이 페이지를 새로고침하세요.", cls: "bg-amber-50 text-amber-700 ring-amber-100" }
+      : status === "unconfigured"
+      ? { text: "확장 ID가 설정되면 설치 여부를 자동 확인할 수 있습니다.", cls: "bg-zinc-50 text-zinc-500 ring-zinc-100" }
+      : { text: "확장 설치 여부를 확인하는 중입니다.", cls: "bg-[#2563EB]/5 text-[#2563EB] ring-[#2563EB]/15" };
+
+  return (
+    <div className={`mt-4 rounded-xl px-4 py-3 text-xs font-semibold ring-1 ${copy.cls}`}>
+      {copy.text}
     </div>
   );
 }

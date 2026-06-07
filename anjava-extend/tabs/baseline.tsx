@@ -6,8 +6,16 @@ const API_BASE = `${WEB_URL}/api/backend`
 
 const DURATION_MS = 10_000
 const INTERVAL_MS = 200
+const DEBUG_ENABLED = process.env.PLASMO_PUBLIC_DEBUG === "1"
 
 interface Landmark { x: number; y: number; z: number }
+type PoseLandmark = Partial<Landmark> & { visibility?: number }
+type PoseDetector = {
+  detectForVideo(video: HTMLVideoElement, timestamp: number): {
+    worldLandmarks?: PoseLandmark[][]
+    landmarks?: PoseLandmark[][]
+  }
+}
 interface Frame {
   timestamp:      string
   visibility:     number
@@ -21,8 +29,13 @@ interface Frame {
 
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
-function lm(arr: any[] | undefined, i: number): Landmark {
-  return arr?.[i] ? { x: arr[i].x, y: arr[i].y, z: arr[i].z } : EMPTY
+function debugLog(...args: unknown[]): void {
+  if (DEBUG_ENABLED) console.log(...args)
+}
+
+function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
+  const point = arr?.[i]
+  return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z } : EMPTY
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -38,7 +51,7 @@ type Phase = "cam" | "ready" | "collecting" | "uploading" | "done" | "error"
 export default function BaselinePage() {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const canvasRef   = useRef<HTMLCanvasElement>(null)
-  const detectorRef = useRef<any>(null)
+  const detectorRef = useRef<PoseDetector | null>(null)
   const framesRef   = useRef<Frame[]>([])
 
   const [phase, setPhase]       = useState<Phase>("cam")
@@ -69,9 +82,9 @@ export default function BaselinePage() {
   async function initDetector() {
     const { PoseLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision")
     const wasmPath = chrome.runtime.getURL("assets/mediapipe-wasm")
-    console.log("[baseline-tab] WASM 경로:", wasmPath)
+    debugLog("[baseline-tab] WASM 경로:", wasmPath)
     const vision = await FilesetResolver.forVisionTasks(wasmPath)
-    console.log("[baseline-tab] FilesetResolver 완료")
+    debugLog("[baseline-tab] FilesetResolver 완료")
     const MODEL = chrome.runtime.getURL("assets/mediapipe-wasm/pose_landmarker_lite.task")
     const opts = (delegate: "GPU" | "CPU") => ({
       baseOptions: { modelAssetPath: MODEL, delegate },
@@ -80,11 +93,11 @@ export default function BaselinePage() {
     })
     try {
       detectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("GPU"))
-      console.log("[baseline-tab] GPU delegate 성공")
+      debugLog("[baseline-tab] GPU delegate 성공")
     } catch (gpuErr) {
       console.warn("[baseline-tab] GPU 실패, CPU로 재시도:", gpuErr)
       detectorRef.current = await PoseLandmarker.createFromOptions(vision, opts("CPU"))
-      console.log("[baseline-tab] CPU delegate 성공")
+      debugLog("[baseline-tab] CPU delegate 성공")
     }
   }
 
@@ -120,8 +133,8 @@ export default function BaselinePage() {
 
       ctx.drawImage(video, 0, 0)
 
-      let pts: any[] | undefined
-      let ptsNorm: any[] | undefined
+      let pts: PoseLandmark[] | undefined
+      let ptsNorm: PoseLandmark[] | undefined
       try {
         if (detectorRef.current) {
           const result = detectorRef.current.detectForVideo(video, performance.now())
@@ -144,7 +157,7 @@ export default function BaselinePage() {
       framesRef.current.push(frame)
 
       if (framesRef.current.length % 5 === 1) {
-        console.log(`[baseline-tab] 프레임 ${framesRef.current.length} | visibility: ${frame.visibility.toFixed(3)} | brightness: ${frame.brightness}`)
+        debugLog(`[baseline-tab] 프레임 ${framesRef.current.length} | visibility: ${frame.visibility.toFixed(3)} | brightness: ${frame.brightness}`)
       }
 
       setTimeout(tick, INTERVAL_MS)
@@ -179,7 +192,7 @@ export default function BaselinePage() {
       if (frames.length === 0) throw new Error("수집된 프레임이 없습니다. 다시 시도해주세요.")
 
       const validCount = frames.filter(f => f.visibility >= 0.8).length
-      console.log(`[baseline-tab] 업로드 | 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%) | userId: ${finalId}`)
+      debugLog(`[baseline-tab] 업로드 | 총 ${frames.length}프레임 | visibility>=0.8: ${validCount}개 (${Math.round(validCount/frames.length*100)}%) | userId: ${finalId}`)
 
       const res = await fetch(`${WEB_URL}/v1/baseline/cal`, {
         method: "POST",

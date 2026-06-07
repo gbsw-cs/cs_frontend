@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -253,10 +254,8 @@ export default function DashboardPage() {
         serverDailySlotsRef.current = nextServerSlots;
         setServerDailySlots(nextServerSlots);
       } else console.error("[dashboard] daily 실패:", d.reason);
-      if (tl.status === "fulfilled") {
-        console.log("[dashboard] timeline 응답:", tl.value);
-        setTimeline(tl.value);
-      } else console.error("[dashboard] timeline 실패:", tl.reason);
+      if (tl.status === "fulfilled") setTimeline(tl.value);
+      else console.error("[dashboard] timeline 실패:", tl.reason);
     });
   }, []);
 
@@ -491,9 +490,16 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
-                  {me?.profileImg
-                    ? <img src={me.profileImg} className="h-16 w-16 object-cover" alt="프로필" />
-                    : "🌿"}
+                  {me?.profileImg ? (
+                    <Image
+                      src={me.profileImg}
+                      className="h-16 w-16 object-cover"
+                      alt="프로필"
+                      width={64}
+                      height={64}
+                      unoptimized
+                    />
+                  ) : "🌿"}
                 </div>
                 <div>
                   <div className="text-lg font-bold text-zinc-900">{me?.name ?? "—"}</div>

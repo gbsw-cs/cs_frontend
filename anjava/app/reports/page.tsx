@@ -32,22 +32,6 @@ const ISSUE_LABELS: Record<string, string> = {
   GOOD_POSTURE:       "바른 자세",
 };
 
-const ISSUE_COLORS: Record<string, string> = {
-  TURTLE_NECK:        "bg-amber-400",
-  ROUND_SHOULDER:     "bg-amber-400",
-  SHOULDER_ASYMMETRY: "bg-amber-400",
-  DARK_ENV:           "bg-slate-400",
-  GOOD_POSTURE:       "bg-emerald-400",
-};
-
-const ISSUE_BAR_COLORS: Record<string, string> = {
-  TURTLE_NECK:        "#fbbf24",
-  ROUND_SHOULDER:     "#fbbf24",
-  SHOULDER_ASYMMETRY: "#fbbf24",
-  DARK_ENV:           "#94a3b8",
-  GOOD_POSTURE:       "#34d399",
-};
-
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 function fmtDate(dateStr: string) {

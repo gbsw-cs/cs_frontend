@@ -1,14 +1,15 @@
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 const FCM_SENDER_ID = process.env.PLASMO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? ""
+const DEBUG_ENABLED = process.env.PLASMO_PUBLIC_DEBUG === "1"
 
 const BREAK_TIPS = [
-  "?? ???? ???? ????!",
-  "?? ?? 10?? ?????.",
-  "? ? ? ???? ?????.",
-  "?? ??? ?? ??? ?????.",
-  "??? ?? ?? ??? ?????.",
-  "????? ??? ???? ????."
+  "잠깐 일어나서 몸을 풀어주세요!",
+  "눈을 감고 10초간 쉬어보세요.",
+  "목과 어깨를 천천히 돌려보세요.",
+  "허리를 펴고 자세를 다시 잡아보세요.",
+  "물 한 잔 마시고 돌아오세요.",
+  "짧은 휴식이 집중력을 높여줍니다."
 ]
 
 const BREAK_ALARM = "break-reminder"
@@ -16,10 +17,74 @@ const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
 const APPROVAL_TIMEOUT_MS = 60_000
 
 let pendingOffscreenData: {
-  accessToken: string; userId: string; baselineData: any
+  accessToken: string; userId: string; baselineData: unknown
   sessionId: string
   settings: { darkDetectionEnabled: boolean }
 } | null = null
+
+type ExtensionSettings = {
+  postureInterval?: number
+  breakInterval?: number
+  pushEnabled?: boolean
+  soundEnabled?: boolean
+  darkDetectionEnabled?: boolean
+}
+
+type PostureMessage = {
+  type: "POSTURE_ALERT" | "POSTURE_ALERT_OFFSCREEN" | "POSTURE_ALERT_FROM_WEB"
+  state?: string
+  message?: string
+  soundEnabled?: boolean
+}
+
+type RuntimeMessage =
+  | { type: "GET_STATUS" }
+  | PostureMessage
+  | { type: "REQUEST_APPROVAL_NOTIFICATION"; title?: string; message?: string; allowLabel?: string; denyLabel?: string }
+  | { type: "OFFSCREEN_READY" }
+  | { type: "BASELINE_REQUIRED" }
+  | { type: "DETECTION_ACTIVE" }
+  | { type: "OFFSCREEN_CAMERA_ERROR"; name?: string; message?: string }
+  | { type: "FLUSH_START"; count: number; sessionId: string }
+  | { type: "OFFSCREEN_HEARTBEAT"; currentState: string; queueSize: number; hasToken: boolean }
+  | { type: "FLUSH_RESULT"; ok: boolean; count?: number; accepted?: number; sessionId: string; status?: number; body?: string }
+  | { type: "PAUSE_SESSION" }
+  | { type: "RESUME_SESSION" }
+  | { type: "END_SESSION" }
+  | { type: "LOGIN"; accessToken: string; refreshToken?: string }
+  | { type: "START_SESSION" }
+  | { type: "LOGOUT" }
+  | { type: "UPDATE_SETTINGS"; settings: ExtensionSettings }
+  | { type: "FETCH_USER_SETTINGS" }
+  | { type: "START_DETECTION" | "STOP_DETECTION" }
+
+type ExternalMessage =
+  | { type: "PING" }
+  | { type: "BASELINE_DONE"; baselineData: unknown }
+
+type ApiJson = {
+  data?: unknown
+  message?: string
+  error?: { message?: string; validationErrors?: unknown }
+  validationErrors?: unknown
+}
+
+type ApiError = Error & {
+  status?: number
+  responseBody?: unknown
+  validationErrors?: unknown
+}
+
+type UserInfoResponse = {
+  id: string
+  name?: string
+  profileImg?: string | null
+  settings: {
+    pushEnabled?: boolean
+    soundEnabled?: boolean
+    darkDetectionEnabled?: boolean
+  }
+}
 
 type ApprovalNotificationOptions = {
   title: string
@@ -40,12 +105,16 @@ type PendingApproval = {
 
 const pendingApprovals = new Map<string, PendingApproval>()
 
+function debugLog(...args: unknown[]): void {
+  if (DEBUG_ENABLED) console.log(...args)
+}
+
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
 function getNotificationIcon(): string {
-  const icons = (chrome.runtime.getManifest() as any).icons ?? {}
+  const icons = chrome.runtime.getManifest().icons ?? {}
   const path = icons["128"] ?? icons["48"] ?? icons["32"] ?? ""
   return path ? chrome.runtime.getURL(path) : ""
 }
@@ -78,9 +147,9 @@ async function apiCall<T>(path: string, init: RequestInit, retry = true): Promis
     throw Object.assign(new Error("AUTH_FAILED"), { status: 401 })
   }
 
-  const json = await res.json().catch(() => ({})) as any
+  const json = await res.json().catch(() => ({})) as ApiJson
   if (!res.ok) {
-    const err = Object.assign(
+    const err: ApiError = Object.assign(
       new Error(json.message ?? json.error?.message ?? `HTTP ${res.status}`),
       {
         status: res.status,
@@ -166,8 +235,9 @@ async function startSession(): Promise<void> {
       currentSessionId: data.sessionId,
       sessionStartedAt: data.startedAt
     })
-  } catch (apiErr: any) {
-    if (apiErr?.status === 409) {
+  } catch (apiErr: unknown) {
+    const err = apiErr as ApiError
+    if (err.status === 409) {
       // 이미 진행 중인 세션 → GET /sessions/current로 기존 세션 ID 복원
       try {
         const cur = await apiCall<{ sessionId: string; startedAt: string } | null>(
@@ -178,7 +248,7 @@ async function startSession(): Promise<void> {
             currentSessionId: cur.sessionId,
             sessionStartedAt: cur.startedAt
           })
-          console.log("[session] 기존 세션 복원:", cur.sessionId)
+          debugLog("[session] 기존 세션 복원:", cur.sessionId)
         }
       } catch {
         await chrome.storage.local.set({
@@ -186,14 +256,14 @@ async function startSession(): Promise<void> {
           sessionStartedAt: startedAt
         })
       }
-    } else if (apiErr?.status === 404 || String(apiErr?.message).includes("404")) {
+    } else if (err.status === 404 || String(err.message).includes("404")) {
       console.warn("[session] API 없음 → 로컬 세션 생성")
       await chrome.storage.local.set({
         currentSessionId: `local-${Date.now()}`,
         sessionStartedAt: startedAt
       })
     } else {
-      console.error("[session] start 실패:", apiErr)
+      console.error("[session] start 실패:", err)
       await chrome.storage.local.set({
         currentSessionId: `local-${Date.now()}`,
         sessionStartedAt: startedAt
@@ -234,7 +304,7 @@ async function ensureOffscreen(): Promise<void> {
 async function closeOffscreen(): Promise<void> {
   if (await chrome.offscreen.hasDocument()) {
     await chrome.offscreen.closeDocument()
-    console.log("[offscreen] document closed")
+      debugLog("[offscreen] document closed")
   }
 }
 
@@ -283,7 +353,7 @@ async function startOffscreenDetection(): Promise<void> {
     const data = pendingOffscreenData
     pendingOffscreenData = null
     chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
-      .then(() => console.log("[offscreen] 강제 START_DETECTION 완료"))
+      .then(() => debugLog("[offscreen] 강제 START_DETECTION 완료"))
       .catch(e => console.error("[offscreen] 강제 START_DETECTION 실패:", e))
   }, 3000)
 }
@@ -302,16 +372,16 @@ async function stopOffscreenDetection(): Promise<void> {
 
 // ─── Notifications ───────────────────────────────────────────
 const TOAST_MESSAGES: Record<string, string> = {
-  TURTLE_NECK:        "??? ??? ?????. ?? ??? ?????.",
-  turtle_neck:        "??? ??? ?????. ?? ??? ?????.",
-  SHOULDER_ISSUE:     "?? ?? ??? ?????. ??? ?? ????.",
-  ROUND_SHOULDER:     "?????? ?????. ??? ?? ????.",
-  round_shoulder:     "?????? ?????. ??? ?? ????.",
-  SHOULDER_ASYMMETRY: "?? ???? ?????. ?? ??? ?????.",
-  shoulder_tilted:    "?? ???? ?????. ?? ??? ?????.",
-  DARK_ENV:           "??? ??? ?????. ?? ??? ?????.",
-  dark_env:           "??? ??? ?????. ?? ??? ?????.",
-  GOOD_POSTURE:       "??? ?????. ?? ??? ??????.",
+  TURTLE_NECK:        "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
+  turtle_neck:        "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
+  SHOULDER_ISSUE:     "어깨 자세 이상이 감지됐어요. 어깨를 뒤로 펴주세요.",
+  ROUND_SHOULDER:     "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
+  round_shoulder:     "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
+  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지됐어요. 어깨 높이를 맞춰주세요.",
+  shoulder_tilted:    "어깨 비대칭이 감지됐어요. 어깨 높이를 맞춰주세요.",
+  DARK_ENV:           "어두운 환경이 감지됐어요. 주변 밝기를 높여주세요.",
+  dark_env:           "어두운 환경이 감지됐어요. 주변 밝기를 높여주세요.",
+  GOOD_POSTURE:       "자세가 교정됐어요. 바른 자세를 유지해보세요.",
 }
 
 type NotificationSettings = {
@@ -340,7 +410,7 @@ async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
     .slice(0, 1)
 }
 
-async function sendToActiveTab(msg: any): Promise<void> {
+async function sendToActiveTab(msg: PostureMessage): Promise<void> {
   const tabs = await getToastTargetTabs()
   if (tabs.length === 0) {
     console.warn("[toast] ?? ??? HTTP/HTTPS ?? ????.")
@@ -366,7 +436,7 @@ function shouldShowSystemPostureNotification(state: unknown, message: string): b
   return state !== "GOOD_POSTURE" && message.trim().length > 0
 }
 
-async function showPostureSystemNotification(msg: any, settings: NotificationSettings): Promise<void> {
+async function showPostureSystemNotification(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const message = getPostureAlertMessage(msg.state, msg.message)
   if (!shouldShowSystemPostureNotification(msg.state, message)) return
 
@@ -380,9 +450,9 @@ async function showPostureSystemNotification(msg: any, settings: NotificationSet
   })
 }
 
-async function deliverPostureAlert(msg: any, settings: NotificationSettings): Promise<void> {
+async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const soundEnabled = msg.soundEnabled ?? (settings.soundEnabled !== false)
-  const alert = {
+  const alert: PostureMessage = {
     type: "POSTURE_ALERT",
     state: msg.state,
     message: getPostureAlertMessage(msg.state, msg.message),
@@ -571,13 +641,13 @@ function postTimeline(rawState: string, message: string): void {
     hour: "2-digit",
     minute: "2-digit",
   })
-  console.log(`[timeline] POST date=${date} time=${time} state=${dominantState} msg="${message}"`)
+  debugLog(`[timeline] POST date=${date} time=${time} state=${dominantState} msg="${message}"`)
   apiCall("/dashboard/timeline", {
     method: "POST",
     body: JSON.stringify({ date, time, dominantState, message: message ?? "" }),
   }).then(() => {
-    console.log(`[timeline] 저장 성공: ${dominantState}`)
-  }).catch((e: any) => {
+    debugLog(`[timeline] 저장 성공: ${dominantState}`)
+  }).catch((e: ApiError) => {
     console.error(
       `[timeline] 저장 실패 [${dominantState}]:`,
       e.message,
@@ -592,7 +662,8 @@ function postTimeline(rawState: string, message: string): void {
 }
 
 // ─── Messages ────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
+  const msg = rawMsg as RuntimeMessage
   // These types are sent FROM background TO offscreen — ignore if echoed back
   if (["START_DETECTION", "STOP_DETECTION"].includes(msg.type)) return
 
@@ -679,20 +750,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "FLUSH_START") {
-    console.log(`[events] 🚀 fetch 시작: ${msg.count}개 → session: ${msg.sessionId}`)
+    debugLog(`[events] fetch 시작: ${msg.count}개 → session: ${msg.sessionId}`)
     sendResponse({ ok: true })
     return true
   }
 
   if (msg.type === "OFFSCREEN_HEARTBEAT") {
-    console.log(`[offscreen] 💓 heartbeat | state: ${msg.currentState} | queue: ${msg.queueSize} | hasToken: ${msg.hasToken}`)
+    debugLog(`[offscreen] heartbeat | state: ${msg.currentState} | queue: ${msg.queueSize} | hasToken: ${msg.hasToken}`)
     sendResponse({ ok: true })
     return true
   }
 
   if (msg.type === "FLUSH_RESULT") {
     if (msg.ok) {
-      console.log(`[events] ✅ ${msg.count}개 전송 성공 (accepted: ${msg.accepted}) session: ${msg.sessionId}`)
+      debugLog(`[events] 전송 성공 (${msg.count ?? 0}개, accepted: ${msg.accepted ?? 0}) session: ${msg.sessionId}`)
     } else {
       console.error(`[events] ❌ 전송 실패 HTTP ${msg.status} | session: ${msg.sessionId} | ${msg.body}`)
     }
@@ -785,7 +856,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             soundEnabled: next.soundEnabled
           })
         })
-        await syncExtensionPushToken(next.pushEnabled)
+        await syncExtensionPushToken(next.pushEnabled !== false)
         if (next.darkDetectionEnabled !== undefined) {
           await apiCall("/users/me/dark-detection", {
             method: "PATCH",
@@ -807,7 +878,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT") {
-    postTimeline(msg.state, msg.message)
+    postTimeline(msg.state ?? "", msg.message ?? "")
     chrome.storage.local.get("settings").then(({ settings: s }) => {
       if (s?.pushEnabled === false) {
         sendResponse({ success: true, skipped: "push-disabled" })
@@ -824,7 +895,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT_OFFSCREEN") {
-    postTimeline(msg.state, msg.message)
+    postTimeline(msg.state ?? "", msg.message ?? "")
     chrome.storage.local.get("settings").then(({ settings: s }) => {
       if (s?.pushEnabled === false) {
         sendResponse({ success: true, skipped: "push-disabled" })
@@ -841,7 +912,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === "FETCH_USER_SETTINGS") {
-    apiCall<any>("/users/me", { method: "GET" })
+    apiCall<UserInfoResponse>("/users/me", { method: "GET" })
       .then((me) =>
         chrome.storage.local.get("settings").then(async ({ settings: local }) => {
           const merged = {
@@ -864,7 +935,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 })
 
 // ─── External messages (web page → extension) ────────────
-chrome.runtime.onMessageExternal.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => {
+  const msg = rawMsg as ExternalMessage
+  if (msg.type === "PING") {
+    sendResponse({ ok: true })
+    return false
+  }
+
   if (msg.type === "BASELINE_DONE") {
     chrome.storage.local.set({ baselineDone: true, baselineData: msg.baselineData })
       .then(() => startSession())

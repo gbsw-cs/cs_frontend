@@ -2,12 +2,17 @@
 
 - Never commit credentials, private keys, session tokens, or populated `.env` files.
 - Store secrets in environment or managed secret stores; document variable names only.
+- Keep access tokens out of URLs and logs.
+- Web tokens live in localStorage/cookies; extension tokens live in `chrome.storage.local`. Do not mix storage locations accidentally.
 - Validate untrusted input with allowlists and explicit schemas at server boundaries.
 - Enforce authorization per resource; authentication alone is not authorization.
 - Use secure, HTTP-only, same-site cookies for browser sessions when applicable.
 - Protect state-changing cookie-authenticated routes against CSRF.
 - Escape output by context and sanitize only when rendering trusted HTML is unavoidable.
 - Restrict CORS to required origins, methods, and headers.
+- Treat extension external messages, content-script relays, notification actions, uploaded images, webcam frames, and generated URLs as untrusted input.
+- Add Chrome extension permissions only when required by the feature and explain the user-visible impact.
+- Do not weaken notification, offscreen, host, or externally-connectable restrictions without a concrete reason.
 - Rate-limit authentication, recovery, upload, and expensive endpoints.
 - Hash passwords with a current adaptive password hash; never encrypt them reversibly.
 - Verify webhook signatures against the raw body and reject stale events.

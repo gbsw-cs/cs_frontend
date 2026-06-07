@@ -129,63 +129,7 @@ export default function TestPage() {
     setLog((prev) => (prev + '\n' + s).slice(-4000));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const saved = loadSavedBaseline();
-    if (saved) {
-      setBaseline(saved);
-      appendLog(`✓ 저장된 baseline 복원 (${formatAgo(saved.issued_at)} · ${formatRemaining(saved.expires_at)})`);
-    }
-
-    const setup = async () => {
-      try {
-        setPhase('MediaPipe 초기화 중…');
-        const vision = await FilesetResolver.forVisionTasks(WASM_URL);
-        const lm = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-          runningMode: 'VIDEO',
-          numPoses: 1,
-        });
-        if (cancelled) return;
-        landmarkerRef.current = lm;
-
-        setPhase('웹캠 권한 요청 중…');
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        const video = videoRef.current!;
-        video.srcObject = stream;
-        await video.play();
-
-        setPhase('준비 완료');
-        setReady(true);
-        appendLog('✓ MediaPipe + 웹캠 준비 완료');
-        startLandmarkLoop();
-      } catch (e) {
-        setPhase(`초기화 실패: ${String(e)}`);
-        appendLog(`ERROR: ${String(e)}`);
-      }
-    };
-
-    setup();
-
-    return () => {
-      cancelled = true;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (monitorTimerRef.current) clearInterval(monitorTimerRef.current);
-      const stream = videoRef.current?.srcObject as MediaStream | null;
-      stream?.getTracks().forEach((t) => t.stop());
-      landmarkerRef.current?.close();
-    };
-  }, []);
-
-  const measureBrightness = (): number => {
+  const measureBrightness = useCallback((): number => {
     const video = videoRef.current;
     const canvas = brightnessCanvasRef.current;
     if (!video || !canvas) return 128;
@@ -201,9 +145,9 @@ export default function TestPage() {
       sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     }
     return sum / (w * h);
-  };
+  }, []);
 
-  const startLandmarkLoop = () => {
+  const startLandmarkLoop = useCallback(() => {
     const video = videoRef.current!;
     const lm = landmarkerRef.current!;
     let lastTs = 0;
@@ -250,7 +194,65 @@ export default function TestPage() {
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-  };
+  }, [measureBrightness]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let streamRef: MediaStream | null = null;
+    const video = videoRef.current;
+
+    const saved = loadSavedBaseline();
+    if (saved) {
+      setBaseline(saved);
+      appendLog(`✓ 저장된 baseline 복원 (${formatAgo(saved.issued_at)} · ${formatRemaining(saved.expires_at)})`);
+    }
+
+    const setup = async () => {
+      try {
+        setPhase('MediaPipe 초기화 중…');
+        const vision = await FilesetResolver.forVisionTasks(WASM_URL);
+        const lm = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+          runningMode: 'VIDEO',
+          numPoses: 1,
+        });
+        if (cancelled) return;
+        landmarkerRef.current = lm;
+
+        setPhase('웹캠 권한 요청 중…');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480 },
+          audio: false,
+        });
+        streamRef = stream;
+        if (cancelled || !video) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        video.srcObject = stream;
+        await video.play();
+
+        setPhase('준비 완료');
+        setReady(true);
+        appendLog('✓ MediaPipe + 웹캠 준비 완료');
+        startLandmarkLoop();
+      } catch (e) {
+        setPhase(`초기화 실패: ${String(e)}`);
+        appendLog(`ERROR: ${String(e)}`);
+      }
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (monitorTimerRef.current) clearInterval(monitorTimerRef.current);
+      streamRef?.getTracks().forEach((t) => t.stop());
+      if (video?.srcObject) video.srcObject = null;
+      landmarkerRef.current?.close();
+    };
+  }, [appendLog, startLandmarkLoop]);
 
   const startCalibration = async () => {
     if (!ready || calibrating) return;

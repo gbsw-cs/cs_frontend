@@ -46,7 +46,7 @@ run_project() {
   }
 
   local ran=0
-  for script_name in lint test build; do
+  for script_name in lint typecheck test build; do
     if has_script "$script_name"; then
       printf '\n==> [%s] Running %s\n' "$relative_dir" "$script_name"
       CI=1 "${runner[@]}" "$script_name"

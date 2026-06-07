@@ -17,6 +17,55 @@ interface ExtSettings {
   darkDetectionEnabled: boolean
 }
 
+type StatusResponse = {
+  accessToken?: string
+  currentSessionId?: string
+  sessionStartedAt?: string
+  settings?: Partial<ExtSettings>
+  baselineDone?: boolean
+  isPaused?: boolean
+  pausedTotalMs?: number
+  profileImg?: string
+  userName?: string
+  offscreenActive?: boolean
+  offscreenError?: string
+}
+
+type UserSettingsResponse = {
+  settings?: Partial<ExtSettings>
+  name?: string
+  profileImg?: string
+}
+
+type StartSessionResponse = {
+  currentSessionId?: string
+  sessionStartedAt?: string
+}
+
+type ResumeSessionResponse = {
+  pausedTotalMs?: number
+}
+
+type LoginResponse = {
+  success?: boolean
+  message?: string
+  data?: {
+    accessToken?: string
+    refreshToken?: string
+  }
+}
+
+type PopupRuntimeMessage =
+  | { type: "DETECTION_ACTIVE" }
+  | { type: "OFFSCREEN_CAMERA_ERROR"; name?: string; message?: string }
+
+type ApprovalNotificationResponse = {
+  ok?: boolean
+  approved?: boolean
+  reason?: "allow" | "deny" | "closed" | "timeout"
+  error?: string
+}
+
 const DEFAULT_SETTINGS: ExtSettings = {
   postureInterval: 30,
   breakInterval: 60,
@@ -129,7 +178,7 @@ export default function IndexPopup() {
 
   // ── Init ─────────────────────────────────────────────────
   useEffect(() => {
-    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res: any) => {
+    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res: StatusResponse) => {
       if (!res?.accessToken) {
         setPhase("login")
         return
@@ -148,7 +197,7 @@ export default function IndexPopup() {
       setOffscreenError(res.offscreenError ?? "")
       setPhase("main")
 
-      chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: any) => {
+      chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: UserSettingsResponse) => {
         if (r?.settings)  setSettings(s => ({ ...s, ...r.settings }))
         if (r?.name)      setUserName(r.name)
         if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
@@ -157,7 +206,7 @@ export default function IndexPopup() {
   }, [])
 
   useEffect(() => {
-    const listener = (msg: any) => {
+    const listener = (msg: PopupRuntimeMessage) => {
       if (msg?.type === "DETECTION_ACTIVE") {
         setOffscreenActive(true)
         setOffscreenError("")
@@ -201,7 +250,7 @@ export default function IndexPopup() {
 
   const handleResume = () => {
     setIsPaused(false)
-    chrome.runtime.sendMessage({ type: "RESUME_SESSION" }, (r: any) => {
+    chrome.runtime.sendMessage({ type: "RESUME_SESSION" }, (r: ResumeSessionResponse) => {
       if (chrome.runtime.lastError) return
       if (r?.pausedTotalMs !== undefined) setPausedTotalMs(r.pausedTotalMs)
     })
@@ -217,7 +266,7 @@ export default function IndexPopup() {
   }
 
   const handleStartSession = () => {
-    chrome.runtime.sendMessage({ type: "START_SESSION" }, (r: any) => {
+    chrome.runtime.sendMessage({ type: "START_SESSION" }, (r: StartSessionResponse) => {
       if (!chrome.runtime.lastError && r?.currentSessionId) {
         setSessionId(r.currentSessionId)
         setStart(new Date(r.sessionStartedAt))
@@ -237,17 +286,19 @@ export default function IndexPopup() {
         body: JSON.stringify({ email, password })
       })
       const text = await res.text()
-      let json: any = {}
+      let json: LoginResponse = {}
       try { json = JSON.parse(text) } catch {
         throw new Error(`서버 응답 오류 (${res.status}): 서버가 올바른 응답을 반환하지 않았습니다.`)
       }
-      if (!json.success) throw new Error(typeof json.message === "string" ? json.message : `로그인 실패 (${res.status})`)
+      if (!json.success || !json.data?.accessToken) {
+        throw new Error(typeof json.message === "string" ? json.message : `로그인 실패 (${res.status})`)
+      }
 
       chrome.runtime.sendMessage(
         { type: "LOGIN", accessToken: json.data.accessToken, refreshToken: json.data.refreshToken },
         () => {
           setPhase("main")
-          chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (info: any) => {
+          chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (info: UserSettingsResponse) => {
             if (info?.settings)  setSettings(s => ({ ...s, ...info.settings }))
             if (info?.name)      setUserName(info.name)
             if (info?.profileImg !== undefined) setProfileImg(info.profileImg)
@@ -300,7 +351,7 @@ export default function IndexPopup() {
         allowLabel: "허용",
         denyLabel: "거부"
       },
-      (res: any) => {
+      (res: ApprovalNotificationResponse) => {
         if (chrome.runtime.lastError) {
           toast.error(chrome.runtime.lastError.message || "승인 알림 요청에 실패했습니다.")
           return
