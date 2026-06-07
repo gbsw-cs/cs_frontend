@@ -12,12 +12,33 @@ const BREAK_TIPS = [
 ]
 
 const BREAK_ALARM = "break-reminder"
+const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
+const APPROVAL_TIMEOUT_MS = 60_000
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: any
   sessionId: string
   settings: { darkDetectionEnabled: boolean }
 } | null = null
+
+type ApprovalNotificationOptions = {
+  title: string
+  message: string
+  allowLabel?: string
+  denyLabel?: string
+}
+
+type ApprovalNotificationResult = {
+  approved: boolean
+  reason: "allow" | "deny" | "closed" | "timeout"
+}
+
+type PendingApproval = {
+  resolve: (result: ApprovalNotificationResult) => void
+  timeoutId: ReturnType<typeof setTimeout>
+}
+
+const pendingApprovals = new Map<string, PendingApproval>()
 
 function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -397,6 +418,62 @@ async function showNotification(): Promise<void> {
   })
 }
 
+function settleApprovalNotification(
+  notificationId: string,
+  result: ApprovalNotificationResult,
+): void {
+  const pending = pendingApprovals.get(notificationId)
+  if (!pending) return
+
+  clearTimeout(pending.timeoutId)
+  pendingApprovals.delete(notificationId)
+  pending.resolve(result)
+  chrome.notifications.clear(notificationId)
+}
+
+async function requestApprovalNotification(
+  options: ApprovalNotificationOptions,
+): Promise<ApprovalNotificationResult> {
+  const notificationId = `${APPROVAL_NOTIFICATION_PREFIX}${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`
+
+  await chrome.notifications.create(notificationId, {
+    type: "basic",
+    iconUrl: getNotificationIcon(),
+    title: options.title,
+    message: options.message,
+    priority: 2,
+    requireInteraction: true,
+    buttons: [
+      { title: options.allowLabel ?? "허용" },
+      { title: options.denyLabel ?? "거부" },
+    ],
+  })
+
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      settleApprovalNotification(notificationId, { approved: false, reason: "timeout" })
+    }, APPROVAL_TIMEOUT_MS)
+
+    pendingApprovals.set(notificationId, { resolve, timeoutId })
+  })
+}
+
+chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+  if (!notificationId.startsWith(APPROVAL_NOTIFICATION_PREFIX)) return
+
+  settleApprovalNotification(notificationId, {
+    approved: buttonIndex === 0,
+    reason: buttonIndex === 0 ? "allow" : "deny",
+  })
+})
+
+chrome.notifications.onClosed.addListener((notificationId) => {
+  if (!notificationId.startsWith(APPROVAL_NOTIFICATION_PREFIX)) return
+  settleApprovalNotification(notificationId, { approved: false, reason: "closed" })
+})
+
 // ─── Alarms ──────────────────────────────────────────────────
 async function stopAlarms(): Promise<void> {
   await chrome.alarms.clearAll()
@@ -541,6 +618,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ ok: false, error: String(e?.message ?? e) })
         })
     })
+    return true
+  }
+
+  if (msg.type === "REQUEST_APPROVAL_NOTIFICATION") {
+    requestApprovalNotification({
+      title: typeof msg.title === "string" ? msg.title : "작업 승인 요청",
+      message: typeof msg.message === "string" ? msg.message : "이 작업을 실행할까요?",
+      allowLabel: typeof msg.allowLabel === "string" ? msg.allowLabel : undefined,
+      denyLabel: typeof msg.denyLabel === "string" ? msg.denyLabel : undefined,
+    })
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((e) => {
+        console.error("[approval] 알림 요청 실패:", e)
+        sendResponse({ ok: false, error: String(e?.message ?? e) })
+      })
     return true
   }
 

@@ -19,7 +19,7 @@ import {
   Sliders,
 } from "lucide-react";
 
-const TOTAL = 4;
+const TOTAL = 5;
 const STORE_URL =
   process.env.NEXT_PUBLIC_EXTENSION_STORE_URL ??
   "https://chromewebstore.google.com/detail/anjava-extend/ieiojonlbjdkdlpjlcfealifodahjfal";
@@ -57,7 +57,8 @@ export default function ExtensionGuidePage() {
               {step === 1 && <Slide1 storeUrl={STORE_URL} />}
               {step === 2 && <Slide2 storeUrl={STORE_URL} />}
               {step === 3 && <Slide3 />}
-              {step === 4 && <Slide4 />}
+              {step === 4 && <Slide4 storeUrl={STORE_URL} />}
+              {step === 5 && <Slide5 />}
             </div>
           </div>
 
@@ -98,7 +99,7 @@ export default function ExtensionGuidePage() {
               {step === TOTAL ? (
                 <>
                   <Check size={14} strokeWidth={2.6} />
-                  완료
+                  대시보드로 이동
                 </>
               ) : (
                 <>
@@ -194,14 +195,48 @@ function Slide3() {
   );
 }
 
-function Slide4() {
+function Slide4({ storeUrl }: { storeUrl: string }) {
+  return (
+    <div className="grid w-full max-w-[860px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_300px] md:gap-12">
+      <div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+          <CheckCircle2 size={22} />
+        </div>
+        <h2 className="mt-5 text-2xl font-bold text-zinc-900 sm:text-3xl">3. 설치 후 바로 시작하기</h2>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+          설치만으로 감지가 시작되지는 않습니다. 확장 프로그램 팝업에서 로그인하고 베이스라인을 측정해야
+          백그라운드 자세 감지가 켜집니다.
+        </p>
+        <div className="mt-5 grid gap-2.5">
+          <SetupRow label="확장 아이콘 클릭" desc="Chrome 우측 상단 퍼즐 아이콘에서 Anjava extend를 열어주세요." />
+          <SetupRow label="웹사이트 계정으로 로그인" desc="방금 가입한 이메일과 비밀번호를 확장 팝업에도 입력합니다." />
+          <SetupRow label="자세 다시측정하기" desc="팝업의 측정 버튼을 눌러 10초 베이스라인 측정을 완료합니다." />
+          <SetupRow label="세션 시작하기" desc="측정 완료 후 팝업에서 세션을 시작하면 자세 감지와 알림이 동작합니다." />
+        </div>
+        <a
+          href={storeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 flex w-fit items-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+        >
+          <Download size={15} />
+          설치 페이지 다시 열기
+        </a>
+      </div>
+
+      <ActivationVisual />
+    </div>
+  );
+}
+
+function Slide5() {
   return (
     <div className="grid w-full max-w-[840px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_300px] md:gap-12">
       <div>
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB]/10 text-[#2563EB]">
           <Bell size={22} />
         </div>
-        <h2 className="mt-5 text-2xl font-bold text-zinc-900 sm:text-3xl">3. 알림이 안 보일 때 확인하기</h2>
+        <h2 className="mt-5 text-2xl font-bold text-zinc-900 sm:text-3xl">4. 알림이 안 보일 때 확인하기</h2>
         <p className="mt-3 text-sm leading-relaxed text-zinc-500">
           Discord나 전체화면 앱을 켜둔 상태에서는 Windows 알림 설정 때문에 배너가 숨겨질 수 있습니다.
         </p>
@@ -316,6 +351,33 @@ function NotificationSettingsVisual() {
         </div>
         <div className="mt-4 rounded-xl bg-[#2563EB]/5 px-3 py-2 text-[11px] leading-relaxed text-[#2563EB] ring-1 ring-[#2563EB]/15">
           Discord를 보고 있어도 Windows 알림 배너가 화면 구석에 표시됩니다.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivationVisual() {
+  return (
+    <div className="mx-auto w-full max-w-[300px] rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
+      <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-zinc-100">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 size={20} />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-zinc-900">시작 체크리스트</div>
+            <div className="mt-0.5 text-[11px] text-zinc-400">확장 팝업에서 완료</div>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <VisualCheck label="Anjava extend 설치" />
+          <VisualCheck label="확장 팝업 로그인" />
+          <VisualCheck label="10초 베이스라인 측정" />
+          <VisualCheck label="감지 세션 시작" />
+        </div>
+        <div className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-700 ring-1 ring-emerald-100">
+          세션이 시작되면 자세 이상 알림과 대시보드 기록이 함께 업데이트됩니다.
         </div>
       </div>
     </div>

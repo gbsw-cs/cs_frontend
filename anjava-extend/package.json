@@ -6,7 +6,7 @@
   "author": "양선만",
   "scripts": {
     "dev": "plasmo dev",
-    "build": "plasmo build && xcopy /e /i /y assets\\mediapipe-wasm build\\chrome-mv3-prod\\assets\\mediapipe-wasm",
+    "build": "plasmo build && node scripts/copy-mediapipe-wasm.mjs",
     "package": "plasmo package"
   },
   "dependencies": {

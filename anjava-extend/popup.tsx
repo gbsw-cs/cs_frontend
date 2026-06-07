@@ -291,6 +291,39 @@ export default function IndexPopup() {
     chrome.runtime.sendMessage({ type: "UPDATE_SETTINGS", settings: next })
   }
 
+  const handleApprovalNotificationTest = () => {
+    chrome.runtime.sendMessage(
+      {
+        type: "REQUEST_APPROVAL_NOTIFICATION",
+        title: "작업 승인 요청",
+        message: "테스트 작업을 실행할까요?",
+        allowLabel: "허용",
+        denyLabel: "거부"
+      },
+      (res: any) => {
+        if (chrome.runtime.lastError) {
+          toast.error(chrome.runtime.lastError.message || "승인 알림 요청에 실패했습니다.")
+          return
+        }
+        if (!res?.ok) {
+          toast.error(res?.error || "승인 알림 요청에 실패했습니다.")
+          return
+        }
+        if (res.approved) {
+          toast.success("승인되었습니다.")
+        } else {
+          const reasonLabel =
+            res.reason === "timeout"
+              ? "시간 초과"
+              : res.reason === "closed"
+              ? "알림 닫힘"
+              : "거부"
+          toast.info(`승인되지 않았습니다: ${reasonLabel}`)
+        }
+      }
+    )
+  }
+
   // ── Loading ───────────────────────────────────────────────
   if (phase === "loading") {
     return (
@@ -493,6 +526,12 @@ export default function IndexPopup() {
                 onChange={v => updateSetting("soundEnabled", v)}
               />
             </div>
+
+            <div className="divider" />
+
+            <button className="btn-outline" onClick={handleApprovalNotificationTest}>
+              승인 알림 테스트
+            </button>
           </div>
 
           <div className="card">
