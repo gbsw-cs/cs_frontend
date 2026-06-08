@@ -144,13 +144,30 @@ export default function SettingsPage() {
       setSettings(updated);
       cacheSettings(updated);
       if (patch.pushEnabled === true) {
-        void syncWebPushToken().catch((error) => {
-          console.error("[push] FCM 토큰 등록 실패:", error);
-          flash("푸시 알림 등록에 실패했습니다");
-        });
+        void syncWebPushToken()
+          .then((result) => {
+            if (result.ok) {
+              flash("푸시 알림이 등록되었습니다");
+              return;
+            }
+            const message =
+              result.reason === "permission-denied"
+                ? "브라우저 알림 권한이 차단되어 있습니다"
+                : result.reason === "permission-default"
+                ? "브라우저 알림 권한을 허용해야 합니다"
+                : result.reason === "unsupported"
+                ? "이 브라우저는 푸시 알림을 지원하지 않습니다"
+                : "푸시 알림 등록에 실패했습니다";
+            flash(message);
+          })
+          .catch((error) => {
+            console.error("[push] FCM 토큰 등록 실패:", error);
+            flash("푸시 알림 등록에 실패했습니다");
+          });
       }
       if (patch.pushEnabled === false) {
         void deleteWebPushToken();
+        flash("푸시 알림이 해제되었습니다");
       }
     } catch (e) {
       setSettings(previous);
@@ -197,6 +214,7 @@ export default function SettingsPage() {
     if (!confirm("정말 회원탈퇴 하시겠습니까? 이 작업은 되돌릴 수 없습니다."))
       return;
     try {
+      await deleteWebPushToken();
       await withdraw();
       router.push("/");
     } catch (e) {

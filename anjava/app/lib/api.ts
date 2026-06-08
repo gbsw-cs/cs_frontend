@@ -549,12 +549,16 @@ export type TodayDashboard = {
   totalDetectionSec?: number;
   goodPostureRatio?: number;
   breakdown?: {
-    turtleNeckSec?: number;
-    shoulderIssueSec?: number;
-    darkEnvSec?: number;
-    turtleNeckCount?: number;
-    shoulderIssueCount?: number;
-    darkEnvCount?: number;
+    turtleNeckSec?: number | string | null;
+    shoulderIssueSec?: number | string | null;
+    roundShoulderSec?: number | string | null;
+    shoulderAsymmetrySec?: number | string | null;
+    darkEnvSec?: number | string | null;
+    turtleNeckCount?: number | string | null;
+    shoulderIssueCount?: number | string | null;
+    roundShoulderCount?: number | string | null;
+    shoulderAsymmetryCount?: number | string | null;
+    darkEnvCount?: number | string | null;
   };
   darkDetectionMode?: "ON" | "OFF";
 };
@@ -565,7 +569,13 @@ export type WeeklyDashboard = {
   days: {
     date: string;
     badPostureRatio: number;
+    totalDetectionSec: number;
+    turtleNeckSec: number;
+    roundShoulderSec: number;
+    shoulderAsymmetrySec: number;
+    darkEnvSec: number;
   }[];
+  totalDetectionSec: number;
   turtleNeckTotalSec: number;
   roundShoulderTotalSec: number;
   shoulderAsymmetryTotalSec: number;
@@ -584,13 +594,16 @@ export type DailyDashboard = {
   overlappingCount: number;
 };
 
-type RawDailyDashboard = Partial<DailyDashboard> & {
-  slots?: Partial<DailyDashboard>[];
+type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   turtleNeckCount?: number | string | null;
   roundShoulderCount?: number | string | null;
   shoulderAsymmetryCount?: number | string | null;
   shoulderIssueCount?: number | string | null;
   darkEnvCount?: number | string | null;
+};
+
+type RawDailyDashboard = RawDailyDashboardSlot & {
+  slots?: RawDailyDashboardSlot[];
 };
 
 export type TimelineDashboard = {
@@ -632,38 +645,6 @@ export function getDashboardToday() {
 
 type RawWeeklyDashboard = Partial<WeeklyDashboard> & Record<string, unknown>;
 
-function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
-  const n = (keys: string[]) => {
-    for (const k of keys) {
-      const v = raw[k];
-      if (typeof v === "number" && Number.isFinite(v)) return v;
-    }
-    return 0;
-  };
-  const turtleSec = n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
-  const roundSec = n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
-  const asymSec = n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
-  const shoulderIssueSec = n(["shoulderIssueTotalSec", "shoulderIssueSec", "shoulder_issue_total_sec", "shoulder_issue_sec"]);
-  const finalRound = roundSec > 0 ? roundSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
-  const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
-  return {
-    from: typeof raw.from === "string" ? raw.from : "",
-    to: typeof raw.to === "string" ? raw.to : "",
-    days: Array.isArray(raw.days) ? raw.days : [],
-    turtleNeckTotalSec: turtleSec,
-    roundShoulderTotalSec: finalRound,
-    shoulderAsymmetryTotalSec: finalAsym,
-    darkEnvTotalSec: n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]),
-    goodPostureRatio: n(["goodPostureRatio", "good_posture_ratio"]),
-    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : null,
-  };
-}
-
-export function getDashboardWeekly(from: string) {
-  return request<RawWeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true)
-    .then(normalizeWeeklyDashboard);
-}
-
 function toApiNumber(value: unknown, fallback = 0): number {
   const n =
     typeof value === "number"
@@ -674,17 +655,121 @@ function toApiNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function normalizeRatio(value: unknown, fallback = 0): number {
+  const n = toApiNumber(value, fallback);
+  if (!Number.isFinite(n)) return fallback;
+  if (n > 1) return Math.max(0, Math.min(1, n / 100));
+  return Math.max(0, Math.min(1, n));
+}
+
+function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
+  const n = (keys: string[], source: Record<string, unknown> = raw) => {
+    for (const k of keys) {
+      const value = toApiNumber(source[k], NaN);
+      if (Number.isFinite(value)) return value;
+    }
+    return 0;
+  };
+  const rawDays: unknown[] = Array.isArray(raw.days) ? raw.days : [];
+  const days = rawDays
+    .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
+    .map((day) => {
+      const turtleNeckSec = n(["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"], day);
+      const roundShoulderSec = n(["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"], day);
+      const shoulderAsymmetrySec = n(["shoulderAsymmetrySec", "shoulderAsymmetryTotalSec", "shoulder_asymmetry_sec", "shoulder_asymmetry_total_sec"], day);
+      const shoulderIssueSec = n(["shoulderIssueSec", "shoulderIssueTotalSec", "shoulder_issue_sec", "shoulder_issue_total_sec"], day);
+      const finalRoundSec = roundShoulderSec > 0 ? roundShoulderSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+      const finalAsymSec = shoulderAsymmetrySec > 0 ? shoulderAsymmetrySec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+      const darkEnvSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"], day);
+      const badSec = turtleNeckSec + finalRoundSec + finalAsymSec;
+      const totalDetectionSec = n(
+        ["totalDetectionSec", "totalDurationSec", "totalScreenSec", "screenTimeSec", "detectionSec", "total_detection_sec", "total_duration_sec", "total_screen_sec", "screen_time_sec"],
+        day,
+      );
+      const ratioFromDuration = totalDetectionSec > 0 ? badSec / totalDetectionSec : 0;
+      const badPostureRatio =
+        "badPostureRatio" in day || "bad_posture_ratio" in day
+          ? normalizeRatio(day.badPostureRatio ?? day.bad_posture_ratio)
+          : "goodPostureRatio" in day || "good_posture_ratio" in day
+          ? 1 - normalizeRatio(day.goodPostureRatio ?? day.good_posture_ratio)
+          : ratioFromDuration;
+      return {
+        date: typeof day.date === "string" ? day.date : "",
+        badPostureRatio,
+        totalDetectionSec,
+        turtleNeckSec,
+        roundShoulderSec: finalRoundSec,
+        shoulderAsymmetrySec: finalAsymSec,
+        darkEnvSec,
+      };
+    })
+    .filter((day) => day.date.length > 0);
+  const turtleSec = n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
+  const roundSec = n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
+  const asymSec = n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
+  const shoulderIssueSec = n(["shoulderIssueTotalSec", "shoulderIssueSec", "shoulder_issue_total_sec", "shoulder_issue_sec"]);
+  const finalRound = roundSec > 0 ? roundSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+  const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+  const darkSec = n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]);
+  const badSec = turtleSec + finalRound + finalAsym;
+  const summedDayTotalSec = days.reduce((sum, day) => sum + day.totalDetectionSec, 0);
+  const explicitTotalSec = n([
+    "totalDetectionSec",
+    "totalDurationSec",
+    "totalScreenSec",
+    "screenTimeSec",
+    "detectionSec",
+    "total_detection_sec",
+    "total_duration_sec",
+    "total_screen_sec",
+    "screen_time_sec",
+  ]);
+  const rawGoodRatio = raw.goodPostureRatio ?? raw.good_posture_ratio;
+  const goodPostureRatio =
+    rawGoodRatio !== undefined
+      ? normalizeRatio(rawGoodRatio)
+      : explicitTotalSec > 0
+      ? Math.max(0, 1 - badSec / explicitTotalSec)
+      : 0;
+  const totalDetectionSec =
+    explicitTotalSec > 0
+      ? explicitTotalSec
+      : summedDayTotalSec > 0
+      ? summedDayTotalSec
+      : goodPostureRatio < 1 && badSec > 0
+      ? Math.round(badSec / (1 - goodPostureRatio))
+      : 0;
+  return {
+    from: typeof raw.from === "string" ? raw.from : "",
+    to: typeof raw.to === "string" ? raw.to : "",
+    days,
+    totalDetectionSec,
+    turtleNeckTotalSec: turtleSec,
+    roundShoulderTotalSec: finalRound,
+    shoulderAsymmetryTotalSec: finalAsym,
+    darkEnvTotalSec: darkSec,
+    goodPostureRatio,
+    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : null,
+  };
+}
+
+export function getDashboardWeekly(from: string) {
+  return request<RawWeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true)
+    .then(normalizeWeeklyDashboard);
+}
+
 function normalizeDailyDashboard(raw: RawDailyDashboard): DailyDashboard {
   const source = Array.isArray(raw.slots) ? raw.slots[0] ?? raw : raw;
   const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
+  const turtleNeckCount = toApiNumber(source.turtleNeckCount ?? raw.turtleNeckCount);
+  const roundShoulderCount = toApiNumber(source.roundShoulderCount ?? raw.roundShoulderCount);
+  const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount ?? raw.shoulderAsymmetryCount);
+  const shoulderIssueCount = toApiNumber(source.shoulderIssueCount ?? raw.shoulderIssueCount);
+  const darkEnvCount = toApiNumber(source.darkEnvCount ?? raw.darkEnvCount);
   const singleBadCount =
     source.singleBadCount !== undefined
       ? toApiNumber(source.singleBadCount)
-      : toApiNumber(raw.turtleNeckCount) +
-        toApiNumber(raw.roundShoulderCount) +
-        toApiNumber(raw.shoulderAsymmetryCount) +
-        toApiNumber(raw.shoulderIssueCount) +
-        toApiNumber(raw.darkEnvCount);
+      : turtleNeckCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
 
   return {
     date: typeof source.date === "string" ? source.date : "",

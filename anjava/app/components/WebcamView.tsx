@@ -12,6 +12,7 @@ import {
   type DetectionSessionEvent,
   type DetectionState,
 } from "../lib/api";
+import { showLocalPostureNotification } from "../lib/fcm";
 
 const VIDEO_CONSTRAINTS = {
   width: 640,
@@ -132,9 +133,24 @@ function findDetectedLabels(value: unknown, prefix = ""): string[] {
 
 const POSTURE_MESSAGES: Record<string, string> = {
   turtle_neck:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  TURTLE_NECK:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
   round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  ROUND_SHOULDER:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  shoulder_asymmetry: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  shoulder_issue:     "어깨 자세 이상이 감지되었어요! 어깨를 바르게 펴주세요.",
+  SHOULDER_ISSUE:     "어깨 자세 이상이 감지되었어요! 어깨를 바르게 펴주세요.",
   dark_env:           "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+  DARK_ENV:           "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+};
+
+const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
+  TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
+  SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+  SHOULDER_ISSUE: "어깨 자세 이상이 감지되었어요! 어깨를 바르게 펴주세요.",
+  DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
 /*
@@ -432,7 +448,7 @@ export default function WebcamView({
         const result = await response.json().catch(() => null);
         const finalStatus: string = result?.data?.final_status ?? "";
         const backendState = toBackendState(finalStatus);
-        const msg = POSTURE_MESSAGES[finalStatus] ?? "";
+        const msg = POSTURE_MESSAGES[finalStatus] ?? BACKEND_STATE_MESSAGES[backendState] ?? "";
         const detectedLabels = findDetectedLabels(result);
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
@@ -441,10 +457,17 @@ export default function WebcamView({
         if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
           window.postMessage({
             type: "ANJAVA_POSTURE_RELAY",
-            state: finalStatus,
+            state: backendState,
             message: msg,
             soundEnabled,
           }, "*");
+          void showLocalPostureNotification({
+            state: backendState,
+            message: msg,
+            soundEnabled,
+          }).catch((notificationError) => {
+            console.error("Posture notification failed", notificationError);
+          });
         }
         recordStateChange(backendState, msg);
         lastStatusRef.current = finalStatus;

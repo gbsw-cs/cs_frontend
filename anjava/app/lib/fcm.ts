@@ -10,6 +10,7 @@ import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { deletePushToken, getMySettings, registerPushToken } from "./api";
 
 const DEVICE_ID_KEY = "anjavaPushDeviceId";
+const LOCAL_POSTURE_ALERT_COOLDOWN_MS = 5 * 60 * 1000;
 const FIREBASE_CONFIG: Required<
   Pick<FirebaseOptions, "apiKey" | "authDomain" | "projectId" | "storageBucket" | "messagingSenderId" | "appId">
 > & { measurementId: string } = {
@@ -24,6 +25,7 @@ const FIREBASE_CONFIG: Required<
 
 let firebaseApp: ReturnType<typeof initializeApp> | null = null;
 let foregroundMessageListenerReady = false;
+const localPostureAlertAt = new Map<string, number>();
 
 type SyncWebPushTokenOptions = {
   requestPermission?: boolean;
@@ -118,6 +120,66 @@ function setupForegroundMessageListener(registration: ServiceWorkerRegistration)
     if (Notification.permission !== "granted") return;
     const { title, options } = getNotificationContent(payload);
     void registration.showNotification(title, options);
+  });
+}
+
+function showBrowserNotification(title: string, options: NotificationOptions) {
+  const notification = new Notification(title, options);
+  notification.onclick = () => {
+    const targetUrl =
+      typeof options.data === "object" && options.data !== null && "url" in options.data
+        ? String((options.data as { url?: unknown }).url ?? "/dashboard")
+        : "/dashboard";
+    window.focus();
+    if (window.location.pathname !== targetUrl) window.location.assign(targetUrl);
+    notification.close();
+  };
+}
+
+export async function showLocalPostureNotification({
+  state,
+  message,
+  soundEnabled = true,
+}: {
+  state: string;
+  message: string;
+  soundEnabled?: boolean;
+}) {
+  if (typeof window === "undefined") return;
+  if (!message.trim()) return;
+  if (state === "GOOD_POSTURE" || state === "GOOD") return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+  const now = Date.now();
+  const lastAt = localPostureAlertAt.get(state) ?? 0;
+  if (now - lastAt < LOCAL_POSTURE_ALERT_COOLDOWN_MS) return;
+  localPostureAlertAt.set(state, now);
+
+  const title = "자세 교정 알림";
+  const options = {
+    body: message,
+    icon: "/logo.png",
+    badge: "/logo.png",
+    silent: !soundEnabled,
+    data: { url: "/dashboard", state },
+  } satisfies NotificationOptions;
+
+  if (!("serviceWorker" in navigator)) {
+    showBrowserNotification(title, options);
+    return;
+  }
+
+  const registration =
+    (await navigator.serviceWorker.getRegistration("/").catch(() => null)) ??
+    (await getServiceWorkerRegistration(getFirebaseConfig()).catch(() => null));
+
+  if (!registration) {
+    showBrowserNotification(title, options);
+    return;
+  }
+
+  await registration.showNotification(title, options).catch(() => {
+    showBrowserNotification(title, options);
   });
 }
 

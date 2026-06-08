@@ -65,6 +65,8 @@ const STATE_LABEL: Record<string, string> = {
 };
 const ISSUE_LABEL: Record<string, string> = {
   turtleNeckCount: "거북목",
+  roundShoulderCount: "라운드숄더",
+  shoulderAsymmetryCount: "어깨 비대칭",
   shoulderIssueCount: "어깨 자세",
   darkEnvCount: "어두운 환경",
 };
@@ -337,7 +339,10 @@ export default function DashboardPage() {
   const apiWarnings = firstFiniteNumber(
     today?.warningCount,
     toFiniteNumber(today?.breakdown?.turtleNeckCount) +
-      toFiniteNumber(today?.breakdown?.shoulderIssueCount),
+      toFiniteNumber(today?.breakdown?.roundShoulderCount) +
+      toFiniteNumber(today?.breakdown?.shoulderAsymmetryCount) +
+      toFiniteNumber(today?.breakdown?.shoulderIssueCount) +
+      toFiniteNumber(today?.breakdown?.darkEnvCount),
   ) ?? 0;
   const warningCount = Math.max(apiWarnings, derivedWarnings);
 
@@ -353,6 +358,8 @@ export default function DashboardPage() {
 
   const todayIssueEntries = [
     { key: "turtleNeckCount", count: toFiniteNumber(today?.breakdown?.turtleNeckCount) },
+    { key: "roundShoulderCount", count: toFiniteNumber(today?.breakdown?.roundShoulderCount) },
+    { key: "shoulderAsymmetryCount", count: toFiniteNumber(today?.breakdown?.shoulderAsymmetryCount) },
     { key: "shoulderIssueCount", count: toFiniteNumber(today?.breakdown?.shoulderIssueCount) },
     { key: "darkEnvCount", count: toFiniteNumber(today?.breakdown?.darkEnvCount) },
   ];
@@ -419,9 +426,14 @@ export default function DashboardPage() {
     : 0;
   const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
   const weeklyBadRatio = weeklyGoodRatio === null ? null : Math.max(0, 1 - weeklyGoodRatio);
+  const explicitWeeklyScreenSec = weekly ? toFiniteNumber(weekly.totalDetectionSec) : 0;
   const weeklyScreenSec =
-    weekly && badPostureSec > 0 && weeklyBadRatio !== null && weeklyBadRatio > 0
+    explicitWeeklyScreenSec > 0
+      ? explicitWeeklyScreenSec
+      : weekly && badPostureSec > 0 && weeklyBadRatio !== null && weeklyBadRatio > 0
       ? Math.round(badPostureSec / weeklyBadRatio)
+      : weekly
+      ? 0
       : null;
   const weeklyGoodSec =
     weeklyScreenSec === null ? null : Math.max(0, weeklyScreenSec - badPostureSec);
@@ -444,6 +456,10 @@ export default function DashboardPage() {
       date: dateKey,
       isFuture,
       badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
+      totalDetectionSec: day ? toFiniteNumber(day.totalDetectionSec) : 0,
+      turtleNeckSec: day ? toFiniteNumber(day.turtleNeckSec) : 0,
+      roundShoulderSec: day ? toFiniteNumber(day.roundShoulderSec) : 0,
+      shoulderAsymmetrySec: day ? toFiniteNumber(day.shoulderAsymmetrySec) : 0,
     };
   });
   const weeklyValues = weeklyDays.map((d) =>
@@ -936,9 +952,32 @@ export default function DashboardPage() {
                       {values.map((value, i) => {
                         const isFuture = weeklyDays[i]?.isFuture;
                         const hasValue = value !== null;
-                        const turtleH = hasValue && badPostureSec > 0 ? value * turtleRatio : 0;
-                        const roundH = hasValue && badPostureSec > 0 ? value * roundRatio : 0;
-                        const asymH = hasValue && badPostureSec > 0 ? value * asymRatio : 0;
+                        const dayTotalSec = weeklyDays[i]?.totalDetectionSec ?? 0;
+                        const dayTurtleSec = weeklyDays[i]?.turtleNeckSec ?? 0;
+                        const dayRoundSec = weeklyDays[i]?.roundShoulderSec ?? 0;
+                        const dayAsymSec = weeklyDays[i]?.shoulderAsymmetrySec ?? 0;
+                        const hasDayIssueBreakdown = dayTotalSec > 0 && dayTurtleSec + dayRoundSec + dayAsymSec > 0;
+                        const turtleH = !hasValue
+                          ? 0
+                          : hasDayIssueBreakdown
+                          ? clampPercent((dayTurtleSec / dayTotalSec) * 100)
+                          : badPostureSec > 0
+                          ? value * turtleRatio
+                          : 0;
+                        const roundH = !hasValue
+                          ? 0
+                          : hasDayIssueBreakdown
+                          ? clampPercent((dayRoundSec / dayTotalSec) * 100)
+                          : badPostureSec > 0
+                          ? value * roundRatio
+                          : 0;
+                        const asymH = !hasValue
+                          ? 0
+                          : hasDayIssueBreakdown
+                          ? clampPercent((dayAsymSec / dayTotalSec) * 100)
+                          : badPostureSec > 0
+                          ? value * asymRatio
+                          : 0;
                         return (
                           <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5 px-7">
                             <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
@@ -953,8 +992,10 @@ export default function DashboardPage() {
                                   <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
                                   <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
                                 </>
+                              ) : value > 0 ? (
+                                <div className="w-full bg-rose-400 transition-all" style={{ height: `${Math.max(8, value)}%` }} />
                               ) : (
-                                <div className="w-full bg-emerald-300 transition-all" style={{ height: `${Math.max(8, value)}%` }} />
+                                <div className="w-full bg-emerald-300 transition-all" style={{ height: "8%" }} />
                               )}
                             </div>
                             <span className={`mt-0.5 text-[9px] font-medium ${isFuture ? "text-zinc-300" : "text-zinc-500"}`}>
