@@ -352,9 +352,14 @@ export default function DashboardPage() {
     { key: "shoulderIssueCount", count: toFiniteNumber(today?.breakdown?.shoulderIssueCount) },
     { key: "darkEnvCount", count: toFiniteNumber(today?.breakdown?.darkEnvCount) },
   ];
+  const todayBreakdownTotal = todayIssueEntries.reduce((sum, item) => sum + item.count, 0);
   const topTodayIssue = todayIssueEntries.reduce((top, item) =>
     item.count > top.count ? item : top
   , todayIssueEntries[0]);
+  const todayWarningLabel =
+    topTodayIssue.count > 0 && todayBreakdownTotal >= warningCount
+      ? ISSUE_LABEL[topTodayIssue.key] ?? "자세 경고"
+      : "자세 경고";
   const busiestSlot = slots.reduce<{ label: string; count: number }>((top, slot) => {
     const count = slot.singleBadCount + slot.overlappingCount;
     const label = `${String(slot.startHour).padStart(2, "0")}~${String((slot.startHour + 3) % 24).padStart(2, "0")}시`;
@@ -362,7 +367,7 @@ export default function DashboardPage() {
   }, { label: "—", count: 0 });
   const todaySummaryText =
     warningCount > 0
-      ? `오늘 ${ISSUE_LABEL[topTodayIssue.key] ?? "자세 경고"} ${Math.max(topTodayIssue.count, warningCount)}회, 집중 시간대 ${busiestSlot.count > 0 ? busiestSlot.label : "분석 중"}`
+      ? `오늘 ${todayWarningLabel} ${warningCount}회, 집중 시간대 ${busiestSlot.count > 0 ? busiestSlot.label : "분석 중"}`
       : totalEventCount > 0
       ? "오늘 자세 경고 없이 안정적으로 감지 중입니다."
       : "오늘 감지 데이터가 쌓이면 요약이 표시됩니다.";
@@ -900,7 +905,7 @@ export default function DashboardPage() {
 
             <div className="mt-2 grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[240px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-1.5 ring-1 ring-zinc-100">
-                <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+                <div className="grid grid-cols-3 gap-2">
                   <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
@@ -1004,12 +1009,12 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg px-3 py-1 ring-1 ring-zinc-100">
+    <div className="rounded-lg px-3 py-0.5 ring-1 ring-zinc-100">
       <div className="flex items-center justify-between gap-2">
         <div className="truncate text-[10px] text-zinc-400">{label}</div>
-        <div className="text-[10px] font-semibold text-zinc-500">{pct}%</div>
+        <div className="shrink-0 text-[10px] font-semibold text-zinc-500">{pct}%</div>
       </div>
-      <div className="text-xs font-bold text-zinc-900">{formatDuration(sec)}</div>
+      <div className="text-[11px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
       <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
