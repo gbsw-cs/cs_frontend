@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoClose } from "./AutoClose";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -28,7 +29,7 @@ export default async function ExtensionAuthCompletePage({ searchParams }: PagePr
         <p className="mt-3 text-sm leading-relaxed text-zinc-500">
           {failed
             ? "확장 프로그램이 설치되어 있고 최신 버전인지 확인한 뒤 확장 팝업에서 Google 로그인을 다시 시도해 주세요."
-            : "Anjava 확장 팝업을 다시 열면 바로 로그인된 상태로 사용할 수 있습니다."}
+            : "잠시 후 이 탭이 자동으로 닫힙니다. 확장 팝업을 열면 바로 로그인된 상태로 사용할 수 있습니다."}
         </p>
         {failed && reason && (
           <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
@@ -49,6 +50,7 @@ export default async function ExtensionAuthCompletePage({ searchParams }: PagePr
             대시보드로 이동
           </Link>
         </div>
+        {!failed && <AutoClose delayMs={2500} />}
       </section>
     </main>
   );

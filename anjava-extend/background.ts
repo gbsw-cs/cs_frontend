@@ -1038,7 +1038,16 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
           )
         })
       )
-      .then(() => sendResponse({ ok: true }))
+      .then(() => {
+        chrome.notifications.create(`login-success-${Date.now()}`, {
+          type: "basic",
+          iconUrl: getNotificationIcon(),
+          title: "로그인 완료",
+          message: "확장 프로그램 팝업을 열어 사용을 시작하세요.",
+          priority: 1,
+        }).catch(() => {})
+        sendResponse({ ok: true })
+      })
       .catch((e) => {
         console.error("[auth] web login sync 실패:", e)
         sendResponse({ ok: false, error: String(e?.message ?? e) })

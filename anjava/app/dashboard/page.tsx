@@ -928,49 +928,41 @@ export default function DashboardPage() {
                 {(() => {
                   const values = weeklyValues;
                   const dayLabels = WEEK_LABELS;
+                  const turtleRatio = badPostureSec > 0 ? turtleSec / badPostureSec : 0;
+                  const roundRatio = badPostureSec > 0 ? roundShoulderSec / badPostureSec : 0;
+                  const asymRatio = badPostureSec > 0 ? asymSec / badPostureSec : 0;
                   return (
-                    <div className="flex min-h-0 flex-1 flex-col">
-                      <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-2">
-                        {values.map((value, i) => {
-                          const isFuture = weeklyDays[i]?.isFuture;
-                          const hasValue = value !== null;
-                          const height = hasValue ? Math.max(10, Math.round(value)) : 8;
-                          const tone =
-                            isFuture
-                              ? "bg-zinc-100"
-                              : !hasValue
-                              ? "bg-zinc-200"
-                              : value >= 60
-                              ? "bg-rose-400"
-                              : value >= 35
-                              ? "bg-amber-400"
-                              : "bg-emerald-400";
-                          return (
-                            <div key={dayLabels[i]} className="flex min-h-[42px] flex-col items-center justify-end gap-0.5">
-                              <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
-                                {hasValue ? `${Math.round(value)}%` : ""}
-                              </div>
-                              <div className="flex h-7 w-full items-end rounded-full bg-zinc-100 px-1">
-                                <div
-                                  className={`w-full rounded-full transition-all ${tone}`}
-                                  style={{ height: `${height}%` }}
-                                />
-                              </div>
+                    <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-2">
+                      {values.map((value, i) => {
+                        const isFuture = weeklyDays[i]?.isFuture;
+                        const hasValue = value !== null;
+                        const turtleH = hasValue && badPostureSec > 0 ? value * turtleRatio : 0;
+                        const roundH = hasValue && badPostureSec > 0 ? value * roundRatio : 0;
+                        const asymH = hasValue && badPostureSec > 0 ? value * asymRatio : 0;
+                        return (
+                          <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5">
+                            <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
+                              {hasValue && !isFuture ? `${Math.round(value)}%` : ""}
                             </div>
-                          );
-                        })}
-                      </div>
-                      <IssueStackChart
-                        turtleSec={turtleSec}
-                        roundShoulderSec={roundShoulderSec}
-                        asymSec={asymSec}
-                        totalSec={badPostureSec}
-                      />
-                      <div className="mt-1 grid grid-cols-7 gap-2 text-center text-[9px] font-medium text-zinc-500">
-                        {dayLabels.map((label, i) => (
-                          <span key={label} className={weeklyDays[i]?.isFuture ? "text-zinc-300" : ""}>{label}</span>
-                        ))}
-                      </div>
+                            <div className="flex w-full flex-1 flex-col-reverse overflow-hidden rounded-full bg-zinc-100">
+                              {isFuture ? null : !hasValue ? (
+                                <div className="w-full bg-zinc-200" style={{ height: "8%" }} />
+                              ) : badPostureSec > 0 ? (
+                                <>
+                                  <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
+                                  <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
+                                  <div className="w-full bg-white ring-1 ring-inset ring-zinc-300 transition-all" style={{ height: `${asymH}%` }} />
+                                </>
+                              ) : (
+                                <div className="w-full bg-emerald-300 transition-all" style={{ height: `${Math.max(8, value)}%` }} />
+                              )}
+                            </div>
+                            <span className={`mt-0.5 text-[9px] font-medium ${isFuture ? "text-zinc-300" : "text-zinc-500"}`}>
+                              {dayLabels[i]}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
