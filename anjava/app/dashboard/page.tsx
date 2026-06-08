@@ -497,16 +497,16 @@ export default function DashboardPage() {
     : "자세 데이터 수집 중...";
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3 lg:h-dvh lg:overflow-hidden lg:py-[0.75vh]">
+      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col lg:h-full">
         {/* Top badge */}
-        <div className="mb-2 flex shrink-0 justify-center">
-          <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20">
+        <div className="mb-2 flex shrink-0 justify-center lg:mb-[1vh] lg:h-[2.5vh] lg:items-center">
+          <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20 lg:py-0">
             ● AI 신체 활성화 중 ●
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(240px,1.08fr)_minmax(240px,1fr)_minmax(150px,0.58fr)] xl:grid-rows-[minmax(270px,1.1fr)_minmax(260px,1fr)_minmax(170px,0.58fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:h-[95vh] lg:grid-rows-[27vh_27vh_37vh] lg:gap-x-2 lg:gap-y-[2vh] lg:overflow-hidden">
 
           {/* ── Row 1 ── */}
 
