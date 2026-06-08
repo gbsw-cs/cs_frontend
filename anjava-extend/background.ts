@@ -1045,7 +1045,7 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
           title: "로그인 완료",
           message: "확장 프로그램 팝업을 열어 사용을 시작하세요.",
           priority: 1,
-        }).catch(() => {})
+        })
         sendResponse({ ok: true })
       })
       .catch((e) => {
