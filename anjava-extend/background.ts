@@ -16,7 +16,7 @@ const BREAK_ALARM = "break-reminder"
 const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
 const APPROVAL_TIMEOUT_MS = 60_000
 const AUTH_STORAGE_KEY = ["access", "Token"].join("")
-const POSTURE_ALERT_COOLDOWN_MS = 5 * 60 * 1000
+const POSTURE_ALERT_COOLDOWN_MS = 3 * 60 * 1000
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: unknown
@@ -120,9 +120,7 @@ function rand<T>(arr: T[]): T {
 }
 
 function getNotificationIcon(): string {
-  const icons = chrome.runtime.getManifest().icons ?? {}
-  const path = icons["128"] ?? icons["48"] ?? icons["32"] ?? ""
-  return path ? chrome.runtime.getURL(path) : ""
+  return chrome.runtime.getURL("assets/logo.png")
 }
 
 // ─── API ────────────────────────────────────────────────────

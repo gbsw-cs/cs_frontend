@@ -94,6 +94,10 @@ function firstFiniteNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function isUnauthorizedError(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 401);
+}
+
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
@@ -250,6 +254,15 @@ export default function DashboardPage() {
       getDashboardDaily(),
       getDashboardTimeline(date),
     ]).then(([t, w, d, tl]) => {
+      if ([t, w, d, tl].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        clearTokens();
+        router.replace("/login");
+        return;
+      }
       if (t.status === "fulfilled") setToday(t.value);
       else console.error("[dashboard] today 실패:", t.reason);
       if (w.status === "fulfilled") setWeekly(w.value);
@@ -264,7 +277,7 @@ export default function DashboardPage() {
       if (tl.status === "fulfilled") setTimeline(tl.value);
       else console.error("[dashboard] timeline 실패:", tl.reason);
     });
-  }, []);
+  }, [router]);
 
   const refreshDashboardDataSoon = useCallback(() => {
     const now = Date.now();

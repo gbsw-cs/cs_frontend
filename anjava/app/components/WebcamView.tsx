@@ -153,6 +153,38 @@ const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
+function relayPostureAlertToExtension(state: DetectionState, message: string, soundEnabled: boolean) {
+  return new Promise<boolean>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(false);
+      return;
+    }
+    const relayId =
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `posture-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", onAck);
+      resolve(false);
+    }, 400);
+    function onAck(event: MessageEvent) {
+      if (event.source !== window) return;
+      if (event.data?.type !== "ANJAVA_POSTURE_RELAY_ACK" || event.data.relayId !== relayId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onAck);
+      resolve(true);
+    }
+    window.addEventListener("message", onAck);
+    window.postMessage({
+      type: "ANJAVA_POSTURE_RELAY",
+      relayId,
+      state,
+      message,
+      soundEnabled,
+    }, "*");
+  });
+}
+
 /*
 const TOAST_STYLE = `
   #anjava-web-toast {
@@ -455,16 +487,13 @@ export default function WebcamView({
         }
         // 상태가 바뀔 때마다 extension background toast 하나만 표시
         if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
-          window.postMessage({
-            type: "ANJAVA_POSTURE_RELAY",
-            state: backendState,
-            message: msg,
-            soundEnabled,
-          }, "*");
-          void showLocalPostureNotification({
-            state: backendState,
-            message: msg,
-            soundEnabled,
+          void relayPostureAlertToExtension(backendState, msg, soundEnabled).then((handledByExtension) => {
+            if (handledByExtension) return;
+            return showLocalPostureNotification({
+              state: backendState,
+              message: msg,
+              soundEnabled,
+            });
           }).catch((notificationError) => {
             console.error("Posture notification failed", notificationError);
           });

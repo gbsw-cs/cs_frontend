@@ -10,7 +10,7 @@ import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { deletePushToken, getMySettings, registerPushToken } from "./api";
 
 const DEVICE_ID_KEY = "anjavaPushDeviceId";
-const LOCAL_POSTURE_ALERT_COOLDOWN_MS = 5 * 60 * 1000;
+const LOCAL_POSTURE_ALERT_COOLDOWN_MS = 3 * 60 * 1000;
 const FIREBASE_CONFIG: Required<
   Pick<FirebaseOptions, "apiKey" | "authDomain" | "projectId" | "storageBucket" | "messagingSenderId" | "appId">
 > & { measurementId: string } = {
@@ -159,10 +159,10 @@ export async function showLocalPostureNotification({
   const options = {
     body: message,
     icon: "/logo.png",
-    badge: "/logo.png",
+    image: "/logo.png",
     silent: !soundEnabled,
     data: { url: "/dashboard", state },
-  } satisfies NotificationOptions;
+  } satisfies NotificationOptions & { image?: string };
 
   if (!("serviceWorker" in navigator)) {
     showBrowserNotification(title, options);

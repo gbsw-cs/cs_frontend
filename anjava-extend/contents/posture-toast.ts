@@ -283,11 +283,15 @@ if (!window[WEB_RELAY_KEY]) {
   window.addEventListener("message", (event) => {
     if (event.source !== window) return
     if (event.data?.type !== "ANJAVA_POSTURE_RELAY") return
+    const relayId = typeof event.data.relayId === "string" ? event.data.relayId : ""
     chrome.runtime.sendMessage({
       type: "POSTURE_ALERT_FROM_WEB",
       state: event.data.state,
       message: event.data.message,
       soundEnabled: event.data.soundEnabled
+    }).then(() => {
+      if (!relayId) return
+      window.postMessage({ type: "ANJAVA_POSTURE_RELAY_ACK", relayId }, "*")
     }).catch(() => {})
   })
 }
