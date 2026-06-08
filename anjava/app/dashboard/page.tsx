@@ -940,7 +940,7 @@ export default function DashboardPage() {
                         const roundH = hasValue && badPostureSec > 0 ? value * roundRatio : 0;
                         const asymH = hasValue && badPostureSec > 0 ? value * asymRatio : 0;
                         return (
-                          <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5">
+                          <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5 px-2">
                             <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
                               {hasValue && !isFuture ? `${Math.round(value)}%` : ""}
                             </div>
