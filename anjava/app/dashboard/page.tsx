@@ -885,41 +885,40 @@ export default function DashboardPage() {
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
-                <div className="mt-0.5 text-[10px] text-zinc-400">이번 주 핵심 지표만 간단히 정리했습니다.</div>
               </div>
               <div className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
                 {weeklyDateRangeLabel} 기록
               </div>
             </div>
 
-            <div className="mt-1.5 grid shrink-0 grid-cols-2 gap-1.5 lg:grid-cols-4">
-              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-1.5 ring-1 ring-[#2563EB]/15 lg:col-span-1">
-                <div className="text-[10px] font-medium text-[#2563EB]">총 감지 스크린타임</div>
-                <div className="text-lg font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
-                <div className="text-[9px] text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `위험도 ${weeklyRiskPct}%`}</div>
+            <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 lg:grid-cols-4">
+              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-2.5 py-1 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+                <div className="text-[9px] font-medium leading-tight text-[#2563EB]">총 감지 스크린타임</div>
+                <div className="text-base font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
+                <div className="text-[8px] leading-tight text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `위험도 ${weeklyRiskPct}%`}</div>
               </div>
               <WeeklyMetric label="정자세 시간" value={formatDuration(weeklyGoodSec)} tone="good" />
               <WeeklyMetric label="자세 경고 시간" value={formatDuration(badPostureSec)} tone="bad" />
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-1 grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-1.5 ring-1 ring-zinc-100">
-                <div className="grid grid-cols-3 gap-2">
+            <div className="mt-1 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[230px_minmax(0,1fr)]">
+              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
+                <div className="grid grid-cols-3 gap-1.5">
                   <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-1 space-y-1">
+                <div className="mt-0.5 space-y-0.5">
                   <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
                   <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                   <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-col rounded-xl px-3 py-2 ring-1 ring-zinc-100">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <div className="text-[10px] font-semibold text-zinc-500">요일별 비정상 자세 비율</div>
+              <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="text-[9px] font-semibold text-zinc-500">요일별 비정상 자세 비율</div>
                   <div className="text-[9px] text-zinc-400">낮을수록 좋음</div>
                 </div>
                 {(() => {
@@ -941,17 +940,17 @@ export default function DashboardPage() {
                             ? "bg-amber-400"
                             : "bg-emerald-400";
                         return (
-                          <div key={dayLabels[i]} className="flex min-h-[58px] flex-col items-center justify-end gap-1">
-                            <div className="text-[9px] font-semibold text-zinc-400">
+                          <div key={dayLabels[i]} className="flex min-h-[48px] flex-col items-center justify-end gap-0.5">
+                            <div className="text-[8px] font-semibold text-zinc-400">
                               {value === null ? "—" : `${Math.round(value)}%`}
                             </div>
-                            <div className="flex h-9 w-full items-end rounded-full bg-zinc-100 px-1">
+                            <div className="flex h-7 w-full items-end rounded-full bg-zinc-100 px-1">
                               <div
                                 className={`w-full rounded-full transition-all ${tone}`}
                                 style={{ height: `${height}%` }}
                               />
                             </div>
-                            <div className="text-[10px] font-medium text-zinc-500">{dayLabels[i]}</div>
+                            <div className="text-[9px] font-medium text-zinc-500">{dayLabels[i]}</div>
                           </div>
                         );
                       })}
@@ -984,9 +983,9 @@ function WeeklyMetric({ label, value, tone }: { label: string; value: string; to
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="rounded-xl px-3 py-1.5 ring-1 ring-zinc-100">
-      <div className="text-[10px] text-zinc-400">{label}</div>
-      <div className={`text-sm font-bold leading-tight ${toneClass}`}>{value}</div>
+    <div className="rounded-xl px-2.5 py-1 ring-1 ring-zinc-100">
+      <div className="text-[9px] leading-tight text-zinc-400">{label}</div>
+      <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -1000,8 +999,8 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
       : "text-zinc-700";
   return (
     <div>
-      <div className="text-[9px] text-zinc-400">{label}</div>
-      <div className={`mt-0.5 text-sm font-bold ${toneClass}`}>{value}</div>
+      <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
+      <div className={`text-[12px] font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -1009,12 +1008,12 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg px-3 py-0.5 ring-1 ring-zinc-100">
+    <div className="rounded-lg px-2.5 py-0.5 ring-1 ring-zinc-100">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[10px] text-zinc-400">{label}</div>
-        <div className="shrink-0 text-[10px] font-semibold text-zinc-500">{pct}%</div>
+        <div className="truncate text-[9px] leading-tight text-zinc-400">{label}</div>
+        <div className="shrink-0 text-[9px] font-semibold leading-tight text-zinc-500">{pct}%</div>
       </div>
-      <div className="text-[11px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
+      <div className="text-[10px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
       <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
