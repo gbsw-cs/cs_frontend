@@ -17,6 +17,7 @@ const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
 const APPROVAL_TIMEOUT_MS = 60_000
 const AUTH_STORAGE_KEY = ["access", "Token"].join("")
 const POSTURE_ALERT_COOLDOWN_MS = 3 * 60 * 1000
+const DASHBOARD_URL = `${WEB_URL}/dashboard`
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: unknown
@@ -111,6 +112,7 @@ type PendingApproval = {
 
 const pendingApprovals = new Map<string, PendingApproval>()
 const lastPostureAlertAt = new Map<string, number>()
+const notificationClickTargets = new Map<string, string>()
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -461,7 +463,9 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
   if (!shouldShowSystemPostureNotification(msg.state, message)) return
   if (isPostureSystemNotificationCoolingDown(msg.state)) return
 
-  await chrome.notifications.create(`posture-${Date.now()}`, {
+  const notificationId = `posture-${Date.now()}`
+  notificationClickTargets.set(notificationId, DASHBOARD_URL)
+  await chrome.notifications.create(notificationId, {
     type: "basic",
     iconUrl: getNotificationIcon(),
     title: "자세 교정 알림",
@@ -500,8 +504,10 @@ async function showNotification(): Promise<void> {
   if (s.pushEnabled === false) return
 
   const message = rand(BREAK_TIPS)
+  const notificationId = `break-${Date.now()}`
+  notificationClickTargets.set(notificationId, DASHBOARD_URL)
 
-  await chrome.notifications.create({
+  await chrome.notifications.create(notificationId, {
     type: "basic",
     iconUrl: getNotificationIcon(),
     title: "휴식 알림",
@@ -567,7 +573,35 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
   })
 })
 
+async function openNotificationTarget(url: string): Promise<void> {
+  const tabs = await chrome.tabs.query({ url: `${WEB_URL}/*` }).catch(() => [])
+  const dashboardTab = tabs.find((tab) => tab.url?.startsWith(DASHBOARD_URL))
+  const targetTab = dashboardTab ?? tabs[0]
+
+  if (targetTab?.id) {
+    await chrome.tabs.update(targetTab.id, { active: true, url }).catch(() => {})
+    if (targetTab.windowId !== undefined) {
+      await chrome.windows.update(targetTab.windowId, { focused: true }).catch(() => {})
+    }
+    return
+  }
+
+  await chrome.tabs.create({ url }).catch(() => {})
+}
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  if (notificationId.startsWith(APPROVAL_NOTIFICATION_PREFIX)) return
+
+  const url = notificationClickTargets.get(notificationId) ?? DASHBOARD_URL
+  notificationClickTargets.delete(notificationId)
+  chrome.notifications.clear(notificationId)
+  openNotificationTarget(url).catch((e) => {
+    console.error("[notification] 클릭 이동 실패:", e)
+  })
+})
+
 chrome.notifications.onClosed.addListener((notificationId) => {
+  notificationClickTargets.delete(notificationId)
   if (!notificationId.startsWith(APPROVAL_NOTIFICATION_PREFIX)) return
   settleApprovalNotification(notificationId, { approved: false, reason: "closed" })
 })
@@ -654,8 +688,11 @@ chrome.gcm?.onMessage?.addListener((message) => {
       : typeof data.message === "string"
       ? data.message
       : "자세 상태를 확인해주세요."
+    const notificationId = `fcm-${Date.now()}`
+    const targetUrl = typeof data.url === "string" ? new URL(data.url, WEB_URL).href : DASHBOARD_URL
+    notificationClickTargets.set(notificationId, targetUrl)
 
-    chrome.notifications.create(`fcm-${Date.now()}`, {
+    chrome.notifications.create(notificationId, {
       type: "basic",
       iconUrl: getNotificationIcon(),
       title,
@@ -1054,7 +1091,9 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
         })
       )
       .then(() => {
-        chrome.notifications.create(`login-success-${Date.now()}`, {
+        const notificationId = `login-success-${Date.now()}`
+        notificationClickTargets.set(notificationId, DASHBOARD_URL)
+        chrome.notifications.create(notificationId, {
           type: "basic",
           iconUrl: getNotificationIcon(),
           title: "로그인 완료",
