@@ -63,6 +63,11 @@ const STATE_LABEL: Record<string, string> = {
   SHOULDER_ASYMMETRY: "어깨 비대칭 발생",
   DARK_ENV:           "어두운 환경 감지",
 };
+const ISSUE_LABEL: Record<string, string> = {
+  turtleNeckCount: "거북목",
+  shoulderIssueCount: "어깨 자세",
+  darkEnvCount: "어두운 환경",
+};
 
 type DailySlot = Pick<
   DailyDashboard,
@@ -341,6 +346,26 @@ export default function DashboardPage() {
     (s, sl) => s + sl.goodPostureCount + sl.singleBadCount + sl.overlappingCount,
     0,
   );
+
+  const todayIssueEntries = [
+    { key: "turtleNeckCount", count: toFiniteNumber(today?.breakdown?.turtleNeckCount) },
+    { key: "shoulderIssueCount", count: toFiniteNumber(today?.breakdown?.shoulderIssueCount) },
+    { key: "darkEnvCount", count: toFiniteNumber(today?.breakdown?.darkEnvCount) },
+  ];
+  const topTodayIssue = todayIssueEntries.reduce((top, item) =>
+    item.count > top.count ? item : top
+  , todayIssueEntries[0]);
+  const busiestSlot = slots.reduce<{ label: string; count: number }>((top, slot) => {
+    const count = slot.singleBadCount + slot.overlappingCount;
+    const label = `${String(slot.startHour).padStart(2, "0")}~${String((slot.startHour + 3) % 24).padStart(2, "0")}시`;
+    return count > top.count ? { label, count } : top;
+  }, { label: "—", count: 0 });
+  const todaySummaryText =
+    warningCount > 0
+      ? `오늘 ${ISSUE_LABEL[topTodayIssue.key] ?? "자세 경고"} ${Math.max(topTodayIssue.count, warningCount)}회, 집중 시간대 ${busiestSlot.count > 0 ? busiestSlot.label : "분석 중"}`
+      : totalEventCount > 0
+      ? "오늘 자세 경고 없이 안정적으로 감지 중입니다."
+      : "오늘 감지 데이터가 쌓이면 요약이 표시됩니다.";
 
   // 최근 활동 (타임라인 버킷 → 현재 시각 이전, 실제 감지 데이터만)
   const kstNow = new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
@@ -734,6 +759,9 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-full lg:self-end">
             <div className="mt-1 flex items-center gap-2">
               <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
+            </div>
+            <div className="mt-2 rounded-xl bg-[#2563EB]/5 px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#2563EB] ring-1 ring-[#2563EB]/15">
+              {todaySummaryText}
             </div>
 
             <div className="mt-0.5 flex items-start justify-between gap-1">

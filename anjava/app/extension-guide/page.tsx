@@ -26,13 +26,21 @@ const STORE_URL =
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "";
 
 type ExtensionInstallStatus = "unknown" | "installed" | "missing" | "unconfigured";
+type ExtensionReadyStatus = {
+  loggedIn: boolean;
+  baselineDone: boolean;
+  sessionActive: boolean;
+  offscreenActive: boolean;
+  isPaused: boolean;
+  offscreenError: string;
+};
 type ChromeRuntimeWindow = Window & {
   chrome?: {
     runtime?: {
       sendMessage: (
         extensionId: string,
         message: unknown,
-        responseCallback?: (response?: { ok?: boolean }) => void,
+        responseCallback?: (response?: { ok?: boolean } & Partial<ExtensionReadyStatus>) => void,
       ) => void
     }
   }
@@ -44,6 +52,7 @@ export default function ExtensionGuidePage() {
   const [extensionStatus, setExtensionStatus] = useState<ExtensionInstallStatus>(
     EXTENSION_ID ? "unknown" : "unconfigured",
   );
+  const [readyStatus, setReadyStatus] = useState<ExtensionReadyStatus | null>(null);
 
   useEffect(() => {
     if (!EXTENSION_ID) return;
@@ -53,9 +62,27 @@ export default function ExtensionGuidePage() {
       return;
     }
 
-    runtime.sendMessage(EXTENSION_ID, { type: "PING" }, (response) => {
-      setExtensionStatus(response?.ok ? "installed" : "missing");
-    });
+    const checkStatus = () => {
+      runtime.sendMessage(EXTENSION_ID, { type: "GET_STATUS" }, (response) => {
+        if (!response?.ok) {
+          setExtensionStatus("missing");
+          setReadyStatus(null);
+          return;
+        }
+        setExtensionStatus("installed");
+        setReadyStatus({
+          loggedIn: response.loggedIn === true,
+          baselineDone: response.baselineDone === true,
+          sessionActive: response.sessionActive === true,
+          offscreenActive: response.offscreenActive === true,
+          isPaused: response.isPaused === true,
+          offscreenError: typeof response.offscreenError === "string" ? response.offscreenError : "",
+        });
+      });
+    };
+    checkStatus();
+    const id = window.setInterval(checkStatus, 3000);
+    return () => window.clearInterval(id);
   }, []);
 
   function onNext() {
@@ -87,7 +114,7 @@ export default function ExtensionGuidePage() {
               {step === 1 && <Slide1 storeUrl={STORE_URL} />}
               {step === 2 && <Slide2 storeUrl={STORE_URL} />}
               {step === 3 && <Slide3 />}
-              {step === 4 && <Slide4 storeUrl={STORE_URL} extensionStatus={extensionStatus} />}
+              {step === 4 && <Slide4 storeUrl={STORE_URL} extensionStatus={extensionStatus} readyStatus={readyStatus} />}
               {step === 5 && <Slide5 />}
             </div>
           </div>
@@ -228,9 +255,11 @@ function Slide3() {
 function Slide4({
   storeUrl,
   extensionStatus,
+  readyStatus,
 }: {
   storeUrl: string
   extensionStatus: ExtensionInstallStatus
+  readyStatus: ExtensionReadyStatus | null
 }) {
   return (
     <div className="grid w-full max-w-[860px] grid-cols-1 items-center gap-10 md:grid-cols-[1fr_300px] md:gap-12">
@@ -250,6 +279,7 @@ function Slide4({
           <SetupRow label="세션 시작하기" desc="측정 완료 후 팝업에서 세션을 시작하면 자세 감지와 알림이 동작합니다." />
         </div>
         <ExtensionStatusBadge status={extensionStatus} />
+        <ExtensionReadinessPanel extensionStatus={extensionStatus} readyStatus={readyStatus} />
         <a
           href={storeUrl}
           target="_blank"
@@ -417,6 +447,67 @@ function ActivationVisual({ extensionStatus }: { extensionStatus: ExtensionInsta
           세션이 시작되면 자세 이상 알림과 대시보드 기록이 함께 업데이트됩니다.
         </div>
       </div>
+    </div>
+  );
+}
+
+function ExtensionReadinessPanel({
+  extensionStatus,
+  readyStatus,
+}: {
+  extensionStatus: ExtensionInstallStatus
+  readyStatus: ExtensionReadyStatus | null
+}) {
+  const rows = [
+    {
+      label: "확장 로그인",
+      done: readyStatus?.loggedIn === true,
+      desc: readyStatus?.loggedIn ? "로그인 완료" : "팝업에서 웹 계정으로 로그인하세요",
+    },
+    {
+      label: "베이스라인",
+      done: readyStatus?.baselineDone === true,
+      desc: readyStatus?.baselineDone ? "측정 완료" : "팝업에서 10초 기준 자세를 측정하세요",
+    },
+    {
+      label: "감지 세션",
+      done: readyStatus?.sessionActive === true && readyStatus?.isPaused !== true,
+      desc:
+        readyStatus?.sessionActive && readyStatus?.isPaused
+          ? "일시정지됨"
+          : readyStatus?.sessionActive
+          ? readyStatus?.offscreenActive
+            ? "웹캠 감지 중"
+            : "세션 시작됨"
+          : "세션을 시작하세요",
+    },
+  ];
+
+  if (extensionStatus !== "installed") return null;
+
+  return (
+    <div className="mt-4 rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-100">
+      <div className="text-xs font-bold text-zinc-900">확장 사용 준비 상태</div>
+      <div className="mt-3 grid gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-100">
+            <div>
+              <div className="text-[11px] font-semibold text-zinc-700">{row.label}</div>
+              <div className="mt-0.5 text-[10px] text-zinc-400">{row.desc}</div>
+            </div>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+              row.done ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+            }`}>
+              {row.done ? "완료" : "필요"}
+            </span>
+          </div>
+        ))}
+      </div>
+      {readyStatus?.offscreenError ? (
+        <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[10px] leading-relaxed text-rose-600 ring-1 ring-rose-100">
+          {readyStatus.offscreenError}
+        </div>
+      ) : null}
     </div>
   );
 }

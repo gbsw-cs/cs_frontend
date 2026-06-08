@@ -30,12 +30,14 @@ type StatusResponse = {
   userName?: string
   offscreenActive?: boolean
   offscreenError?: string
+  lastSettingsSyncedAt?: string
 }
 
 type UserSettingsResponse = {
   settings?: Partial<ExtSettings>
   name?: string
   profileImg?: string
+  lastSettingsSyncedAt?: string
 }
 
 type StartSessionResponse = {
@@ -92,6 +94,18 @@ function fmtDuration(ms: number) {
   if (h > 0) return `${h}시간 ${m}분`
   if (m > 0) return `${m}분 ${sec}초`
   return `${sec}초`
+}
+
+function fmtSyncTime(value: string) {
+  if (!value) return "아직 동기화 전"
+  const diffMs = Date.now() - new Date(value).getTime()
+  if (!Number.isFinite(diffMs) || diffMs < 0) return "방금 전"
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return "방금 전"
+  if (min < 60) return `${min}분 전`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `${h}시간 전`
+  return `${Math.floor(h / 24)}일 전`
 }
 
 function WebcamCircle() {
@@ -157,6 +171,95 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   )
 }
 
+function Troubleshooter({
+  loggedIn,
+  baselineDone,
+  sessionId,
+  offscreenError,
+  onGoogleLogin,
+  onBaseline,
+  onStartSession,
+  onCameraSettings,
+}: {
+  loggedIn: boolean
+  baselineDone: boolean
+  sessionId: string | null
+  offscreenError: string
+  onGoogleLogin: () => void
+  onBaseline: () => void
+  onStartSession: () => void
+  onCameraSettings: () => void
+}) {
+  const items: Array<{
+    key: string
+    title: string
+    desc: string
+    action: string
+    onClick: () => void
+    tone?: "warn" | "error"
+  }> = []
+
+  if (!loggedIn) {
+    items.push({
+      key: "login",
+      title: "로그인이 필요합니다",
+      desc: "소셜 계정은 Google 로그인을 사용해 확장과 연결하세요.",
+      action: "Google 로그인",
+      onClick: onGoogleLogin,
+      tone: "warn",
+    })
+  } else if (!baselineDone) {
+    items.push({
+      key: "baseline",
+      title: "베이스라인 측정 필요",
+      desc: "정확한 자세 감지를 위해 10초 기준 자세를 먼저 측정하세요.",
+      action: "지금 측정",
+      onClick: onBaseline,
+      tone: "warn",
+    })
+  } else if (!sessionId) {
+    items.push({
+      key: "session",
+      title: "세션이 시작되지 않았습니다",
+      desc: "세션을 시작하면 백그라운드 자세 감지와 알림이 동작합니다.",
+      action: "세션 시작",
+      onClick: onStartSession,
+    })
+  }
+
+  if (offscreenError) {
+    items.push({
+      key: "camera",
+      title: "카메라 연결 확인 필요",
+      desc: offscreenError,
+      action: "카메라 설정",
+      onClick: onCameraSettings,
+      tone: "error",
+    })
+  }
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="trouble-card">
+      <p className="card-label">현재 문제 해결</p>
+      <div className="trouble-list">
+        {items.map((item) => (
+          <div key={item.key} className={`trouble-item ${item.tone === "error" ? "trouble-error" : ""}`}>
+            <div className="trouble-copy">
+              <p className="trouble-title">{item.title}</p>
+              <p className="trouble-desc">{item.desc}</p>
+            </div>
+            <button className="trouble-action" onClick={item.onClick}>
+              {item.action}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function IndexPopup() {
   const [phase, setPhase]         = useState<"loading" | "login" | "main">("loading")
   const [tab, setTab]             = useState<"home" | "settings">("home")
@@ -175,6 +278,7 @@ export default function IndexPopup() {
   const [loginError, setLError]           = useState("")
   const [offscreenActive, setOffscreenActive] = useState(false)
   const [offscreenError, setOffscreenError] = useState("")
+  const [lastSettingsSyncedAt, setLastSettingsSyncedAt] = useState("")
   const emailRef = useRef<HTMLInputElement>(null)
 
   const fetchUserSettings = useCallback(() => {
@@ -182,6 +286,7 @@ export default function IndexPopup() {
       if (r?.settings)  setSettings(s => ({ ...s, ...r.settings }))
       if (r?.name)      setUserName(r.name)
       if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
+      if (r?.lastSettingsSyncedAt) setLastSettingsSyncedAt(r.lastSettingsSyncedAt)
     })
   }, [])
 
@@ -196,6 +301,7 @@ export default function IndexPopup() {
       setProfileImg("")
       setOffscreenActive(false)
       setOffscreenError("")
+      setLastSettingsSyncedAt("")
       setIsPaused(false)
       setPausedTotalMs(0)
       setElapsed(0)
@@ -217,6 +323,7 @@ export default function IndexPopup() {
     setPausedTotalMs(res.pausedTotalMs ?? 0)
     setOffscreenActive(res.offscreenActive === true)
     setOffscreenError(res.offscreenError ?? "")
+    if (res.lastSettingsSyncedAt) setLastSettingsSyncedAt(res.lastSettingsSyncedAt)
     setLLoading(false)
     setLError("")
     setPhase("main")
@@ -239,11 +346,24 @@ export default function IndexPopup() {
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: string,
     ) => {
-      if (areaName !== "local" || !changes[AUTH_STORAGE_KEY]) return
-      if (changes[AUTH_STORAGE_KEY].newValue) {
-        refreshStatus()
-      } else {
+      if (areaName !== "local") return
+      const watchedKeys = [
+        AUTH_STORAGE_KEY,
+        "baselineDone",
+        "currentSessionId",
+        "sessionStartedAt",
+        "isPaused",
+        "pausedTotalMs",
+        "offscreenActive",
+        "offscreenError",
+        "lastSettingsSyncedAt",
+      ]
+      if (!watchedKeys.some((key) => changes[key])) return
+
+      if (changes[AUTH_STORAGE_KEY] && !changes[AUTH_STORAGE_KEY].newValue) {
         setPhase("login")
+      } else {
+        refreshStatus()
       }
     }
     chrome.storage.onChanged.addListener(listener)
@@ -356,6 +476,14 @@ export default function IndexPopup() {
     chrome.tabs.create({ url: `${WEB_URL}/login?extId=${chrome.runtime.id}` })
   }
 
+  const openBaseline = () => {
+    chrome.tabs.create({ url: `${WEB_URL}/webcam-test?extId=${chrome.runtime.id}` })
+  }
+
+  const openCameraSettings = () => {
+    chrome.tabs.create({ url: "chrome://settings/content/camera" })
+  }
+
   const handleLogout = () => {
     chrome.runtime.sendMessage({ type: "LOGOUT" }, () => {
       setPhase("login")
@@ -378,13 +506,15 @@ export default function IndexPopup() {
     setElapsed(0)
     setIsPaused(false)
     setPausedTotalMs(0)
-    chrome.tabs.create({ url: `${WEB_URL}/webcam-test?extId=${chrome.runtime.id}` })
+    openBaseline()
   }
 
   const updateSetting = <K extends keyof ExtSettings>(key: K, value: ExtSettings[K]) => {
     const next = { ...settings, [key]: value }
     setSettings(next)
-    chrome.runtime.sendMessage({ type: "UPDATE_SETTINGS", settings: next })
+    chrome.runtime.sendMessage({ type: "UPDATE_SETTINGS", settings: next }, () => {
+      setLastSettingsSyncedAt(new Date().toISOString())
+    })
   }
 
   const handleApprovalNotificationTest = () => {
@@ -442,6 +572,16 @@ export default function IndexPopup() {
         </header>
 
         <div className="content">
+          <Troubleshooter
+            loggedIn={false}
+            baselineDone={false}
+            sessionId={null}
+            offscreenError=""
+            onGoogleLogin={handleGoogleLogin}
+            onBaseline={openBaseline}
+            onStartSession={handleStartSession}
+            onCameraSettings={openCameraSettings}
+          />
           <div className="card">
             <p className="card-label">로그인</p>
             <div className="field-group">
@@ -549,11 +689,22 @@ export default function IndexPopup() {
               <button
                 className="btn-primary"
                 style={{ marginTop: 10 }}
-                onClick={() => chrome.tabs.create({ url: `${WEB_URL}/webcam-test?extId=${chrome.runtime.id}` })}>
+                onClick={openBaseline}>
                 지금 측정하기
               </button>
             </div>
           )}
+
+          <Troubleshooter
+            loggedIn={true}
+            baselineDone={baselineDone}
+            sessionId={sessionId}
+            offscreenError={offscreenError}
+            onGoogleLogin={handleGoogleLogin}
+            onBaseline={openBaseline}
+            onStartSession={handleStartSession}
+            onCameraSettings={openCameraSettings}
+          />
 
           <div className={`session-card ${sessionId ? (isPaused ? "session-paused" : "session-active") : "session-idle"}`}>
             <div className="session-row">
@@ -610,6 +761,10 @@ export default function IndexPopup() {
         </div>
       ) : (
         <div className="content">
+          <div className="sync-status">
+            <span>설정 동기화</span>
+            <strong>{fmtSyncTime(lastSettingsSyncedAt)}</strong>
+          </div>
           <div className="card">
             <p className="card-label">알림 설정</p>
 

@@ -16,6 +16,7 @@ const BREAK_ALARM = "break-reminder"
 const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
 const APPROVAL_TIMEOUT_MS = 60_000
 const AUTH_STORAGE_KEY = ["access", "Token"].join("")
+const POSTURE_ALERT_COOLDOWN_MS = 5 * 60 * 1000
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: unknown
@@ -61,6 +62,7 @@ type RuntimeMessage =
 
 type ExternalMessage =
   | { type: "PING" }
+  | { type: "GET_STATUS" }
   | { type: "BASELINE_DONE"; baselineData: unknown }
   | { type: "LOGIN_FROM_WEB"; credential?: unknown; refreshToken?: unknown }
 
@@ -106,6 +108,7 @@ type PendingApproval = {
 }
 
 const pendingApprovals = new Map<string, PendingApproval>()
+const lastPostureAlertAt = new Map<string, number>()
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -454,6 +457,16 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
 
 async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const soundEnabled = msg.soundEnabled ?? (settings.soundEnabled !== false)
+  const alertState = typeof msg.state === "string" ? msg.state : "UNKNOWN"
+  if (alertState !== "GOOD_POSTURE" && alertState !== "GOOD") {
+    const now = Date.now()
+    const lastAt = lastPostureAlertAt.get(alertState) ?? 0
+    if (now - lastAt < POSTURE_ALERT_COOLDOWN_MS) {
+      debugLog(`[notification] ${alertState} 중복 알림 쿨다운으로 생략`)
+      return
+    }
+    lastPostureAlertAt.set(alertState, now)
+  }
   const alert: PostureMessage = {
     type: "POSTURE_ALERT",
     state: msg.state,
@@ -559,6 +572,30 @@ async function restartAlarms(): Promise<void> {
     delayInMinutes: s.breakInterval,
     periodInMinutes: s.breakInterval
   })
+}
+
+async function getPublicExtensionStatus() {
+  const stored = await chrome.storage.local.get([
+    AUTH_STORAGE_KEY,
+    "baselineDone",
+    "currentSessionId",
+    "isPaused",
+    "offscreenActive",
+    "offscreenError",
+    "lastSettingsSyncedAt",
+  ])
+  return {
+    ok: true,
+    installed: true,
+    loggedIn: typeof stored[AUTH_STORAGE_KEY] === "string" && stored[AUTH_STORAGE_KEY].length > 0,
+    baselineDone: stored.baselineDone === true,
+    sessionActive: typeof stored.currentSessionId === "string" && stored.currentSessionId.length > 0,
+    isPaused: stored.isPaused === true,
+    offscreenActive: stored.offscreenActive === true,
+    offscreenError: typeof stored.offscreenError === "string" ? stored.offscreenError : "",
+    lastSettingsSyncedAt:
+      typeof stored.lastSettingsSyncedAt === "string" ? stored.lastSettingsSyncedAt : "",
+  }
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────
@@ -673,7 +710,8 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
     chrome.storage.local
       .get(["accessToken", "currentSessionId", "sessionStartedAt", "settings",
             "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
-            "profileImg", "userName", "offscreenActive", "offscreenError"])
+            "profileImg", "userName", "offscreenActive", "offscreenError",
+            "lastSettingsSyncedAt"])
       .then(sendResponse)
     return true
   }
@@ -865,6 +903,7 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
             body: JSON.stringify({ enabled: next.darkDetectionEnabled })
           })
         }
+        await chrome.storage.local.set({ lastSettingsSyncedAt: new Date().toISOString() })
       } catch (e) {
         console.error("[settings] sync:", e)
       }
@@ -927,8 +966,15 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
           await syncExtensionPushToken(merged.pushEnabled).catch((e) =>
             console.error("[push] extension FCM 토큰 동기화 실패:", e)
           )
-          chrome.storage.local.set({ settings: merged, userId: me.id, profileImg: me.profileImg ?? "", userName: me.name ?? "" })
-          sendResponse({ settings: merged, name: me.name, profileImg: me.profileImg ?? "" })
+          const lastSettingsSyncedAt = new Date().toISOString()
+          chrome.storage.local.set({
+            settings: merged,
+            userId: me.id,
+            profileImg: me.profileImg ?? "",
+            userName: me.name ?? "",
+            lastSettingsSyncedAt,
+          })
+          sendResponse({ settings: merged, name: me.name, profileImg: me.profileImg ?? "", lastSettingsSyncedAt })
         })
       )
       .catch((e) => sendResponse({ error: e.message }))
@@ -942,6 +988,13 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
   if (msg.type === "PING") {
     sendResponse({ ok: true })
     return false
+  }
+
+  if (msg.type === "GET_STATUS") {
+    getPublicExtensionStatus()
+      .then(sendResponse)
+      .catch((e) => sendResponse({ ok: false, error: String(e?.message ?? e) }))
+    return true
   }
 
   if (msg.type === "LOGIN_FROM_WEB") {
@@ -972,6 +1025,7 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
             userId: me.id,
             profileImg: me.profileImg ?? "",
             userName: me.name ?? "",
+            lastSettingsSyncedAt: new Date().toISOString(),
           })
           await syncExtensionPushToken(merged.pushEnabled).catch((e) =>
             console.error("[push] extension FCM 토큰 동기화 실패:", e)
