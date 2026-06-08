@@ -98,11 +98,14 @@ function injectStyle() {
     }
     #${TOAST_ID} .toast-kicker {
       margin-bottom: 2px;
-      color: #2563eb;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
+      height: 18px;
+    }
+    #${TOAST_ID} .toast-logo {
+      display: block;
+      width: 64px;
+      height: 18px;
+      object-fit: contain;
+      object-position: left center;
     }
     #${TOAST_ID} .toast-title {
       color: #111827;
@@ -235,7 +238,11 @@ function showToast(message: string, isGood: boolean, soundEnabled: boolean) {
 
   const kicker = document.createElement("div")
   kicker.className = "toast-kicker"
-  kicker.textContent = "Anjava"
+  const logo = document.createElement("img")
+  logo.className = "toast-logo"
+  logo.src = chrome.runtime.getURL("assets/logo.png")
+  logo.alt = "Anjava"
+  kicker.append(logo)
 
   const title = document.createElement("div")
   title.className = "toast-title"

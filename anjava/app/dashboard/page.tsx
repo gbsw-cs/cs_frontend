@@ -909,7 +909,7 @@ export default function DashboardPage() {
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-1 space-y-0.5">
+                <div className="mt-1.5 space-y-0.5">
                   <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
                   <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                   <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
@@ -998,7 +998,7 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div>
+    <div className="flex min-h-[34px] flex-col items-center justify-center text-center">
       <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
       <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
