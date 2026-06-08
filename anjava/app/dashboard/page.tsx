@@ -909,11 +909,12 @@ export default function DashboardPage() {
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-1.5 space-y-0.5">
-                  <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
-                  <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
-                  <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
-                </div>
+                <IssueStackChart
+                  turtleSec={turtleSec}
+                  roundShoulderSec={roundShoulderSec}
+                  asymSec={asymSec}
+                  totalSec={badPostureSec}
+                />
               </div>
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
@@ -1012,17 +1013,53 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
   );
 }
 
-function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
-  const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
+function IssueStackChart({
+  turtleSec,
+  roundShoulderSec,
+  asymSec,
+  totalSec,
+}: {
+  turtleSec: number;
+  roundShoulderSec: number;
+  asymSec: number;
+  totalSec: number;
+}) {
+  const rawItems = [
+    { label: "거북목", sec: turtleSec, color: "bg-rose-400", dot: "bg-rose-400" },
+    { label: "라운드 숄더", sec: roundShoulderSec, color: "bg-amber-400", dot: "bg-amber-400" },
+    { label: "자세 비대칭", sec: asymSec, color: "bg-white ring-1 ring-inset ring-zinc-300", dot: "bg-white ring-1 ring-zinc-300" },
+  ];
+  const items = rawItems.map((item) => ({
+    ...item,
+    pct: totalSec > 0 ? clampPercent(Math.round((item.sec / totalSec) * 100)) : 0,
+    heightPct: totalSec > 0 ? clampPercent((item.sec / totalSec) * 100) : 0,
+  }));
+
   return (
-    <div className="rounded-lg px-2.5 py-0.5 ring-1 ring-zinc-100">
-      <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[9px] leading-tight text-zinc-400">{label}</div>
-        <div className="shrink-0 text-[9px] font-semibold leading-tight text-zinc-500">{pct}%</div>
+    <div className="mt-1.5 flex min-h-0 flex-1 items-stretch gap-2">
+      <div className="flex w-10 shrink-0 flex-col-reverse overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`${item.color} transition-all`}
+            style={{ height: `${totalSec > 0 ? item.heightPct : item.label === "자세 비대칭" ? 100 : 0}%` }}
+          />
+        ))}
       </div>
-      <div className="text-[10px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
-      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+
+      <div className="min-w-0 flex-1 space-y-1">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-2 rounded-lg px-2 py-0.5 ring-1 ring-zinc-100">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${item.dot}`} />
+              <span className="truncate text-[9px] leading-tight text-zinc-500">{item.label}</span>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-[9px] font-bold leading-tight text-zinc-700">{item.pct}%</div>
+              <div className="text-[9px] font-semibold leading-tight text-zinc-900">{formatDuration(item.sec)}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
