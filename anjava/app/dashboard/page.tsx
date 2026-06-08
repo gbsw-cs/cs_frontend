@@ -892,18 +892,18 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
-              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-2 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+            <div className="mt-1.5 grid shrink-0 grid-cols-2 gap-1.5 lg:grid-cols-4">
+              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-3 py-1.5 ring-1 ring-[#2563EB]/15 lg:col-span-1">
                 <div className="text-[10px] font-medium text-[#2563EB]">총 감지 스크린타임</div>
-                <div className="mt-0.5 text-xl font-bold text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
-                <div className="mt-0.5 text-[10px] text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `위험도 ${weeklyRiskPct}%`}</div>
+                <div className="text-lg font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
+                <div className="text-[9px] text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `위험도 ${weeklyRiskPct}%`}</div>
               </div>
               <WeeklyMetric label="정자세 시간" value={formatDuration(weeklyGoodSec)} tone="good" />
               <WeeklyMetric label="자세 경고 시간" value={formatDuration(badPostureSec)} tone="bad" />
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-2 grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="mt-1 grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[240px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-1.5 ring-1 ring-zinc-100">
                 <div className="grid grid-cols-3 gap-2">
                   <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
@@ -984,9 +984,9 @@ function WeeklyMetric({ label, value, tone }: { label: string; value: string; to
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="rounded-xl px-3 py-2 ring-1 ring-zinc-100">
+    <div className="rounded-xl px-3 py-1.5 ring-1 ring-zinc-100">
       <div className="text-[10px] text-zinc-400">{label}</div>
-      <div className={`mt-0.5 text-base font-bold ${toneClass}`}>{value}</div>
+      <div className={`text-sm font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
