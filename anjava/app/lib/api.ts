@@ -571,7 +571,7 @@ export type WeeklyDashboard = {
   shoulderAsymmetryTotalSec: number;
   darkEnvTotalSec: number;
   goodPostureRatio: number;
-  worstWeekday: string;
+  worstWeekday: string | null;
 };
 
 export type DailyDashboard = {
@@ -655,7 +655,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     shoulderAsymmetryTotalSec: finalAsym,
     darkEnvTotalSec: n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]),
     goodPostureRatio: n(["goodPostureRatio", "good_posture_ratio"]),
-    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : "",
+    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : null,
   };
 }
 

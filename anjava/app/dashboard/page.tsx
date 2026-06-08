@@ -457,7 +457,7 @@ export default function DashboardPage() {
       ? Math.round(weeklyFilledValues.reduce((sum, value) => sum + value, 0) / weeklyFilledDays)
       : 0;
   const worstWeekday =
-    weekly?.worstWeekday ??
+    weekly?.worstWeekday ||
     weeklyDays.reduce<{ index: number; value: number } | null>((worst, day, index) => {
       if (day.badPostureRatio === null) return worst;
       const value = day.badPostureRatio;
