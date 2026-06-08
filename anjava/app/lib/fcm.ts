@@ -136,6 +136,36 @@ function showBrowserNotification(title: string, options: NotificationOptions) {
   };
 }
 
+function playAlertTone(soundEnabled: boolean) {
+  if (!soundEnabled) return;
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    const ctx = new AudioContextCtor();
+    const playNote = (frequency: number, start: number, duration: number) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.02);
+    };
+
+    const now = ctx.currentTime;
+    playNote(1046.5, now, 0.17);
+    playNote(1318.5, now + 0.14, 0.24);
+    window.setTimeout(() => ctx.close().catch(() => {}), 650);
+  } catch {}
+}
+
 export async function showLocalPostureNotification({
   state,
   message,
@@ -155,6 +185,7 @@ export async function showLocalPostureNotification({
   const lastAt = localPostureAlertAt.get(state) ?? 0;
   if (now - lastAt < LOCAL_POSTURE_ALERT_COOLDOWN_MS) return;
   localPostureAlertAt.set(state, now);
+  playAlertTone(soundEnabled);
 
   const title = "자세 교정 알림";
   const options = {

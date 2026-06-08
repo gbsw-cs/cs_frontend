@@ -191,18 +191,29 @@ function playTone(isGood: boolean, soundEnabled: boolean) {
     if (!AudioContextCtor) return
 
     const ctx = new AudioContextCtor()
-    const oscillator = ctx.createOscillator()
-    const gain = ctx.createGain()
-    oscillator.type = "sine"
-    oscillator.frequency.setValueAtTime(isGood ? 660 : 880, ctx.currentTime)
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22)
-    oscillator.connect(gain)
-    gain.connect(ctx.destination)
-    oscillator.start()
-    oscillator.stop(ctx.currentTime + 0.24)
-    window.setTimeout(() => ctx.close().catch(() => {}), 400)
+    const playNote = (frequency: number, start: number, duration: number, peak = 0.18) => {
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(frequency, start)
+      gain.gain.setValueAtTime(0.0001, start)
+      gain.gain.exponentialRampToValueAtTime(peak, start + 0.018)
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start(start)
+      oscillator.stop(start + duration + 0.02)
+    }
+
+    const now = ctx.currentTime
+    if (isGood) {
+      playNote(660, now, 0.16, 0.13)
+      playNote(880, now + 0.14, 0.2, 0.12)
+    } else {
+      playNote(1046.5, now, 0.17)
+      playNote(1318.5, now + 0.14, 0.24)
+    }
+    window.setTimeout(() => ctx.close().catch(() => {}), 650)
   } catch {}
 }
 
