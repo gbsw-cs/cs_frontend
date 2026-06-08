@@ -925,35 +925,42 @@ export default function DashboardPage() {
                   const values = weeklyValues;
                   const dayLabels = WEEK_LABELS;
                   return (
-                    <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-2">
-                      {values.map((value, i) => {
-                        const isFuture = weeklyDays[i]?.isFuture;
-                        const height = value === null ? 6 : Math.max(8, Math.round(value));
-                        const tone =
-                          isFuture
-                            ? "bg-zinc-100"
-                            : value === null
-                            ? "bg-zinc-200"
-                            : value >= 60
-                            ? "bg-rose-400"
-                            : value >= 35
-                            ? "bg-amber-400"
-                            : "bg-emerald-400";
-                        return (
-                          <div key={dayLabels[i]} className="flex min-h-[48px] flex-col items-center justify-end gap-0.5">
-                            <div className="text-[8px] font-semibold text-zinc-400">
-                              {value === null ? "—" : `${Math.round(value)}%`}
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <div className="grid min-h-0 flex-1 grid-cols-7 items-end gap-2">
+                        {values.map((value, i) => {
+                          const isFuture = weeklyDays[i]?.isFuture;
+                          const hasValue = value !== null;
+                          const height = hasValue ? Math.max(10, Math.round(value)) : 8;
+                          const tone =
+                            isFuture
+                              ? "bg-zinc-100"
+                              : !hasValue
+                              ? "bg-zinc-200"
+                              : value >= 60
+                              ? "bg-rose-400"
+                              : value >= 35
+                              ? "bg-amber-400"
+                              : "bg-emerald-400";
+                          return (
+                            <div key={dayLabels[i]} className="flex min-h-[42px] flex-col items-center justify-end gap-0.5">
+                              <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
+                                {hasValue ? `${Math.round(value)}%` : ""}
+                              </div>
+                              <div className="flex h-7 w-full items-end rounded-full bg-zinc-100 px-1">
+                                <div
+                                  className={`w-full rounded-full transition-all ${tone}`}
+                                  style={{ height: `${height}%` }}
+                                />
+                              </div>
                             </div>
-                            <div className="flex h-7 w-full items-end rounded-full bg-zinc-100 px-1">
-                              <div
-                                className={`w-full rounded-full transition-all ${tone}`}
-                                style={{ height: `${height}%` }}
-                              />
-                            </div>
-                            <div className="text-[9px] font-medium text-zinc-500">{dayLabels[i]}</div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                      <div className="mt-1 grid grid-cols-7 gap-2 text-center text-[9px] font-medium text-zinc-500">
+                        {dayLabels.map((label, i) => (
+                          <span key={label} className={weeklyDays[i]?.isFuture ? "text-zinc-300" : ""}>{label}</span>
+                        ))}
+                      </div>
                     </div>
                   );
                 })()}
