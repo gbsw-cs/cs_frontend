@@ -7,6 +7,12 @@ import { clearTokens, getAccessToken, getMe, login, resolvePostAuthPath, saveTok
 import { SocialLoginButtons } from "../components/SocialLoginButtons";
 import { syncWebPushTokenIfEnabled } from "../lib/fcm";
 import { validatePassword } from "../lib/validation";
+import {
+  clearPendingExtensionLoginId,
+  getCurrentTokensForExtension,
+  getPendingExtensionLoginId,
+  sendExtensionLogin,
+} from "../lib/extensionAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,16 +20,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [extensionId, setExtensionId] = useState("");
 
   const passwordError = validatePassword(password);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pendingExtensionId = getPendingExtensionLoginId(params);
+    setExtensionId(pendingExtensionId);
+
     if (!getAccessToken()) return;
 
     let cancelled = false;
     getMe()
-      .then(() => {
-        if (!cancelled) router.replace("/dashboard");
+      .then(async () => {
+        if (cancelled) return;
+        if (pendingExtensionId) {
+          const tokens = getCurrentTokensForExtension();
+          if (tokens) {
+            try {
+              await sendExtensionLogin(pendingExtensionId, tokens);
+              clearPendingExtensionLoginId();
+            } catch {
+              // 웹 로그인은 유지하고 확장 연결만 건너뜁니다.
+            }
+          }
+        }
+        if (!cancelled) router.replace(pendingExtensionId ? "/extension-guide" : "/dashboard");
       })
       .catch(() => {
         clearTokens();
@@ -43,8 +66,12 @@ export default function LoginPage() {
       const tokens = await login(email, password);
       saveTokens(tokens);
       void syncWebPushTokenIfEnabled();
+      if (extensionId) {
+        await sendExtensionLogin(extensionId, tokens);
+        clearPendingExtensionLoginId();
+      }
       const path = await resolvePostAuthPath();
-      router.push(path);
+      router.push(extensionId ? "/extension-guide" : path);
     } catch (err) {
       setError(err instanceof Error ? err.message : "로그인 실패");
     } finally {
@@ -75,7 +102,7 @@ export default function LoginPage() {
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
-        <SocialLoginButtons />
+        <SocialLoginButtons extensionId={extensionId} />
         <p className="mt-6 text-center text-xs text-zinc-400">
           계정이 없으신가요?
           <br />

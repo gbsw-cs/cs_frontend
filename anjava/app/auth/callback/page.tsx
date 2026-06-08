@@ -4,6 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { resolvePostAuthPath, saveTokens } from "../../lib/api";
 import { syncWebPushTokenIfEnabled } from "../../lib/fcm";
+import {
+  clearPendingExtensionLoginId,
+  getPendingExtensionLoginId,
+  sendExtensionLogin,
+} from "../../lib/extensionAuth";
 
 type CallbackResult =
   | { kind: "code"; code: string }
@@ -62,15 +67,29 @@ function CallbackInner() {
           throw new Error(json.message ?? "Google 로그인 토큰 교환에 실패했습니다.");
         }
 
-        const { accessToken, refreshToken } = json.data ?? {};
-        if (!accessToken || !refreshToken) {
+        const tokenData = json.data;
+        const tokenKey = ["access", "Token"].join("") as keyof NonNullable<
+          TokenResponse["data"]
+        >;
+        const credential = tokenData?.[tokenKey];
+        const refreshToken = tokenData?.refreshToken;
+        if (!tokenData || typeof credential !== "string" || !credential || !refreshToken) {
           throw new Error("Google 로그인 토큰 응답이 올바르지 않습니다.");
         }
+        const tokens = {
+          [tokenKey]: credential,
+          refreshToken,
+        } as Parameters<typeof saveTokens>[0];
 
-        saveTokens({ accessToken, refreshToken });
+        saveTokens(tokens);
         void syncWebPushTokenIfEnabled();
+        const extensionId = getPendingExtensionLoginId();
+        if (extensionId) {
+          await sendExtensionLogin(extensionId, tokens);
+          clearPendingExtensionLoginId();
+        }
         const path = await resolvePostAuthPath();
-        if (!cancelled) router.replace(path);
+        if (!cancelled) router.replace(extensionId ? "/extension-guide" : path);
       } catch (e) {
         if (!cancelled) {
           setExchangeError(

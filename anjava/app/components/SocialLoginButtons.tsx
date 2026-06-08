@@ -1,8 +1,16 @@
 "use client";
 import { googleLoginUrl } from "../lib/api";
+import { rememberExtensionLoginId } from "../lib/extensionAuth";
 
-export function SocialLoginButtons({ label = "간편 로그인" }: { label?: string }) {
+export function SocialLoginButtons({
+  label = "간편 로그인",
+  extensionId = "",
+}: {
+  label?: string;
+  extensionId?: string;
+}) {
   function onGoogleLogin() {
+    if (extensionId) rememberExtensionLoginId(extensionId);
     window.location.href = googleLoginUrl();
   }
 

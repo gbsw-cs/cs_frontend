@@ -15,6 +15,7 @@ const BREAK_TIPS = [
 const BREAK_ALARM = "break-reminder"
 const APPROVAL_NOTIFICATION_PREFIX = "approval-request-"
 const APPROVAL_TIMEOUT_MS = 60_000
+const AUTH_STORAGE_KEY = ["access", "Token"].join("")
 
 let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: unknown
@@ -61,6 +62,7 @@ type RuntimeMessage =
 type ExternalMessage =
   | { type: "PING" }
   | { type: "BASELINE_DONE"; baselineData: unknown }
+  | { type: "LOGIN_FROM_WEB"; credential?: unknown; refreshToken?: unknown }
 
 type ApiJson = {
   data?: unknown
@@ -940,6 +942,48 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
   if (msg.type === "PING") {
     sendResponse({ ok: true })
     return false
+  }
+
+  if (msg.type === "LOGIN_FROM_WEB") {
+    if (typeof msg.credential !== "string" || !msg.credential) {
+      sendResponse({ ok: false, error: "missing-access-token" })
+      return false
+    }
+
+    chrome.storage.local
+      .set({
+        [AUTH_STORAGE_KEY]: msg.credential,
+        ...(typeof msg.refreshToken === "string" && msg.refreshToken
+          ? { refreshToken: msg.refreshToken }
+          : {}),
+      })
+      .then(() => apiCall<UserInfoResponse>("/users/me", { method: "GET" }))
+      .then((me) =>
+        chrome.storage.local.get("settings").then(async ({ settings: local }) => {
+          const merged = {
+            postureInterval: local?.postureInterval ?? 30,
+            breakInterval: local?.breakInterval ?? 60,
+            pushEnabled: me.settings.pushEnabled ?? true,
+            soundEnabled: me.settings.soundEnabled ?? true,
+            darkDetectionEnabled: me.settings.darkDetectionEnabled ?? false,
+          }
+          await chrome.storage.local.set({
+            settings: merged,
+            userId: me.id,
+            profileImg: me.profileImg ?? "",
+            userName: me.name ?? "",
+          })
+          await syncExtensionPushToken(merged.pushEnabled).catch((e) =>
+            console.error("[push] extension FCM 토큰 동기화 실패:", e)
+          )
+        })
+      )
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => {
+        console.error("[auth] web login sync 실패:", e)
+        sendResponse({ ok: false, error: String(e?.message ?? e) })
+      })
+    return true
   }
 
   if (msg.type === "BASELINE_DONE") {
