@@ -4,3 +4,10 @@ trouble.md
 .claude/
 **/.omc/
 /*.png
+
+# local agent/workflow files
+.codex/
+AGENTS.md
+
+# Chrome Web Store local submission assets
+store-assets/
