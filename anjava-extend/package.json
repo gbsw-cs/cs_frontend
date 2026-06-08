@@ -9,7 +9,6 @@
     "build": "plasmo build && node scripts/copy-mediapipe-wasm.mjs",
     "package": "plasmo package && node scripts/verify-extension-package.mjs",
     "package:verify": "node scripts/verify-extension-package.mjs",
-    "publish:chrome": "node scripts/publish-chrome-webstore.mjs",
     "version:patch": "node scripts/bump-extension-version.mjs patch",
     "typecheck": "tsc --noEmit"
   },
