@@ -10,6 +10,13 @@ import {
   sendExtensionLogin,
 } from "../../lib/extensionAuth";
 
+function extensionAuthCompletePath(options?: { failed?: boolean; reason?: string }) {
+  if (!options?.failed) return "/extension-auth-complete";
+  const params = new URLSearchParams({ status: "failed" });
+  if (options.reason) params.set("reason", options.reason);
+  return `/extension-auth-complete?${params.toString()}`;
+}
+
 type CallbackResult =
   | { kind: "code"; code: string }
   | { kind: "error"; message: string };
@@ -84,12 +91,25 @@ function CallbackInner() {
         saveTokens(tokens);
         void syncWebPushTokenIfEnabled();
         const extensionId = getPendingExtensionLoginId();
+        let extensionPath = "";
         if (extensionId) {
-          await sendExtensionLogin(extensionId, tokens);
-          clearPendingExtensionLoginId();
+          try {
+            const linked = await sendExtensionLogin(extensionId, tokens);
+            clearPendingExtensionLoginId();
+            extensionPath = extensionAuthCompletePath({
+              failed: !linked,
+              reason: linked ? undefined : "확장 프로그램 메시지 연결을 사용할 수 없습니다.",
+            });
+          } catch (e) {
+            clearPendingExtensionLoginId();
+            extensionPath = extensionAuthCompletePath({
+              failed: true,
+              reason: e instanceof Error ? e.message : "확장 프로그램 연결 중 오류가 발생했습니다.",
+            });
+          }
         }
         const path = await resolvePostAuthPath();
-        if (!cancelled) router.replace(extensionId ? "/extension-guide" : path);
+        if (!cancelled) router.replace(extensionId ? extensionPath : path);
       } catch (e) {
         if (!cancelled) {
           setExchangeError(

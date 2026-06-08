@@ -1,6 +1,6 @@
 declare module "react-toastify/dist/ReactToastify.css";
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import logoUrl from "url:./assets/logo.png"
@@ -8,6 +8,7 @@ import "./popup.css"
 
 const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
+const AUTH_STORAGE_KEY = ["access", "Token"].join("")
 
 interface ExtSettings {
   postureInterval: number
@@ -176,34 +177,78 @@ export default function IndexPopup() {
   const [offscreenError, setOffscreenError] = useState("")
   const emailRef = useRef<HTMLInputElement>(null)
 
-  // ── Init ─────────────────────────────────────────────────
-  useEffect(() => {
-    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res: StatusResponse) => {
-      if (!res?.accessToken) {
-        setPhase("login")
-        return
-      }
-      if (res.currentSessionId) {
-        setSessionId(res.currentSessionId)
-        setStart(new Date(res.sessionStartedAt))
-      }
-      if (res.settings)  setSettings({ ...DEFAULT_SETTINGS, ...res.settings })
-      if (res.userName)  setUserName(res.userName)
-      if (res.profileImg) setProfileImg(res.profileImg)
-      setBaselineDone(res.baselineDone === true)
-      setIsPaused(res.isPaused === true)
-      setPausedTotalMs(res.pausedTotalMs ?? 0)
-      setOffscreenActive(res.offscreenActive === true)
-      setOffscreenError(res.offscreenError ?? "")
-      setPhase("main")
-
-      chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: UserSettingsResponse) => {
-        if (r?.settings)  setSettings(s => ({ ...s, ...r.settings }))
-        if (r?.name)      setUserName(r.name)
-        if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
-      })
+  const fetchUserSettings = useCallback(() => {
+    chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (r: UserSettingsResponse) => {
+      if (r?.settings)  setSettings(s => ({ ...s, ...r.settings }))
+      if (r?.name)      setUserName(r.name)
+      if (r?.profileImg !== undefined) setProfileImg(r.profileImg)
     })
   }, [])
+
+  const applyStatus = useCallback((res?: StatusResponse) => {
+    const credential = (res as Record<string, unknown> | undefined)?.[AUTH_STORAGE_KEY]
+    if (typeof credential !== "string" || !credential) {
+      setLLoading(false)
+      setSessionId(null)
+      setStart(null)
+      setBaselineDone(false)
+      setUserName("")
+      setProfileImg("")
+      setOffscreenActive(false)
+      setOffscreenError("")
+      setIsPaused(false)
+      setPausedTotalMs(0)
+      setElapsed(0)
+      setPhase("login")
+      return
+    }
+    if (res.currentSessionId) {
+      setSessionId(res.currentSessionId)
+      setStart(new Date(res.sessionStartedAt))
+    } else {
+      setSessionId(null)
+      setStart(null)
+    }
+    if (res.settings)  setSettings({ ...DEFAULT_SETTINGS, ...res.settings })
+    if (res.userName)  setUserName(res.userName)
+    if (res.profileImg) setProfileImg(res.profileImg)
+    setBaselineDone(res.baselineDone === true)
+    setIsPaused(res.isPaused === true)
+    setPausedTotalMs(res.pausedTotalMs ?? 0)
+    setOffscreenActive(res.offscreenActive === true)
+    setOffscreenError(res.offscreenError ?? "")
+    setLLoading(false)
+    setLError("")
+    setPhase("main")
+    fetchUserSettings()
+  }, [fetchUserSettings])
+
+  const refreshStatus = useCallback(() => {
+    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (res: StatusResponse) => {
+      applyStatus(res)
+    })
+  }, [applyStatus])
+
+  // ── Init ─────────────────────────────────────────────────
+  useEffect(() => {
+    refreshStatus()
+  }, [refreshStatus])
+
+  useEffect(() => {
+    const listener = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (areaName !== "local" || !changes[AUTH_STORAGE_KEY]) return
+      if (changes[AUTH_STORAGE_KEY].newValue) {
+        refreshStatus()
+      } else {
+        setPhase("login")
+      }
+    }
+    chrome.storage.onChanged.addListener(listener)
+    return () => chrome.storage.onChanged.removeListener(listener)
+  }, [refreshStatus])
 
   useEffect(() => {
     const listener = (msg: PopupRuntimeMessage) => {
@@ -297,12 +342,7 @@ export default function IndexPopup() {
       chrome.runtime.sendMessage(
         { type: "LOGIN", accessToken: json.data.accessToken, refreshToken: json.data.refreshToken },
         () => {
-          setPhase("main")
-          chrome.runtime.sendMessage({ type: "FETCH_USER_SETTINGS" }, (info: UserSettingsResponse) => {
-            if (info?.settings)  setSettings(s => ({ ...s, ...info.settings }))
-            if (info?.name)      setUserName(info.name)
-            if (info?.profileImg !== undefined) setProfileImg(info.profileImg)
-          })
+          refreshStatus()
         }
       )
     } catch (e) {
