@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css"
 import logoUrl from "url:./assets/logo.png"
 import "./popup.css"
 
-const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "https://anjava.vercel.app").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 const AUTH_STORAGE_KEY = ["access", "Token"].join("")
 

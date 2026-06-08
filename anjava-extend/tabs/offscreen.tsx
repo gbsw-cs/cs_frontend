@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 
-const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "https://anjava.vercel.app").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 const DEBUG_ENABLED = process.env.PLASMO_PUBLIC_DEBUG === "1"
 

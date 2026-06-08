@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import "./baseline.css"
 
-const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "")
+const WEB_URL  = (process.env.PLASMO_PUBLIC_WEB_URL ?? "https://anjava.vercel.app").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 
 const DURATION_MS = 10_000
