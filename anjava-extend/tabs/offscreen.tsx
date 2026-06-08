@@ -43,6 +43,7 @@ type OffscreenMessage =
     }
   | { type: "STOP_DETECTION" }
   | { type: "UPDATE_SETTINGS"; settings?: { darkDetectionEnabled?: boolean } }
+  | { type: "PLAY_ALERT_SOUND"; soundEnabled?: boolean }
 type EventFlushResponse = {
   data?: { accepted?: number }
 }
@@ -81,6 +82,36 @@ function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): nu
 function getBaselineBrightness(baselineData: unknown): number | null {
   const brightness = (baselineData as BaselinePayload | undefined)?.data?.baseline?.brightness
   return typeof brightness === "number" ? brightness : null
+}
+
+function playAlertTone(soundEnabled: boolean): void {
+  if (!soundEnabled) return
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextCtor) return
+
+    const ctx = new AudioContextCtor()
+    const playNote = (frequency: number, start: number, duration: number, peak = 0.18) => {
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(frequency, start)
+      gain.gain.setValueAtTime(0.0001, start)
+      gain.gain.exponentialRampToValueAtTime(peak, start + 0.018)
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start(start)
+      oscillator.stop(start + duration + 0.02)
+    }
+
+    const now = ctx.currentTime
+    playNote(1046.5, now, 0.17)
+    playNote(1318.5, now + 0.14, 0.24)
+    window.setTimeout(() => ctx.close().catch(() => {}), 650)
+  } catch {}
 }
 
 export default function OffscreenPage() {
@@ -123,6 +154,11 @@ export default function OffscreenPage() {
       if (msg?.type === "UPDATE_SETTINGS") {
         if (msg.settings?.darkDetectionEnabled !== undefined)
           darkModeRef.current = msg.settings.darkDetectionEnabled
+        sendResponse({ ok: true })
+        return true
+      }
+      if (msg?.type === "PLAY_ALERT_SOUND") {
+        playAlertTone(msg.soundEnabled !== false)
         sendResponse({ ok: true })
         return true
       }

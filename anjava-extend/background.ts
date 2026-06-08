@@ -113,6 +113,7 @@ type PendingApproval = {
 const pendingApprovals = new Map<string, PendingApproval>()
 const lastPostureAlertAt = new Map<string, number>()
 const notificationClickTargets = new Map<string, string>()
+let paddedNotificationIconUrlPromise: Promise<string> | null = null
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -122,8 +123,55 @@ function rand<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function getNotificationIcon(): string {
-  return chrome.runtime.getURL("assets/logo.png")
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ""
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function getNotificationIcon(): Promise<string> {
+  if (!paddedNotificationIconUrlPromise) {
+    paddedNotificationIconUrlPromise = (async () => {
+      const fallback = chrome.runtime.getURL("assets/logo.png")
+      try {
+        const source = await fetch(fallback)
+        const blob = await source.blob()
+        const bitmap = await createImageBitmap(blob)
+        const size = 128
+        const padding = 28
+        const box = size - padding * 2
+        const scale = Math.min(box / bitmap.width, box / bitmap.height)
+        const width = Math.max(1, Math.round(bitmap.width * scale))
+        const height = Math.max(1, Math.round(bitmap.height * scale))
+        const canvas = new OffscreenCanvas(size, size)
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return fallback
+        ctx.clearRect(0, 0, size, size)
+        ctx.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height)
+        const out = await canvas.convertToBlob({ type: "image/png" })
+        const base64 = bytesToBase64(new Uint8Array(await out.arrayBuffer()))
+        return `data:image/png;base64,${base64}`
+      } catch (error) {
+        console.warn("[notification] 아이콘 생성 실패, 기본 아이콘 사용:", error)
+        return fallback
+      }
+    })()
+  }
+
+  return paddedNotificationIconUrlPromise
+}
+
+async function playPostureAlertSound(soundEnabled: boolean): Promise<void> {
+  if (!soundEnabled) return
+  try {
+    await chrome.runtime.sendMessage({
+      type: "PLAY_ALERT_SOUND",
+      soundEnabled,
+    }).catch(() => {})
+  } catch {}
 }
 
 // ─── API ────────────────────────────────────────────────────
@@ -304,7 +352,7 @@ async function ensureOffscreen(): Promise<void> {
   await chrome.offscreen.createDocument({
     url: chrome.runtime.getURL("tabs/offscreen.html"),
     reasons: ["USER_MEDIA" as any],
-    justification: "Webcam access for background posture detection"
+    justification: "Webcam access for background posture detection and alert playback"
   })
 }
 
@@ -443,6 +491,18 @@ function shouldShowSystemPostureNotification(state: unknown, message: string): b
   return state !== "GOOD_POSTURE" && message.trim().length > 0
 }
 
+async function shouldSuppressSystemPostureNotification(msg: PostureMessage): Promise<boolean> {
+  if (msg.suppressSystemNotification === true) return true
+
+  const windows = await chrome.windows.getAll({ populate: true }).catch(() => [])
+  const focusedWindow = windows.find((window) => window.focused)
+  if (!focusedWindow?.tabs) return false
+
+  const activeTab = focusedWindow.tabs.find((tab) => tab.active)
+  const activeUrl = activeTab?.url ?? ""
+  return activeUrl.startsWith(WEB_URL)
+}
+
 function isPostureSystemNotificationCoolingDown(state: unknown): boolean {
   const alertState = typeof state === "string" ? state : "UNKNOWN"
   if (alertState === "GOOD_POSTURE" || alertState === "GOOD") return false
@@ -465,14 +525,16 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
 
   const notificationId = `posture-${Date.now()}`
   notificationClickTargets.set(notificationId, DASHBOARD_URL)
+  const iconUrl = await getNotificationIcon()
   await chrome.notifications.create(notificationId, {
     type: "basic",
-    iconUrl: getNotificationIcon(),
+    iconUrl,
     title: "자세 교정 알림",
     message,
     priority: 2,
     silent: settings.soundEnabled === false,
   })
+  await playPostureAlertSound(settings.soundEnabled !== false)
 }
 
 async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
@@ -485,7 +547,8 @@ async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSe
   }
 
   const tasks: Promise<void>[] = [sendToActiveTab(alert)]
-  if (!msg.suppressSystemNotification) {
+  const suppressSystemNotification = await shouldSuppressSystemPostureNotification(msg)
+  if (!suppressSystemNotification) {
     tasks.unshift(showPostureSystemNotification(alert, { ...settings, soundEnabled }))
   }
 
@@ -506,10 +569,11 @@ async function showNotification(): Promise<void> {
   const message = rand(BREAK_TIPS)
   const notificationId = `break-${Date.now()}`
   notificationClickTargets.set(notificationId, DASHBOARD_URL)
+  const iconUrl = await getNotificationIcon()
 
   await chrome.notifications.create(notificationId, {
     type: "basic",
-    iconUrl: getNotificationIcon(),
+    iconUrl,
     title: "휴식 알림",
     message,
     priority: 2,
@@ -677,7 +741,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === BREAK_ALARM) showNotification()
 })
 
-chrome.gcm?.onMessage?.addListener((message) => {
+  chrome.gcm?.onMessage?.addListener((message) => {
   chrome.storage.local.get("settings").then(({ settings: s }) => {
     if (s?.pushEnabled === false) return
 
@@ -691,15 +755,16 @@ chrome.gcm?.onMessage?.addListener((message) => {
     const notificationId = `fcm-${Date.now()}`
     const targetUrl = typeof data.url === "string" ? new URL(data.url, WEB_URL).href : DASHBOARD_URL
     notificationClickTargets.set(notificationId, targetUrl)
-
-    chrome.notifications.create(notificationId, {
-      type: "basic",
-      iconUrl: getNotificationIcon(),
-      title,
-      message: body,
-      priority: 2,
-      silent: s?.soundEnabled === false,
-    })
+    getNotificationIcon().then((iconUrl) =>
+      chrome.notifications.create(notificationId, {
+        type: "basic",
+        iconUrl,
+        title,
+        message: body,
+        priority: 2,
+        silent: s?.soundEnabled === false,
+      })
+    ).catch(() => {})
   })
 })
 
@@ -1093,13 +1158,15 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
       .then(() => {
         const notificationId = `login-success-${Date.now()}`
         notificationClickTargets.set(notificationId, DASHBOARD_URL)
-        chrome.notifications.create(notificationId, {
-          type: "basic",
-          iconUrl: getNotificationIcon(),
-          title: "로그인 완료",
-          message: "확장 프로그램 팝업을 열어 사용을 시작하세요.",
-          priority: 1,
-        })
+        getNotificationIcon().then((iconUrl) =>
+          chrome.notifications.create(notificationId, {
+            type: "basic",
+            iconUrl,
+            title: "로그인 완료",
+            message: "확장 프로그램 팝업을 열어 사용을 시작하세요.",
+            priority: 1,
+          })
+        ).catch(() => {})
         sendResponse({ ok: true })
       })
       .catch((e) => {
