@@ -1,4 +1,5 @@
 import type { PlasmoCSConfig } from "plasmo"
+import avatarUrl from "url:../assets/avatar.png"
 
 export const config: PlasmoCSConfig = {
   matches: ["http://*/*", "https://*/*"],
@@ -118,40 +119,20 @@ function injectStyle() {
       word-break: keep-all;
     }
     #${TOAST_ID} .toast-avatar {
-      position: relative;
       width: 46px;
       height: 54px;
       flex-shrink: 0;
       overflow: hidden;
-      border-radius: 999px;
+      border-radius: 16px;
       background: linear-gradient(180deg, #dbeafe, #ffffff);
       box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
     }
-    #${TOAST_ID} .toast-avatar:before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 9px;
-      width: 18px;
-      height: 18px;
-      transform: translateX(-50%);
-      border-radius: 999px;
-      background: #f4c7a1;
-    }
-    #${TOAST_ID} .toast-avatar:after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      bottom: -14px;
-      width: 42px;
-      height: 42px;
-      transform: translateX(-50%);
-      border-radius: 18px 18px 10px 10px;
-      background: #2563eb;
-      box-shadow: inset 0 8px 0 rgba(255, 255, 255, 0.16);
-    }
-    #${TOAST_ID}.is-good .toast-avatar:after {
-      background: #22c55e;
+    #${TOAST_ID} .toast-avatar img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
     }
     #${TOAST_ID} .toast-close {
       position: absolute;
@@ -268,6 +249,10 @@ function showToast(message: string, isGood: boolean, soundEnabled: boolean) {
   const avatar = document.createElement("div")
   avatar.className = "toast-avatar"
   avatar.setAttribute("aria-hidden", "true")
+  const avatarImage = document.createElement("img")
+  avatarImage.src = avatarUrl
+  avatarImage.alt = ""
+  avatar.append(avatarImage)
 
   const close = document.createElement("button")
   close.className = "toast-close"

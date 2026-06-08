@@ -506,7 +506,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:h-[95vh] lg:grid-rows-[27vh_27vh_37vh] lg:gap-x-2 lg:gap-y-[2vh] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:h-[95vh] lg:grid-rows-[27vh_30vh_34vh] lg:gap-x-2 lg:gap-y-[2vh] lg:overflow-hidden">
 
           {/* ── Row 1 ── */}
 
@@ -899,13 +899,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-2 grid min-h-0 flex-1 grid-cols-1 gap-2 lg:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="flex min-h-0 flex-col justify-between rounded-xl bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100">
+              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-1.5 ring-1 ring-zinc-100">
                 <div className="grid grid-cols-3 gap-2 lg:grid-cols-1">
                   <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-2 space-y-1.5">
+                <div className="mt-1 space-y-1">
                   <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
                   <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                   <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
@@ -1004,13 +1004,13 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg px-3 py-1.5 ring-1 ring-zinc-100">
+    <div className="rounded-lg px-3 py-1 ring-1 ring-zinc-100">
       <div className="flex items-center justify-between gap-2">
         <div className="truncate text-[10px] text-zinc-400">{label}</div>
         <div className="text-[10px] font-semibold text-zinc-500">{pct}%</div>
       </div>
-      <div className="mt-0.5 text-xs font-bold text-zinc-900">{formatDuration(sec)}</div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+      <div className="text-xs font-bold text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
