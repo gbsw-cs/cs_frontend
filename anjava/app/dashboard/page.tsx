@@ -346,6 +346,10 @@ export default function DashboardPage() {
     (s, sl) => s + sl.goodPostureCount + sl.singleBadCount + sl.overlappingCount,
     0,
   );
+  const measuredPostureCount = slots.reduce(
+    (s, sl) => s + sl.singleBadCount + sl.overlappingCount,
+    0,
+  );
 
   const todayIssueEntries = [
     { key: "turtleNeckCount", count: toFiniteNumber(today?.breakdown?.turtleNeckCount) },
@@ -718,15 +722,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-5 flex items-stretch gap-3">
-              {/* 좌측: 총 이벤트 수 */}
+              {/* 좌측: 자세 이슈 측정 수 */}
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold text-zinc-900">
-                    {totalEventCount}
+                    {measuredPostureCount}
                   </span>
                   <span className="text-[10px] text-zinc-500">건</span>
                 </div>
-                <div className="translate-y-1 text-[9px] text-zinc-400">상태 비율</div>
+                <div className="translate-y-1 text-[9px] text-zinc-400">자세 측정</div>
               </div>
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
