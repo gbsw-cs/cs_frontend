@@ -159,6 +159,8 @@ function relayPostureAlertToExtension(state: DetectionState, message: string, so
       resolve(false);
       return;
     }
+    const suppressSystemNotification =
+      document.visibilityState === "visible" && document.hasFocus();
     const relayId =
       typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
@@ -181,6 +183,7 @@ function relayPostureAlertToExtension(state: DetectionState, message: string, so
       state,
       message,
       soundEnabled,
+      suppressSystemNotification,
     }, "*");
   });
 }

@@ -37,6 +37,7 @@ type PostureMessage = {
   state?: string
   message?: string
   soundEnabled?: boolean
+  suppressSystemNotification?: boolean
 }
 
 type RuntimeMessage =
@@ -479,10 +480,12 @@ async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSe
     soundEnabled,
   }
 
-  const results = await Promise.allSettled([
-    showPostureSystemNotification(alert, { ...settings, soundEnabled }),
-    sendToActiveTab(alert),
-  ])
+  const tasks: Promise<void>[] = [sendToActiveTab(alert)]
+  if (!msg.suppressSystemNotification) {
+    tasks.unshift(showPostureSystemNotification(alert, { ...settings, soundEnabled }))
+  }
+
+  const results = await Promise.allSettled(tasks)
 
   for (const result of results) {
     if (result.status === "rejected") {

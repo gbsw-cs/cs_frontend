@@ -288,7 +288,8 @@ if (!window[WEB_RELAY_KEY]) {
       type: "POSTURE_ALERT_FROM_WEB",
       state: event.data.state,
       message: event.data.message,
-      soundEnabled: event.data.soundEnabled
+      soundEnabled: event.data.soundEnabled,
+      suppressSystemNotification: event.data.suppressSystemNotification === true
     }).then(() => {
       if (!relayId) return
       window.postMessage({ type: "ANJAVA_POSTURE_RELAY_ACK", relayId }, "*")

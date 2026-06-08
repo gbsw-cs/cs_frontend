@@ -149,6 +149,7 @@ export async function showLocalPostureNotification({
   if (!message.trim()) return;
   if (state === "GOOD_POSTURE" || state === "GOOD") return;
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible" && document.hasFocus()) return;
 
   const now = Date.now();
   const lastAt = localPostureAlertAt.get(state) ?? 0;
