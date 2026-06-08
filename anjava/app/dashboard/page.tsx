@@ -603,7 +603,6 @@ export default function DashboardPage() {
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
-                <div className="mt-0.5 text-[10px] text-zinc-400">자세 감지가 진행 중입니다.</div>
               </div>
               <button
                 onClick={() => setWebcamVisible((v) => !v)}
@@ -623,7 +622,7 @@ export default function DashboardPage() {
                 )}
               </button>
             </div>
-            <div className="relative mt-1.5 min-h-0 flex-1 overflow-hidden rounded-xl">
+            <div className="relative mt-1 min-h-[260px] flex-1 overflow-hidden rounded-xl sm:min-h-[300px] lg:min-h-[320px]">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 pushEnabled={me?.settings?.pushEnabled ?? true}
