@@ -913,12 +913,11 @@ export default function DashboardPage() {
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <IssueStackChart
-                  turtleSec={turtleSec}
-                  roundShoulderSec={roundShoulderSec}
-                  asymSec={asymSec}
-                  totalSec={badPostureSec}
-                />
+                <div className="mt-1.5 space-y-0.5">
+                  <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
+                  <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
+                  <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
+                </div>
               </div>
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
@@ -961,6 +960,12 @@ export default function DashboardPage() {
                           );
                         })}
                       </div>
+                      <IssueStackChart
+                        turtleSec={turtleSec}
+                        roundShoulderSec={roundShoulderSec}
+                        asymSec={asymSec}
+                        totalSec={badPostureSec}
+                      />
                       <div className="mt-1 grid grid-cols-7 gap-2 text-center text-[9px] font-medium text-zinc-500">
                         {dayLabels.map((label, i) => (
                           <span key={label} className={weeklyDays[i]?.isFuture ? "text-zinc-300" : ""}>{label}</span>
@@ -1013,6 +1018,22 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
     <div className="flex min-h-[34px] flex-col items-center justify-center text-center">
       <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
       <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
+    </div>
+  );
+}
+
+function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
+  const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
+  return (
+    <div className="rounded-lg px-2.5 py-0.5 ring-1 ring-zinc-100">
+      <div className="flex items-center justify-between gap-2">
+        <div className="truncate text-[9px] leading-tight text-zinc-400">{label}</div>
+        <div className="shrink-0 text-[9px] font-semibold leading-tight text-zinc-500">{pct}%</div>
+      </div>
+      <div className="text-[10px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
