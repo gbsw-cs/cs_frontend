@@ -526,20 +526,34 @@ export default function IndexPopup() {
   }
 
   const handleApprovalNotificationTest = () => {
-    chrome.notifications.create(`test-${Date.now()}`, {
-      type: "basic",
-      iconUrl: "icon128.plasmo.3c1ed2d2.png",
-      title: "알림 테스트",
-      message: "알림이 정상적으로 동작하고 있습니다.",
-      priority: 1,
-    }, (id) => {
-      if (chrome.runtime.lastError) {
-        toast.error(chrome.runtime.lastError.message || "알림 전송에 실패했습니다.")
-        return
-      }
-      toast.success("알림이 전송됐습니다.")
-      setTimeout(() => chrome.notifications.clear(id), 4000)
-    })
+    chrome.runtime.sendMessage(
+      {
+        type: "REQUEST_APPROVAL_NOTIFICATION",
+        title: "작업 승인 요청",
+        message: "테스트 작업을 실행할까요?",
+        allowLabel: "허용",
+        denyLabel: "거부",
+      },
+      (res: ApprovalNotificationResponse) => {
+        if (chrome.runtime.lastError) {
+          toast.error(chrome.runtime.lastError.message || "승인 알림 요청에 실패했습니다.")
+          return
+        }
+        if (!res?.ok) {
+          toast.error(res?.error || "승인 알림 요청에 실패했습니다.")
+          return
+        }
+        if (res.approved) {
+          toast.success("승인되었습니다.")
+        } else {
+          const reasonLabel =
+            res.reason === "timeout" ? "시간 초과"
+            : res.reason === "closed" ? "알림 닫힘"
+            : "거부"
+          toast.info(`승인되지 않았습니다: ${reasonLabel}`)
+        }
+      },
+    )
   }
 
   // ── Loading ───────────────────────────────────────────────

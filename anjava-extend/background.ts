@@ -58,6 +58,7 @@ type RuntimeMessage =
   | { type: "LOGOUT" }
   | { type: "UPDATE_SETTINGS"; settings: ExtensionSettings }
   | { type: "FETCH_USER_SETTINGS" }
+  | { type: "APPROVAL_RESULT"; requestId: string; approved: boolean }
   | { type: "START_DETECTION" | "STOP_DETECTION" }
 
 type ExternalMessage =
@@ -525,29 +526,34 @@ function settleApprovalNotification(
 async function requestApprovalNotification(
   options: ApprovalNotificationOptions,
 ): Promise<ApprovalNotificationResult> {
-  const notificationId = `${APPROVAL_NOTIFICATION_PREFIX}${Date.now()}-${Math.random()
+  const requestId = `${APPROVAL_NOTIFICATION_PREFIX}${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}`
 
-  await chrome.notifications.create(notificationId, {
-    type: "basic",
-    iconUrl: getNotificationIcon(),
-    title: options.title,
-    message: options.message,
-    priority: 2,
-    requireInteraction: true,
-    buttons: [
-      { title: options.allowLabel ?? "허용" },
-      { title: options.denyLabel ?? "거부" },
-    ],
+  const params = new URLSearchParams({
+    requestId,
+    title:      options.title,
+    message:    options.message,
+    allowLabel: options.allowLabel ?? "허용",
+    denyLabel:  options.denyLabel  ?? "거부",
+  })
+  const url = chrome.runtime.getURL(`tabs/approval.html?${params.toString()}`)
+
+  const win = await chrome.windows.create({
+    url,
+    type: "popup",
+    width: 400,
+    height: 220,
+    focused: true,
   })
 
   return new Promise((resolve) => {
     const timeoutId = setTimeout(() => {
-      settleApprovalNotification(notificationId, { approved: false, reason: "timeout" })
+      settleApprovalNotification(requestId, { approved: false, reason: "timeout" })
+      chrome.windows.remove(win.id!).catch(() => {})
     }, APPROVAL_TIMEOUT_MS)
 
-    pendingApprovals.set(notificationId, { resolve, timeoutId })
+    pendingApprovals.set(requestId, { resolve, timeoutId })
   })
 }
 
@@ -750,6 +756,14 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
         console.error("[approval] 알림 요청 실패:", e)
         sendResponse({ ok: false, error: String(e?.message ?? e) })
       })
+    return true
+  }
+
+  if (msg.type === "APPROVAL_RESULT") {
+    const requestId = typeof msg.requestId === "string" ? msg.requestId : ""
+    const approved = msg.approved === true
+    settleApprovalNotification(requestId, { approved, reason: approved ? "allow" : "deny" })
+    sendResponse({ ok: true })
     return true
   }
 
