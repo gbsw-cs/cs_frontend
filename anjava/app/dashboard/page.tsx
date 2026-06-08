@@ -902,14 +902,14 @@ export default function DashboardPage() {
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-1 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[230px_minmax(0,1fr)]">
+            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[230px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
                 <div className="grid grid-cols-3 gap-1.5">
                   <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-0.5 space-y-0.5">
+                <div className="mt-1 space-y-0.5">
                   <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
                   <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                   <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
@@ -1000,7 +1000,7 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
   return (
     <div>
       <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
-      <div className={`text-[12px] font-bold leading-tight ${toneClass}`}>{value}</div>
+      <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
