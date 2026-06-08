@@ -630,8 +630,38 @@ export function getDashboardToday() {
   return request<TodayDashboard>("/dashboard/today", { method: "GET" }, true);
 }
 
+type RawWeeklyDashboard = Partial<WeeklyDashboard> & Record<string, unknown>;
+
+function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
+  const n = (keys: string[]) => {
+    for (const k of keys) {
+      const v = raw[k];
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+    }
+    return 0;
+  };
+  const turtleSec = n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
+  const roundSec = n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
+  const asymSec = n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
+  const shoulderIssueSec = n(["shoulderIssueTotalSec", "shoulderIssueSec", "shoulder_issue_total_sec", "shoulder_issue_sec"]);
+  const finalRound = roundSec > 0 ? roundSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+  const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+  return {
+    from: typeof raw.from === "string" ? raw.from : "",
+    to: typeof raw.to === "string" ? raw.to : "",
+    days: Array.isArray(raw.days) ? raw.days : [],
+    turtleNeckTotalSec: turtleSec,
+    roundShoulderTotalSec: finalRound,
+    shoulderAsymmetryTotalSec: finalAsym,
+    darkEnvTotalSec: n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]),
+    goodPostureRatio: n(["goodPostureRatio", "good_posture_ratio"]),
+    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : "",
+  };
+}
+
 export function getDashboardWeekly(from: string) {
-  return request<WeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true);
+  return request<RawWeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true)
+    .then(normalizeWeeklyDashboard);
 }
 
 function toApiNumber(value: unknown, fallback = 0): number {

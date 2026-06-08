@@ -944,14 +944,14 @@ export default function DashboardPage() {
                             <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
                               {hasValue && !isFuture ? `${Math.round(value)}%` : ""}
                             </div>
-                            <div className="flex w-full flex-1 flex-col-reverse overflow-hidden rounded-full bg-zinc-100">
+                            <div className="flex w-full flex-1 flex-col-reverse overflow-hidden rounded-sm bg-zinc-100">
                               {isFuture ? null : !hasValue ? (
                                 <div className="w-full bg-zinc-200" style={{ height: "8%" }} />
                               ) : badPostureSec > 0 ? (
                                 <>
                                   <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
                                   <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
-                                  <div className="w-full bg-white ring-1 ring-inset ring-zinc-300 transition-all" style={{ height: `${asymH}%` }} />
+                                  <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
                                 </>
                               ) : (
                                 <div className="w-full bg-emerald-300 transition-all" style={{ height: `${Math.max(8, value)}%` }} />
