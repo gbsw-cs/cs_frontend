@@ -114,7 +114,8 @@ function WebcamCircle() {
   const [error, setError] = useState("")
   const streamRef = useRef<MediaStream | null>(null)
 
-  useEffect(() => {
+  const startCamera = () => {
+    setError("")
     navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
       .then(stream => {
         streamRef.current = stream
@@ -128,6 +129,10 @@ function WebcamCircle() {
         console.error("[popup] 카메라 권한 확인 실패:", e.name, e.message, e)
         setError(e.name || "CameraError")
       })
+  }
+
+  useEffect(() => {
+    startCamera()
     return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [])
 
@@ -155,13 +160,25 @@ function WebcamCircle() {
       </div>
       <span className="webcam-circle-label">{active ? "● 라이브" : error ? errorLabel : "연결 중..."}</span>
       {error === "NotAllowedError" && (
-        <button
-          className="btn-outline"
-          style={{ marginTop: 6, fontSize: 11, padding: "3px 10px" }}
-          onClick={() => chrome.tabs.create({ url: "chrome://settings/content/camera" })}
-        >
-          카메라 권한 허용하기
-        </button>
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <button
+            className="btn-outline"
+            style={{ fontSize: 11, padding: "3px 10px" }}
+            onClick={startCamera}
+          >
+            권한 다시 요청
+          </button>
+          <button
+            className="btn-outline"
+            style={{ fontSize: 10, padding: "2px 8px", opacity: 0.7 }}
+            onClick={() => chrome.tabs.create({ url: "chrome://settings/content/camera" })}
+          >
+            카메라 설정 열기
+          </button>
+          <span style={{ fontSize: 9, color: "#a1a1aa", textAlign: "center", lineHeight: 1.4 }}>
+            설정에서 확장 프로그램 항목을<br/>허용으로 변경해주세요
+          </span>
+        </div>
       )}
     </div>
   )
