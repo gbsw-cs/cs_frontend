@@ -1,5 +1,4 @@
 import type { PlasmoCSConfig } from "plasmo"
-import avatarUrl from "url:../assets/avatar.png"
 
 export const config: PlasmoCSConfig = {
   matches: ["http://*/*", "https://*/*"],
@@ -250,7 +249,7 @@ function showToast(message: string, isGood: boolean, soundEnabled: boolean) {
   avatar.className = "toast-avatar"
   avatar.setAttribute("aria-hidden", "true")
   const avatarImage = document.createElement("img")
-  avatarImage.src = avatarUrl
+  avatarImage.src = chrome.runtime.getURL("assets/avatar.png")
   avatarImage.alt = ""
   avatar.append(avatarImage)
 

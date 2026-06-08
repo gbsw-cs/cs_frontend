@@ -441,9 +441,25 @@ function shouldShowSystemPostureNotification(state: unknown, message: string): b
   return state !== "GOOD_POSTURE" && message.trim().length > 0
 }
 
+function isPostureSystemNotificationCoolingDown(state: unknown): boolean {
+  const alertState = typeof state === "string" ? state : "UNKNOWN"
+  if (alertState === "GOOD_POSTURE" || alertState === "GOOD") return false
+
+  const now = Date.now()
+  const lastAt = lastPostureAlertAt.get(alertState) ?? 0
+  if (now - lastAt < POSTURE_ALERT_COOLDOWN_MS) {
+    debugLog(`[notification] ${alertState} 시스템 알림 쿨다운으로 생략`)
+    return true
+  }
+
+  lastPostureAlertAt.set(alertState, now)
+  return false
+}
+
 async function showPostureSystemNotification(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const message = getPostureAlertMessage(msg.state, msg.message)
   if (!shouldShowSystemPostureNotification(msg.state, message)) return
+  if (isPostureSystemNotificationCoolingDown(msg.state)) return
 
   await chrome.notifications.create(`posture-${Date.now()}`, {
     type: "basic",
@@ -457,16 +473,6 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
 
 async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const soundEnabled = msg.soundEnabled ?? (settings.soundEnabled !== false)
-  const alertState = typeof msg.state === "string" ? msg.state : "UNKNOWN"
-  if (alertState !== "GOOD_POSTURE" && alertState !== "GOOD") {
-    const now = Date.now()
-    const lastAt = lastPostureAlertAt.get(alertState) ?? 0
-    if (now - lastAt < POSTURE_ALERT_COOLDOWN_MS) {
-      debugLog(`[notification] ${alertState} 중복 알림 쿨다운으로 생략`)
-      return
-    }
-    lastPostureAlertAt.set(alertState, now)
-  }
   const alert: PostureMessage = {
     type: "POSTURE_ALERT",
     state: msg.state,
