@@ -766,21 +766,6 @@ export default function IndexPopup() {
 
       {tab === "home" ? (
         <div className="content">
-          {!baselineDone && (
-            <div className="baseline-card">
-              <p className="baseline-title">베이스라인 측정 필요</p>
-              <p className="baseline-desc">
-                정확한 자세 감지를 위해 초기 측정이 필요합니다.
-              </p>
-              <button
-                className="btn-primary"
-                style={{ marginTop: 10 }}
-                onClick={openBaseline}>
-                지금 측정하기
-              </button>
-            </div>
-          )}
-
           <Troubleshooter
             loggedIn={true}
             baselineDone={baselineDone}

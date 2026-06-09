@@ -281,10 +281,11 @@ export default function DashboardPage() {
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "ANJAVA_TIMELINE_POSTED") refreshTimeline();
+      if (e.data?.type === "ANJAVA_SESSION_CHANGED") refreshDashboardDataSoon();
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [refreshTimeline]);
+  }, [refreshTimeline, refreshDashboardDataSoon]);
 
   const handleSessionActiveChange = useCallback((active: boolean, reason?: "paused" | "stopped") => {
     sessionActiveRef.current = active;

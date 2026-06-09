@@ -339,6 +339,10 @@ const toastListener = (msg: PostureAlertMessage | { type: string }) => {
     window.postMessage({ type: "ANJAVA_TIMELINE_POSTED" }, "*")
     return
   }
+  if (msg.type === "SESSION_CHANGED") {
+    window.postMessage({ type: "ANJAVA_SESSION_CHANGED" }, "*")
+    return
+  }
   if (msg.type !== "POSTURE_ALERT") return
   const m = msg as PostureAlertMessage
   const isGood = m.state === "GOOD_POSTURE"

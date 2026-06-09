@@ -804,6 +804,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   })
 })
 
+// ─── Dashboard notify ────────────────────────────────────────
+async function notifyDashboard(type: string): Promise<void> {
+  const tabs = await chrome.tabs.query({ url: `${WEB_URL}/dashboard*` }).catch(() => [] as chrome.tabs.Tab[])
+  tabs.forEach((tab) => {
+    if (tab.id) chrome.tabs.sendMessage(tab.id, { type }).catch(() => {})
+  })
+}
+
 // ─── Timeline ────────────────────────────────────────────────
 // 백엔드 허용값: TURTLE_NECK, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE
 const TIMELINE_STATE_MAP: Record<string, string> = {
@@ -998,7 +1006,7 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
         })
       )
       .then(() => stopAlarms())
-      .then(() => sendResponse({ success: true }))
+      .then(() => { notifyDashboard("SESSION_CHANGED").catch(() => {}); sendResponse({ success: true }) })
       .catch(() => sendResponse({ success: false }))
     return true
   }
@@ -1013,7 +1021,7 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
           .then(() => restartAlarms())
           .then(() => total))
       })
-      .then((total) => sendResponse({ success: true, pausedTotalMs: total }))
+      .then((total) => { notifyDashboard("SESSION_CHANGED").catch(() => {}); sendResponse({ success: true, pausedTotalMs: total }) })
       .catch(() => sendResponse({ success: false }))
     return true
   }
@@ -1022,7 +1030,7 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
     endSession()
       .then(() => chrome.storage.local.set({ isPaused: false, pausedAt: null, pausedTotalMs: 0 }))
       .then(() => stopAlarms())
-      .then(() => sendResponse({ success: true }))
+      .then(() => { notifyDashboard("SESSION_CHANGED").catch(() => {}); sendResponse({ success: true }) })
       .catch(() => sendResponse({ success: false }))
     return true
   }
@@ -1038,7 +1046,7 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
   if (msg.type === "START_SESSION") {
     startSession()
       .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
-      .then(sendResponse)
+      .then((result) => { notifyDashboard("SESSION_CHANGED").catch(() => {}); sendResponse(result) })
       .catch((error: unknown) => sendResponse({
         error: error instanceof Error ? error.message : "세션을 시작하지 못했습니다."
       }))
@@ -1237,7 +1245,7 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
     chrome.storage.local.set({ baselineDone: true, baselineData: msg.baselineData })
       .then(() => startSession())
       .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
-      .then(sendResponse)
+      .then((result) => { notifyDashboard("SESSION_CHANGED").catch(() => {}); sendResponse(result) })
     return true
   }
 })
