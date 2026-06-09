@@ -400,7 +400,7 @@ export function changePassword(currentPassword: string, newPassword: string) {
 }
 
 export function googleLoginUrl() {
-  return `${API_URL}/auth/google`;
+  return "/api/auth/google";
 }
 
 export function updateProfile(patch: { name?: string; profileImg?: string | null }) {
