@@ -264,6 +264,7 @@ export default function DashboardPage() {
   const sessionActiveRef = useRef(false);
   const sessionStateChangedAtRef = useRef(0);
   const lastLiveDetectionRef = useRef<{ state: DetectionState; at: number } | null>(null);
+  const lastReportedDetectionStateRef = useRef<DetectionState | null>(null);
   const serverDailySlotsRef = useRef<DailySlot[]>(createEmptyDailySlots());
   const realtimeDateRef = useRef(getKSTDate());
   const [serverDailySlots, setServerDailySlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
@@ -277,6 +278,7 @@ export default function DashboardPage() {
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
+    if (document.hidden) return;
     if (dashboardRequestInFlightRef.current || Date.now() < dashboardBackoffUntilRef.current) return;
     dashboardRequestInFlightRef.current = true;
     const date = getKSTDate();
@@ -337,6 +339,74 @@ export default function DashboardPage() {
     refreshCooldownRef.current = now;
     void loadDashboardData();
   }, [loadDashboardData]);
+
+  const handleSessionActiveChange = useCallback((active: boolean) => {
+    sessionActiveRef.current = active;
+    sessionStateChangedAtRef.current = Date.now();
+    if (!active) {
+      lastLiveDetectionRef.current = null;
+      lastReportedDetectionStateRef.current = null;
+      setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+    }
+  }, []);
+
+  const handleAuthenticationExpired = useCallback(() => {
+    clearTokens();
+    router.replace("/login");
+  }, [router]);
+
+  const handleDetectionStateChange = useCallback((state: DetectionState, message: string) => {
+    const now = Date.now();
+    if (!sessionActiveRef.current) {
+      lastLiveDetectionRef.current = null;
+      return;
+    }
+    const previousDetection = lastLiveDetectionRef.current;
+    if (previousDetection) {
+      const elapsedSec = Math.min(15, Math.max(0, (now - previousDetection.at) / 1000));
+      if (elapsedSec > 0) {
+        setLiveWeeklyDurations((current) => {
+          const next = {
+            ...current,
+            totalSec: current.totalSec + elapsedSec,
+          };
+          switch (previousDetection.state) {
+            case "GOOD_POSTURE":
+              next.goodSec += elapsedSec;
+              break;
+            case "TURTLE_NECK":
+              next.turtleNeckSec += elapsedSec;
+              break;
+            case "SHOULDER_ISSUE":
+            case "ROUND_SHOULDER":
+              next.roundShoulderSec += elapsedSec;
+              break;
+            case "SHOULDER_ASYMMETRY":
+              next.shoulderAsymmetrySec += elapsedSec;
+              break;
+            case "DARK_ENV":
+              next.darkEnvSec += elapsedSec;
+              break;
+          }
+          return next;
+        });
+      }
+    }
+    lastLiveDetectionRef.current = { state, at: now };
+    if (lastReportedDetectionStateRef.current !== state) {
+      lastReportedDetectionStateRef.current = state;
+      setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
+      setLiveDetection({
+        state,
+        message,
+        updatedAt: new Date().toLocaleTimeString("en-GB", {
+          timeZone: "Asia/Seoul",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    }
+  }, []);
 
   async function toggleDarkDetection(next: boolean) {
     if (darkPending) return;
@@ -774,67 +844,9 @@ export default function DashboardPage() {
                 darkDetectionEnabled={darkMode}
                 pushEnabled={me?.settings?.pushEnabled ?? true}
                 soundEnabled={me?.settings?.soundEnabled ?? true}
-                onSessionActiveChange={(active) => {
-                  sessionActiveRef.current = active;
-                  sessionStateChangedAtRef.current = Date.now();
-                  if (!active) {
-                    lastLiveDetectionRef.current = null;
-                    setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
-                  }
-                }}
-                onAuthenticationExpired={() => {
-                  clearTokens();
-                  router.replace("/login");
-                }}
-                onDetectionStateChange={(state, message) => {
-                  const now = Date.now();
-                  if (!sessionActiveRef.current) {
-                    lastLiveDetectionRef.current = null;
-                    return;
-                  }
-                  const previousDetection = lastLiveDetectionRef.current;
-                  if (previousDetection) {
-                    const elapsedSec = Math.min(15, Math.max(0, (now - previousDetection.at) / 1000));
-                    if (elapsedSec > 0) {
-                      setLiveWeeklyDurations((current) => {
-                        const next = {
-                          ...current,
-                          totalSec: current.totalSec + elapsedSec,
-                        };
-                        switch (previousDetection.state) {
-                          case "GOOD_POSTURE":
-                            next.goodSec += elapsedSec;
-                            break;
-                          case "TURTLE_NECK":
-                            next.turtleNeckSec += elapsedSec;
-                            break;
-                          case "SHOULDER_ISSUE":
-                          case "ROUND_SHOULDER":
-                            next.roundShoulderSec += elapsedSec;
-                            break;
-                          case "SHOULDER_ASYMMETRY":
-                            next.shoulderAsymmetrySec += elapsedSec;
-                            break;
-                          case "DARK_ENV":
-                            next.darkEnvSec += elapsedSec;
-                            break;
-                        }
-                        return next;
-                      });
-                    }
-                  }
-                  lastLiveDetectionRef.current = { state, at: now };
-                  setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
-                  setLiveDetection({
-                    state,
-                    message,
-                    updatedAt: new Date().toLocaleTimeString("en-GB", {
-                      timeZone: "Asia/Seoul",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }),
-                  });
-                }}
+                onSessionActiveChange={handleSessionActiveChange}
+                onAuthenticationExpired={handleAuthenticationExpired}
+                onDetectionStateChange={handleDetectionStateChange}
                 onDashboardDataChanged={refreshDashboardDataSoon}
               />
               {!webcamVisible && (

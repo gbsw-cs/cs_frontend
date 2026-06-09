@@ -248,6 +248,8 @@ export default function WebcamView({
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
 
+  const scheduleSessionRecoveryRef = useRef<((delayMs: number) => void) | null>(null);
+
   const flushQueuedEvents = useCallback(async () => {
     const sessionId = sessionIdRef.current;
     if (!sessionId || eventQueueRef.current.length === 0) return;
@@ -263,6 +265,7 @@ export default function WebcamView({
         sessionIdRef.current = null;
         lastBackendStateRef.current = null;
         onSessionActiveChangeRef.current?.(false);
+        scheduleSessionRecoveryRef.current?.(5_000);
       }
       console.error("Detection events upload failed", e);
     }
@@ -336,6 +339,17 @@ export default function WebcamView({
       });
     startSessionResolution();
 
+    const scheduleSessionRecovery = (delayMs: number) => {
+      if (cancelled) return;
+      if (sessionRetryTimer !== null) window.clearTimeout(sessionRetryTimer);
+      sessionRetryTimer = window.setTimeout(() => {
+        if (!cancelled && !sessionIdRef.current) {
+          startSessionResolution();
+        }
+      }, delayMs);
+    };
+    scheduleSessionRecoveryRef.current = scheduleSessionRecovery;
+
     async function flushEvents() {
       const sessionId = sessionIdRef.current;
       if (!sessionId) return;
@@ -356,6 +370,7 @@ export default function WebcamView({
     const flushInterval = window.setInterval(flushEvents, EVENT_FLUSH_INTERVAL_MS);
     return () => {
       cancelled = true;
+      scheduleSessionRecoveryRef.current = null;
       if (sessionRetryTimer !== null) window.clearTimeout(sessionRetryTimer);
       window.clearInterval(flushInterval);
       const previous = lastBackendStateRef.current;
@@ -374,15 +389,17 @@ export default function WebcamView({
       lastBackendStateRef.current = null;
       onSessionActiveChangeRef.current?.(false);
       if (sessionId) {
-        if (events.length > 0) {
-          void postSessionEvents(sessionId, events).catch((e) => {
-            console.error("Detection events final upload failed", e);
+        const eventsPromise = events.length > 0
+          ? postSessionEvents(sessionId, events).catch((e) => {
+              console.error("Detection events final upload failed", e);
+            })
+          : Promise.resolve();
+        void eventsPromise.finally(() => {
+          void endDetectionSession(sessionId).then(() => {
+            onDashboardDataChangedRef.current?.();
+          }).catch((e) => {
+            console.error("Detection session end failed", e);
           });
-        }
-        void endDetectionSession(sessionId).then(() => {
-          onDashboardDataChangedRef.current?.();
-        }).catch((e) => {
-          console.error("Detection session end failed", e);
         });
       }
     };
