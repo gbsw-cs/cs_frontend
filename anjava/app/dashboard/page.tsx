@@ -456,6 +456,25 @@ export default function DashboardPage() {
     ? 0
     : clampPercent(Math.round(weeklyBadRatio * 100));
 
+  const todayTimelineCounts = timelineActivity.reduce(
+    (counts, item) => {
+      if (item.dominantState === "GOOD" || item.dominantState === "GOOD_POSTURE") {
+        counts.good += 1;
+      } else {
+        counts.bad += 1;
+      }
+      return counts;
+    },
+    { good: 0, bad: 0 },
+  );
+  const todayTimelineTotal = todayTimelineCounts.good + todayTimelineCounts.bad;
+  const todayObservedBadRatio =
+    todayTimelineTotal > 0
+      ? todayTimelineCounts.bad / todayTimelineTotal
+      : slotTotal > 0
+      ? slotBad / slotTotal
+      : null;
+
   // 주간 선형 차트 값
   const mondayKST = getMondayKST();
   const todayKST = getKSTDate();
@@ -465,10 +484,17 @@ export default function DashboardPage() {
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
     const isFuture = dateKey > todayKST;
     const day = isFuture ? undefined : weekly?.days.find((item) => item.date === dateKey);
+    const observedBadPostureRatio =
+      dateKey === todayKST && todayObservedBadRatio !== null
+        ? todayObservedBadRatio
+        : day
+        ? toFiniteNumber(day.badPostureRatio)
+        : null;
     return {
       date: dateKey,
       isFuture,
-      badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
+      badPostureRatio: observedBadPostureRatio,
+      hasDetectionData: Boolean(day) || (dateKey === todayKST && todayObservedBadRatio !== null),
       totalDetectionSec: day ? toFiniteNumber(day.totalDetectionSec) : 0,
       turtleNeckSec: day ? toFiniteNumber(day.turtleNeckSec) : 0,
       roundShoulderSec: day ? toFiniteNumber(day.roundShoulderSec) : 0,
@@ -476,7 +502,9 @@ export default function DashboardPage() {
     };
   });
   const weeklyValues = weeklyDays.map((d) =>
-    d.badPostureRatio === null ? null : clampPercent(d.badPostureRatio * 100),
+    !d.hasDetectionData || d.badPostureRatio === null
+      ? null
+      : clampPercent(d.badPostureRatio * 100),
   );
   const weeklyFilledValues = weeklyValues.filter((value): value is number => value !== null);
   const weeklyFilledDays = weeklyFilledValues.length;
@@ -951,8 +979,8 @@ export default function DashboardPage() {
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="text-[9px] font-semibold text-zinc-500">요일별 비정상 자세 비율</div>
-                  <div className="text-[9px] text-zinc-400">낮을수록 좋음</div>
+                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 감지 비율</div>
+                  <div className="text-[9px] text-zinc-400">초록색이 많을수록 좋음</div>
                 </div>
                 {(() => {
                   const values = weeklyValues;
@@ -970,6 +998,7 @@ export default function DashboardPage() {
                         const dayRoundSec = weeklyDays[i]?.roundShoulderSec ?? 0;
                         const dayAsymSec = weeklyDays[i]?.shoulderAsymmetrySec ?? 0;
                         const hasDayIssueBreakdown = dayTotalSec > 0 && dayTurtleSec + dayRoundSec + dayAsymSec > 0;
+                        const goodH = hasValue ? Math.max(0, 100 - value) : 0;
                         const turtleH = !hasValue
                           ? 0
                           : hasDayIssueBreakdown
@@ -999,16 +1028,19 @@ export default function DashboardPage() {
                             <div className="flex w-full flex-1 flex-col-reverse overflow-hidden rounded-sm bg-zinc-100">
                               {isFuture ? null : !hasValue ? (
                                 <div className="w-full bg-zinc-200" style={{ height: "8%" }} />
-                              ) : badPostureSec > 0 ? (
-                                <>
-                                  <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
-                                  <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
-                                  <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
-                                </>
-                              ) : value > 0 ? (
-                                <div className="w-full bg-rose-400 transition-all" style={{ height: `${Math.max(8, value)}%` }} />
                               ) : (
-                                <div className="w-full bg-emerald-300 transition-all" style={{ height: "8%" }} />
+                                <>
+                                  <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
+                                  {badPostureSec > 0 ? (
+                                    <>
+                                      <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
+                                      <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
+                                      <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
+                                    </>
+                                  ) : value > 0 ? (
+                                    <div className="w-full bg-rose-400 transition-all" style={{ height: `${value}%` }} />
+                                  ) : null}
+                                </>
                               )}
                             </div>
                             <span className={`mt-0.5 text-[9px] font-medium ${isFuture ? "text-zinc-300" : "text-zinc-500"}`}>
