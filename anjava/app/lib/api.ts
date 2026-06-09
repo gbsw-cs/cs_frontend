@@ -736,7 +736,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
         day,
       );
       const ratioFromDuration = totalDetectionSec > 0 ? badSec / totalDetectionSec : 0;
-      const rawBadRatio = day.badPostureRatio;
+      const rawBadRatio = day.badPostureRatio ?? day.bad_posture_ratio;
       const badPostureRatio =
         typeof rawBadRatio === "number" && Number.isFinite(rawBadRatio)
           ? normalizeRatio(rawBadRatio)
@@ -799,7 +799,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
 
   // 신 API: goodPostureRatio (0~1) 또는 riskPercent (0~100) 중 있는 쪽 사용
   const rawGoodRatio = raw.goodPostureRatio ?? raw.good_posture_ratio;
-  const rawRiskPct = typeof raw.riskPercent === "number" ? raw.riskPercent : NaN;
+  const rawRiskPct = toApiNumber(raw.riskPercent ?? raw.risk_percent, NaN);
   const goodPostureRatio =
     rawGoodRatio !== undefined
       ? normalizeRatio(rawGoodRatio)

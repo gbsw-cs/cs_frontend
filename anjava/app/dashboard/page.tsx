@@ -129,9 +129,9 @@ function clampPercent(value: number): number {
 
 function formatDuration(sec: number | null): string {
   if (sec === null) return "—";
-  const safeSec = Math.max(0, Math.round(sec));
-  const h = Math.floor(safeSec / 3600);
-  const m = Math.round((safeSec % 3600) / 60);
+  const totalMinutes = Math.max(0, Math.round(sec / 60));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
   if (h > 0) return `${h}h ${m > 0 ? `${m}m` : ""}`.trim();
   return `${m}m`;
 }
@@ -596,9 +596,6 @@ export default function DashboardPage() {
     toFiniteNumber(weekly?.shoulderAsymmetryTotalSec) + liveWeeklyDurations.shoulderAsymmetrySec;
   const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec) + liveWeeklyDurations.darkEnvSec;
   const badPostureSec = turtleSec + roundShoulderSec + asymSec;
-  const goodPct = weekly
-    ? Math.round(clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100))
-    : 0;
   const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
   const weeklyBadRatio = weeklyGoodRatio === null ? null : Math.max(0, 1 - weeklyGoodRatio);
   const explicitWeeklyScreenSec = weekly
@@ -624,6 +621,12 @@ export default function DashboardPage() {
     : weeklyBadRatio === null
     ? 0
     : clampPercent(Math.round(weeklyBadRatio * 100));
+  const unclassifiedSec = weeklyScreenSec === null || weeklyGoodSec === null
+    ? null
+    : Math.max(0, weeklyScreenSec - weeklyGoodSec - badPostureSec - darkSec);
+  const weeklyGoodPct = weeklyScreenSec && weeklyScreenSec > 0 && weeklyGoodSec !== null
+    ? clampPercent(Math.round((weeklyGoodSec / weeklyScreenSec) * 100))
+    : 0;
 
   // 주간 선형 차트 값
   const mondayKST = getMondayKST();
@@ -645,7 +648,7 @@ export default function DashboardPage() {
       shoulderAsymmetrySec: day ? toFiniteNumber(day.shoulderAsymmetrySec) : 0,
     };
   });
-  const weeklyValues = weeklyDays.map((d) =>
+  const weeklyBadValues = weeklyDays.map((d) =>
     !d.hasDetectionData || d.badPostureRatio === null
       ? null
       : clampPercent(d.badPostureRatio * 100),
@@ -1097,32 +1100,34 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-9">
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-bold text-zinc-900">주간 스크린타임</div>
+                <div className="text-xs font-bold text-zinc-900">이번 주 누적 스크린타임</div>
               </div>
               <div className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
-                {weeklyDateRangeLabel} 기록
+                {weeklyDateRangeLabel} 누적
               </div>
             </div>
 
-            <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 lg:grid-cols-4">
+            <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 lg:grid-cols-5">
               <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-2.5 py-1 ring-1 ring-[#2563EB]/15 lg:col-span-1">
                 <div className="text-[9px] font-medium leading-tight text-[#2563EB]">총 감지 스크린타임</div>
                 <div className="text-base font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
-                <div className="text-[8px] leading-tight text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `위험도 ${weeklyRiskPct}%`}</div>
+                <div className="text-[8px] leading-tight text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `자세 경고 비율 ${weeklyRiskPct}%`}</div>
               </div>
               <WeeklyMetric label="정자세 시간" value={formatDuration(weeklyGoodSec)} tone="good" />
               <WeeklyMetric label="자세 경고 시간" value={formatDuration(badPostureSec)} tone="bad" />
+              <WeeklyMetric label="기타/미분류 시간" value={formatDuration(unclassifiedSec)} tone="dark" />
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
             <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[230px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
                 <div className="grid grid-cols-3 gap-1.5">
-                  <WeeklyCompactStat label="평균 위험도" value={`${weeklyAvgBadPct}%`} tone="bad" />
-                  <WeeklyCompactStat label="정자세 비율" value={`${goodPct}%`} tone="good" />
+                  <WeeklyCompactStat label="자세 경고 비율" value={`${weeklyAvgBadPct}%`} tone="bad" />
+                  <WeeklyCompactStat label="정자세 비율" value={`${weeklyGoodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
                 <div className="mt-1.5 space-y-0.5">
+                  <div className="px-0.5 text-[8px] leading-tight text-zinc-400">자세 경고 유형별 비중</div>
                   <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
                   <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                   <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
@@ -1131,11 +1136,11 @@ export default function DashboardPage() {
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 감지 비율</div>
-                  <div className="text-[9px] text-zinc-400">초록색이 많을수록 좋음</div>
+                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 경고 비율</div>
+                  <div className="text-[9px] text-zinc-400">숫자 = 감지 시간 중 경고 비율</div>
                 </div>
                 {(() => {
-                  const values = weeklyValues;
+                  const values = weeklyBadValues;
                   const dayLabels = WEEK_LABELS;
                   return (
                     <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-2">
@@ -1147,7 +1152,6 @@ export default function DashboardPage() {
                         const dayRoundSec = weeklyDays[i]?.roundShoulderSec ?? 0;
                         const dayAsymSec = weeklyDays[i]?.shoulderAsymmetrySec ?? 0;
                         const hasDayIssueBreakdown = dayTotalSec > 0 && dayTurtleSec + dayRoundSec + dayAsymSec > 0;
-                        const goodH = hasValue ? Math.max(0, 100 - value) : 0;
                         const turtleH = !hasValue
                           ? 0
                           : hasDayIssueBreakdown
@@ -1173,7 +1177,6 @@ export default function DashboardPage() {
                                 <div className="w-full bg-zinc-200" style={{ height: "8%" }} />
                               ) : (
                                 <>
-                                  <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
                                   {hasDayIssueBreakdown ? (
                                     <>
                                       <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
