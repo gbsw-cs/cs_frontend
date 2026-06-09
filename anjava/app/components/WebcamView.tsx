@@ -30,6 +30,7 @@ type WebcamViewProps = {
   pushEnabled?: boolean;
   soundEnabled?: boolean;
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
+  onSessionActiveChange?: (active: boolean) => void;
   onDashboardDataChanged?: () => void;
 };
 
@@ -240,6 +241,7 @@ export default function WebcamView({
   pushEnabled = true,
   soundEnabled = true,
   onDetectionStateChange,
+  onSessionActiveChange,
   onDashboardDataChanged,
 }: WebcamViewProps) {
   const webcamRef = useRef<Webcam>(null);
@@ -253,6 +255,7 @@ export default function WebcamView({
   const stateStartRef = useRef<number>(Date.now());
   const lastBackendStateRef = useRef<DetectionState | null>(null);
   const onDetectionStateChangeRef = useRef(onDetectionStateChange);
+  const onSessionActiveChangeRef = useRef(onSessionActiveChange);
   const onDashboardDataChangedRef = useRef(onDashboardDataChanged);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -267,14 +270,23 @@ export default function WebcamView({
       onDashboardDataChangedRef.current?.();
     } catch (e) {
       eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
+      const status = e && typeof e === "object" && "status" in e
+        ? Number((e as { status?: unknown }).status)
+        : 0;
+      if (status === 404 || status === 409) {
+        sessionIdRef.current = null;
+        lastBackendStateRef.current = null;
+        onSessionActiveChangeRef.current?.(false);
+      }
       console.error("Detection events upload failed", e);
     }
   }, []);
 
   useEffect(() => {
     onDetectionStateChangeRef.current = onDetectionStateChange;
+    onSessionActiveChangeRef.current = onSessionActiveChange;
     onDashboardDataChangedRef.current = onDashboardDataChanged;
-  }, [onDetectionStateChange, onDashboardDataChanged]);
+  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged]);
 
   useEffect(() => {
     if (!ready) return;
@@ -285,20 +297,27 @@ export default function WebcamView({
         if (cancelled) return;
         sessionIdRef.current = session.sessionId;
         stateStartRef.current = Date.now();
+        onSessionActiveChangeRef.current?.(true);
       })
       .catch((e) => {
         if (cancelled) return;
         if (isDuplicateSessionError(e)) {
           getCurrentDetectionSession()
             .then((session) => {
-              if (cancelled || !session?.sessionId) return;
+              if (cancelled || !session?.sessionId) {
+                onSessionActiveChangeRef.current?.(false);
+                return;
+              }
               sessionIdRef.current = session.sessionId;
               stateStartRef.current = Date.now();
+              onSessionActiveChangeRef.current?.(true);
             })
             .catch((currentError) => {
+              onSessionActiveChangeRef.current?.(false);
               console.error("Detection current session lookup failed", currentError);
             });
         } else {
+          onSessionActiveChangeRef.current?.(false);
           console.error("Detection session start failed", e);
         }
       });
@@ -338,6 +357,7 @@ export default function WebcamView({
       const events = eventQueueRef.current.splice(0, 100);
       sessionIdRef.current = null;
       lastBackendStateRef.current = null;
+      onSessionActiveChangeRef.current?.(false);
       if (sessionId) {
         if (events.length > 0) {
           void postSessionEvents(sessionId, events).catch((e) => {

@@ -26,6 +26,7 @@ import {
   getDashboardWeekly,
   getDashboardDaily,
   getDashboardTimeline,
+  getCurrentDetectionSession,
   type Me,
   type TodayDashboard,
   type WeeklyDashboard,
@@ -114,6 +115,10 @@ function firstFiniteNumber(...values: unknown[]): number | null {
 
 function isUnauthorizedError(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 401);
+}
+
+function isMissingSessionError(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 404);
 }
 
 function clampPercent(value: number): number {
@@ -252,6 +257,8 @@ export default function DashboardPage() {
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
+  const sessionActiveRef = useRef(false);
+  const sessionStateChangedAtRef = useRef(0);
   const lastLiveDetectionRef = useRef<{ state: DetectionState; at: number } | null>(null);
   const serverDailySlotsRef = useRef<DailySlot[]>(createEmptyDailySlots());
   const realtimeDateRef = useRef(getKSTDate());
@@ -264,6 +271,7 @@ export default function DashboardPage() {
   const loadDashboardData = useCallback(() => {
     const date = getKSTDate();
     const monday = getMondayKST();
+    const sessionCheckStartedAt = Date.now();
     if (realtimeDateRef.current !== date) {
       realtimeDateRef.current = date;
       serverDailySlotsRef.current = createEmptyDailySlots();
@@ -275,8 +283,9 @@ export default function DashboardPage() {
       getDashboardWeekly(monday),
       getDashboardDaily(),
       getDashboardTimeline(date),
-    ]).then(([t, w, d, tl]) => {
-      if ([t, w, d, tl].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
+      getCurrentDetectionSession(),
+    ]).then(([t, w, d, tl, session]) => {
+      if ([t, w, d, tl, session].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -298,6 +307,16 @@ export default function DashboardPage() {
       } else console.error("[dashboard] daily 실패:", d.reason);
       if (tl.status === "fulfilled") setTimeline(tl.value);
       else console.error("[dashboard] timeline 실패:", tl.reason);
+      if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
+        const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
+        if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
+        sessionActiveRef.current = active;
+        sessionStateChangedAtRef.current = Date.now();
+        if (!active) {
+          lastLiveDetectionRef.current = null;
+          setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+        }
+      }
     });
   }, [router]);
 
@@ -688,8 +707,20 @@ export default function DashboardPage() {
                 darkDetectionEnabled={darkMode}
                 pushEnabled={me?.settings?.pushEnabled ?? true}
                 soundEnabled={me?.settings?.soundEnabled ?? true}
+                onSessionActiveChange={(active) => {
+                  sessionActiveRef.current = active;
+                  sessionStateChangedAtRef.current = Date.now();
+                  if (!active) {
+                    lastLiveDetectionRef.current = null;
+                    setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+                  }
+                }}
                 onDetectionStateChange={(state, message) => {
                   const now = Date.now();
+                  if (!sessionActiveRef.current) {
+                    lastLiveDetectionRef.current = null;
+                    return;
+                  }
                   const previousDetection = lastLiveDetectionRef.current;
                   if (previousDetection) {
                     const elapsedSec = Math.min(15, Math.max(0, (now - previousDetection.at) / 1000));
