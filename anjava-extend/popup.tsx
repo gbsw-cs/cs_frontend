@@ -695,44 +695,7 @@ export default function IndexPopup() {
         </header>
 
         <div className="content">
-          <Troubleshooter
-            loggedIn={false}
-            baselineDone={false}
-            sessionId={null}
-            offscreenError=""
-            onGoogleLogin={handleGoogleLogin}
-            onBaseline={openBaseline}
-            onStartSession={handleStartSession}
-            onCameraSettings={openCameraSettings}
-          />
           <div className="card">
-            <p className="card-label">로그인</p>
-            <div className="field-group">
-              <input
-                ref={emailRef}
-                className="field"
-                type="email"
-                placeholder="이메일"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleLogin()}
-              />
-              <input
-                className="field"
-                type="password"
-                placeholder="비밀번호"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleLogin()}
-              />
-              {loginError && <p className="error-text">{loginError}</p>}
-              <button
-                className="btn-primary"
-                onClick={handleLogin}
-                disabled={loginLoading || !email || !password}>
-                {loginLoading ? "로그인 중…" : "로그인"}
-              </button>
-            </div>
             <div className="social-divider">
               <span />
               <p>간편 로그인</p>
