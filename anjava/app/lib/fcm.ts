@@ -191,28 +191,15 @@ export async function showLocalPostureNotification({
   const options = {
     body: message,
     icon: "/logo.png",
-    image: "/logo.png",
     silent: !soundEnabled,
+    tag: `anjava-posture-${state}`,
     data: { url: "/dashboard", state },
-  } satisfies NotificationOptions & { image?: string };
+  } satisfies NotificationOptions;
 
-  if (!("serviceWorker" in navigator)) {
-    showBrowserNotification(title, options);
-    return;
-  }
-
-  const registration =
-    (await navigator.serviceWorker.getRegistration("/").catch(() => null)) ??
-    (await getServiceWorkerRegistration(getFirebaseConfig()).catch(() => null));
-
-  if (!registration) {
-    showBrowserNotification(title, options);
-    return;
-  }
-
-  await registration.showNotification(title, options).catch(() => {
-    showBrowserNotification(title, options);
-  });
+  // 자세 감지는 열린 웹 페이지에서 실행되므로 데스크톱 알림은 페이지가 직접
+  // 생성한다. Windows Chromium에서 서비스 워커 알림이 알림 센터에만 쌓이고
+  // 배너가 생략되는 경우를 피하면서 클릭 동작도 동일하게 유지한다.
+  showBrowserNotification(title, options);
 }
 
 async function isMessagingSupported() {

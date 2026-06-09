@@ -268,7 +268,7 @@ export default function DashboardPage() {
     EMPTY_LIVE_WEEKLY_DURATIONS,
   );
 
-  const loadDashboardData = useCallback(() => {
+  const loadDashboardData = useCallback(async () => {
     const date = getKSTDate();
     const monday = getMondayKST();
     const sessionCheckStartedAt = Date.now();
@@ -278,46 +278,59 @@ export default function DashboardPage() {
       setServerDailySlots(createEmptyDailySlots());
       setRealtimeSlots(createEmptyDailySlots());
     }
-    return Promise.allSettled([
+
+    const session = await getCurrentDetectionSession().then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason: unknown) => ({ status: "rejected" as const, reason }),
+    );
+    if (session.status === "rejected" && isUnauthorizedError(session.reason)) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      clearTokens();
+      router.replace("/login");
+      return;
+    }
+
+    const [t, w, d, tl] = await Promise.allSettled([
       getDashboardToday(),
       getDashboardWeekly(monday),
       getDashboardDaily(),
       getDashboardTimeline(date),
-      getCurrentDetectionSession(),
-    ]).then(([t, w, d, tl, session]) => {
-      if ([t, w, d, tl, session].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
-        if (pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
-        clearTokens();
-        router.replace("/login");
-        return;
+    ]);
+    if ([t, w, d, tl].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
       }
-      if (t.status === "fulfilled") setToday(t.value);
-      else console.error("[dashboard] today 실패:", t.reason);
-      if (w.status === "fulfilled") setWeekly(w.value);
-      else console.error("[dashboard] weekly 실패:", w.reason);
-      if (d.status === "fulfilled") {
-        const previousServerSlots = serverDailySlotsRef.current;
-        const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
-        setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
-        serverDailySlotsRef.current = nextServerSlots;
-        setServerDailySlots(nextServerSlots);
-      } else console.error("[dashboard] daily 실패:", d.reason);
-      if (tl.status === "fulfilled") setTimeline(tl.value);
-      else console.error("[dashboard] timeline 실패:", tl.reason);
-      if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
-        const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
-        if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
-        sessionActiveRef.current = active;
-        sessionStateChangedAtRef.current = Date.now();
-        if (!active) {
-          lastLiveDetectionRef.current = null;
-          setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
-        }
+      clearTokens();
+      router.replace("/login");
+      return;
+    }
+    if (t.status === "fulfilled") setToday(t.value);
+    else console.error("[dashboard] today 실패:", t.reason);
+    if (w.status === "fulfilled") setWeekly(w.value);
+    else console.error("[dashboard] weekly 실패:", w.reason);
+    if (d.status === "fulfilled") {
+      const previousServerSlots = serverDailySlotsRef.current;
+      const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
+      setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
+      serverDailySlotsRef.current = nextServerSlots;
+      setServerDailySlots(nextServerSlots);
+    } else console.error("[dashboard] daily 실패:", d.reason);
+    if (tl.status === "fulfilled") setTimeline(tl.value);
+    else console.error("[dashboard] timeline 실패:", tl.reason);
+    if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
+      const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
+      if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
+      sessionActiveRef.current = active;
+      sessionStateChangedAtRef.current = Date.now();
+      if (!active) {
+        lastLiveDetectionRef.current = null;
+        setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
       }
-    });
+    }
   }, [router]);
 
   const refreshDashboardDataSoon = useCallback(() => {
@@ -349,19 +362,31 @@ export default function DashboardPage() {
       return;
     }
 
-    getMe().then((m) => {
-      setMe(m);
-      setDarkMode(m.settings.darkDetectionEnabled);
-    }).catch(() => {
-      clearTokens();
-      router.replace("/login");
-    });
+    let cancelled = false;
+    void getMe()
+      .then((m) => {
+        if (cancelled) return;
+        setMe(m);
+        setDarkMode(m.settings.darkDetectionEnabled);
+        void getBadges().then((b) => {
+          if (!cancelled) setBadges(b.slice(0, 3));
+        }).catch(() => {});
+        void loadDashboardData();
+        pollRef.current = setInterval(loadDashboardData, 5_000);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearTokens();
+        router.replace("/login");
+      });
 
-    getBadges().then((b) => setBadges(b.slice(0, 3))).catch(() => {});
-
-    void loadDashboardData();
-    pollRef.current = setInterval(loadDashboardData, 5_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [loadDashboardData, router]);
 
   // ── 파생 데이터 ────────────────────────────────────────
@@ -576,9 +601,13 @@ export default function DashboardPage() {
       : "자세를 교정해주세요 ⚠️"
     : "자세 데이터 수집 중...";
 
+  if (!me) {
+    return <div className="min-h-dvh bg-zinc-50" aria-label="대시보드 불러오는 중" />;
+  }
+
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3 lg:h-dvh lg:overflow-hidden lg:py-[0.75vh]">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col lg:h-full">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3 lg:py-[0.75vh]">
+      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
         {/* Top badge */}
         <div className="mb-2 flex shrink-0 justify-center lg:mb-[1vh] lg:h-[2.5vh] lg:items-center">
           <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20 lg:py-0">
@@ -586,7 +615,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:h-[95vh] lg:grid-rows-[27vh_30vh_34vh] lg:gap-x-2 lg:gap-y-[2vh] lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(230px,27vh)_minmax(260px,30vh)_minmax(310px,34vh)] lg:gap-x-2 lg:gap-y-[2vh]">
 
           {/* ── Row 1 ── */}
 

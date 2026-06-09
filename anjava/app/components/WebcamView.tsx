@@ -289,6 +289,20 @@ export default function WebcamView({
   }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged]);
 
   useEffect(() => {
+    const allowBackgroundAlert = () => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) {
+        lastStatusRef.current = "";
+      }
+    };
+    document.addEventListener("visibilitychange", allowBackgroundAlert);
+    window.addEventListener("blur", allowBackgroundAlert);
+    return () => {
+      document.removeEventListener("visibilitychange", allowBackgroundAlert);
+      window.removeEventListener("blur", allowBackgroundAlert);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!ready) return;
     let cancelled = false;
 
@@ -508,16 +522,26 @@ export default function WebcamView({
         if (detectedLabels.length > 0) {
           console.log("자세 감지됨", detectedLabels);
         }
-        // 상태가 바뀔 때마다 extension background toast 하나만 표시
+        // 웹이 활성 상태면 페이지 toast를 우선하고, 백그라운드에서는 웹이 직접
+        // 시스템 알림을 표시해 확장 프로그램의 실행 상태에 의존하지 않는다.
         if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
-          void relayPostureAlertToExtension(backendState, msg, soundEnabled).then((handledByExtension) => {
-            if (handledByExtension) return;
-            return showLocalPostureNotification({
+          const webIsForeground =
+            document.visibilityState === "visible" && document.hasFocus();
+          const notification = webIsForeground
+            ? relayPostureAlertToExtension(backendState, msg, soundEnabled).then((handledByExtension) => {
+                if (handledByExtension) return;
+                return showLocalPostureNotification({
+                  state: backendState,
+                  message: msg,
+                  soundEnabled,
+                });
+              })
+            : showLocalPostureNotification({
               state: backendState,
               message: msg,
               soundEnabled,
             });
-          }).catch((notificationError) => {
+          void notification.catch((notificationError) => {
             console.error("Posture notification failed", notificationError);
           });
         }
