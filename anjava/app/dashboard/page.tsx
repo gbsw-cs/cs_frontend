@@ -34,6 +34,7 @@ import {
   type TimelineDashboard,
   type DetectionState,
 } from "../lib/api";
+import { syncWebPushToken } from "../lib/fcm";
 
 // ── 날짜 헬퍼 ──────────────────────────────────────────────
 
@@ -275,6 +276,10 @@ export default function DashboardPage() {
   const [liveWeeklyDurations, setLiveWeeklyDurations] = useState<LiveWeeklyDurations>(
     EMPTY_LIVE_WEEKLY_DURATIONS,
   );
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported",
+  );
+  const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
     if (dashboardRequestInFlightRef.current || Date.now() < dashboardBackoffUntilRef.current) return;
@@ -385,11 +390,32 @@ export default function DashboardPage() {
     }
   }
 
+  async function enableNotifications() {
+    if (notificationPermissionPending) return;
+    setNotificationPermissionPending(true);
+    try {
+      const result = await syncWebPushToken({ requestPermission: true });
+      setNotificationPermission(
+        typeof Notification === "undefined" ? "unsupported" : Notification.permission,
+      );
+      if (!result.ok) {
+        console.warn("[push] 알림 활성화 실패:", result.reason);
+      }
+    } finally {
+      setNotificationPermissionPending(false);
+    }
+  }
+
   useEffect(() => {
+    const updateNotificationPermission = () => setNotificationPermission(
+      typeof Notification === "undefined" ? "unsupported" : Notification.permission,
+    );
+    updateNotificationPermission();
+    window.addEventListener("focus", updateNotificationPermission);
     if (!getAccessToken()) {
       clearTokens();
       router.replace("/login");
-      return;
+      return () => window.removeEventListener("focus", updateNotificationPermission);
     }
 
     let cancelled = false;
@@ -411,6 +437,7 @@ export default function DashboardPage() {
       });
 
     return () => {
+      window.removeEventListener("focus", updateNotificationPermission);
       cancelled = true;
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -638,6 +665,24 @@ export default function DashboardPage() {
   return (
     <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3 lg:py-[0.75vh]">
       <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
+        {me.settings.pushEnabled && notificationPermission === "default" && (
+          <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+            <span>백그라운드 자세 알림을 받으려면 브라우저 알림 권한이 필요합니다.</span>
+            <button
+              type="button"
+              onClick={enableNotifications}
+              disabled={notificationPermissionPending}
+              className="shrink-0 rounded-md bg-[#2563EB] px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+            >
+              {notificationPermissionPending ? "요청 중..." : "알림 허용"}
+            </button>
+          </div>
+        )}
+        {me.settings.pushEnabled && notificationPermission === "denied" && (
+          <div className="mb-2 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            브라우저에서 알림이 차단되어 있습니다. 주소창 왼쪽 사이트 설정에서 알림을 허용해주세요.
+          </div>
+        )}
         {/* Top badge */}
         <div className="mb-2 flex shrink-0 justify-center lg:mb-[1vh] lg:h-[2.5vh] lg:items-center">
           <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20 lg:py-0">
