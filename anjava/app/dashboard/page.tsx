@@ -74,7 +74,19 @@ const ISSUE_LABEL: Record<string, string> = {
 
 type DailySlot = Pick<
   DailyDashboard,
-  "slotIndex" | "startHour" | "goodPostureCount" | "singleBadCount" | "overlappingCount"
+  | "slotIndex"
+  | "startHour"
+  | "goodPostureCount"
+  | "singleBadCount"
+  | "overlappingCount"
+  | "totalDetectionSec"
+  | "goodPostureSec"
+  | "turtleNeckSec"
+  | "roundShoulderSec"
+  | "shoulderAsymmetrySec"
+  | "darkEnvSec"
+  | "unclassifiedSec"
+  | "hasDurationData"
 >;
 
 type LiveWeeklyDurations = {
@@ -148,6 +160,14 @@ function createEmptyDailySlots(): DailySlot[] {
     goodPostureCount: 0,
     singleBadCount: 0,
     overlappingCount: 0,
+    totalDetectionSec: 0,
+    goodPostureSec: 0,
+    turtleNeckSec: 0,
+    roundShoulderSec: 0,
+    shoulderAsymmetrySec: 0,
+    darkEnvSec: 0,
+    unclassifiedSec: 0,
+    hasDurationData: false,
   }));
 }
 
@@ -172,6 +192,26 @@ function toDailySlots(daily: DailyDashboard[] | null): DailySlot[] {
         toFiniteNumber(previous.overlappingCount),
         toFiniteNumber(item.overlappingCount),
       ),
+      totalDetectionSec: Math.max(
+        toFiniteNumber(previous.totalDetectionSec),
+        toFiniteNumber(item.totalDetectionSec),
+      ),
+      goodPostureSec: Math.max(toFiniteNumber(previous.goodPostureSec), toFiniteNumber(item.goodPostureSec)),
+      turtleNeckSec: Math.max(toFiniteNumber(previous.turtleNeckSec), toFiniteNumber(item.turtleNeckSec)),
+      roundShoulderSec: Math.max(
+        toFiniteNumber(previous.roundShoulderSec),
+        toFiniteNumber(item.roundShoulderSec),
+      ),
+      shoulderAsymmetrySec: Math.max(
+        toFiniteNumber(previous.shoulderAsymmetrySec),
+        toFiniteNumber(item.shoulderAsymmetrySec),
+      ),
+      darkEnvSec: Math.max(toFiniteNumber(previous.darkEnvSec), toFiniteNumber(item.darkEnvSec)),
+      unclassifiedSec: Math.max(
+        toFiniteNumber(previous.unclassifiedSec),
+        toFiniteNumber(item.unclassifiedSec),
+      ),
+      hasDurationData: previous.hasDurationData || item.hasDurationData,
     };
   });
   return slots;
@@ -196,6 +236,32 @@ function mergeMaxDailySlots(previous: DailySlot[], next: DailySlot[]): DailySlot
         toFiniteNumber(previousSlot.overlappingCount),
         toFiniteNumber(nextSlot.overlappingCount),
       ),
+      totalDetectionSec: Math.max(
+        toFiniteNumber(previousSlot.totalDetectionSec),
+        toFiniteNumber(nextSlot.totalDetectionSec),
+      ),
+      goodPostureSec: Math.max(
+        toFiniteNumber(previousSlot.goodPostureSec),
+        toFiniteNumber(nextSlot.goodPostureSec),
+      ),
+      turtleNeckSec: Math.max(
+        toFiniteNumber(previousSlot.turtleNeckSec),
+        toFiniteNumber(nextSlot.turtleNeckSec),
+      ),
+      roundShoulderSec: Math.max(
+        toFiniteNumber(previousSlot.roundShoulderSec),
+        toFiniteNumber(nextSlot.roundShoulderSec),
+      ),
+      shoulderAsymmetrySec: Math.max(
+        toFiniteNumber(previousSlot.shoulderAsymmetrySec),
+        toFiniteNumber(nextSlot.shoulderAsymmetrySec),
+      ),
+      darkEnvSec: Math.max(toFiniteNumber(previousSlot.darkEnvSec), toFiniteNumber(nextSlot.darkEnvSec)),
+      unclassifiedSec: Math.max(
+        toFiniteNumber(previousSlot.unclassifiedSec),
+        toFiniteNumber(nextSlot.unclassifiedSec),
+      ),
+      hasDurationData: previousSlot.hasDurationData || nextSlot.hasDurationData,
     };
   });
 }
@@ -226,6 +292,14 @@ function settleRealtimeSlots(
         toFiniteNumber(realtimeSlot.overlappingCount) -
           Math.max(0, toFiniteNumber(nextSlot.overlappingCount) - toFiniteNumber(previousSlot.overlappingCount)),
       ),
+      totalDetectionSec: 0,
+      goodPostureSec: 0,
+      turtleNeckSec: 0,
+      roundShoulderSec: 0,
+      shoulderAsymmetrySec: 0,
+      darkEnvSec: 0,
+      unclassifiedSec: 0,
+      hasDurationData: false,
     };
   });
 }
@@ -508,6 +582,7 @@ export default function DashboardPage() {
     overlappingCount:
       toFiniteNumber(slot.overlappingCount) + toFiniteNumber(realtimeSlots[i]?.overlappingCount),
   }));
+  const hasDailyDurationData = slots.some((slot) => slot.hasDurationData);
 
   // 슬롯 집계 (실시간 반영용)
   const slotGood = slots.reduce((s, sl) => s + sl.goodPostureCount, 0);
@@ -655,9 +730,13 @@ export default function DashboardPage() {
       badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
       hasDetectionData: Boolean(day),
       totalDetectionSec: day ? toFiniteNumber(day.totalDetectionSec) : 0,
+      goodPostureSec: day ? toFiniteNumber(day.goodPostureSec) : 0,
+      unclassifiedSec: day ? toFiniteNumber(day.unclassifiedSec) : 0,
+      hasExplicitGoodPostureData: Boolean(day?.hasExplicitGoodPostureData),
       turtleNeckSec: day ? toFiniteNumber(day.turtleNeckSec) : 0,
       roundShoulderSec: day ? toFiniteNumber(day.roundShoulderSec) : 0,
       shoulderAsymmetrySec: day ? toFiniteNumber(day.shoulderAsymmetrySec) : 0,
+      darkEnvSec: day ? toFiniteNumber(day.darkEnvSec) : 0,
     };
   });
   const weeklyBadValues = weeklyDays.map((d) =>
@@ -938,10 +1017,21 @@ export default function DashboardPage() {
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden lg:col-span-6">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="text-xs font-bold text-zinc-900">일간 스크린타임</div>
-              <div className="flex items-center gap-3 text-[10px]">
-                <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />양호</span>
-                <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />경고</span>
-                <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />위험</span>
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px]">
+                {hasDailyDurationData ? (
+                  <>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />정상</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />양호</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />경고</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />위험</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -961,6 +1051,27 @@ export default function DashboardPage() {
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
+                    if (slot.hasDurationData) {
+                      const issueSec = slot.turtleNeckSec + slot.roundShoulderSec + slot.shoulderAsymmetrySec;
+                      const categorizedSec = slot.goodPostureSec + issueSec + slot.darkEnvSec + slot.unclassifiedSec;
+                      const totalSec = Math.max(slot.totalDetectionSec, categorizedSec);
+                      const pct = (sec: number) => totalSec > 0 ? clampPercent((sec / totalSec) * 100) : 0;
+                      const otherSec = Math.max(
+                        slot.darkEnvSec + slot.unclassifiedSec,
+                        totalSec - slot.goodPostureSec - issueSec,
+                      );
+                      return (
+                        <div key={i} className="flex h-full w-4 flex-col justify-end">
+                          <div className="flex h-full w-full flex-col overflow-hidden rounded-full bg-zinc-200">
+                            <div className="bg-zinc-300" style={{ height: `${pct(otherSec)}%` }} />
+                            <div className="bg-emerald-400" style={{ height: `${pct(slot.goodPostureSec)}%` }} />
+                            <div className="bg-rose-400" style={{ height: `${pct(slot.turtleNeckSec)}%` }} />
+                            <div className="bg-amber-400" style={{ height: `${pct(slot.roundShoulderSec)}%` }} />
+                            <div className="bg-violet-400" style={{ height: `${pct(slot.shoulderAsymmetrySec)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    }
                     const total = slot.goodPostureCount + slot.singleBadCount + slot.overlappingCount;
                     const goodH = total > 0 ? (slot.goodPostureCount / total) * 100 : 0;
                     const singleH = total > 0 ? (slot.singleBadCount / total) * 100 : 0;
@@ -1148,8 +1259,14 @@ export default function DashboardPage() {
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 경고 비율</div>
-                  <div className="text-[9px] text-zinc-400">숫자 = 감지 시간 중 경고 비율</div>
+                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 비율 <span className="font-normal text-zinc-400">(숫자: 경고 비율)</span></div>
+                  <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[8px] text-zinc-400">
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />정상</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />기타</span>
+                  </div>
                 </div>
                 {(() => {
                   const values = weeklyBadValues;
@@ -1160,24 +1277,40 @@ export default function DashboardPage() {
                         const isFuture = weeklyDays[i]?.isFuture;
                         const hasValue = value !== null;
                         const dayTotalSec = weeklyDays[i]?.totalDetectionSec ?? 0;
+                        const dayGoodSec = weeklyDays[i]?.goodPostureSec ?? 0;
+                        const dayUnclassifiedSec = weeklyDays[i]?.unclassifiedSec ?? 0;
                         const dayTurtleSec = weeklyDays[i]?.turtleNeckSec ?? 0;
                         const dayRoundSec = weeklyDays[i]?.roundShoulderSec ?? 0;
                         const dayAsymSec = weeklyDays[i]?.shoulderAsymmetrySec ?? 0;
-                        const hasDayIssueBreakdown = dayTotalSec > 0 && dayTurtleSec + dayRoundSec + dayAsymSec > 0;
+                        const dayDarkSec = weeklyDays[i]?.darkEnvSec ?? 0;
+                        const dayIssueSec = dayTurtleSec + dayRoundSec + dayAsymSec;
+                        const dayCategorizedSec = dayGoodSec + dayIssueSec + dayDarkSec + dayUnclassifiedSec;
+                        const chartTotalSec = Math.max(dayTotalSec, dayCategorizedSec);
+                        const hasDayBreakdown = chartTotalSec > 0 && dayCategorizedSec > 0;
+                        const goodH = hasDayBreakdown
+                          ? clampPercent((dayGoodSec / chartTotalSec) * 100)
+                          : 0;
                         const turtleH = !hasValue
                           ? 0
-                          : hasDayIssueBreakdown
-                          ? clampPercent((dayTurtleSec / dayTotalSec) * 100)
+                          : hasDayBreakdown
+                          ? clampPercent((dayTurtleSec / chartTotalSec) * 100)
                           : 0;
                         const roundH = !hasValue
                           ? 0
-                          : hasDayIssueBreakdown
-                          ? clampPercent((dayRoundSec / dayTotalSec) * 100)
+                          : hasDayBreakdown
+                          ? clampPercent((dayRoundSec / chartTotalSec) * 100)
                           : 0;
                         const asymH = !hasValue
                           ? 0
-                          : hasDayIssueBreakdown
-                          ? clampPercent((dayAsymSec / dayTotalSec) * 100)
+                          : hasDayBreakdown
+                          ? clampPercent((dayAsymSec / chartTotalSec) * 100)
+                          : 0;
+                        const otherSec = Math.max(
+                          dayDarkSec + dayUnclassifiedSec,
+                          chartTotalSec - dayGoodSec - dayIssueSec,
+                        );
+                        const otherH = hasDayBreakdown
+                          ? clampPercent((otherSec / chartTotalSec) * 100)
                           : 0;
                         return (
                           <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5 px-7">
@@ -1189,8 +1322,10 @@ export default function DashboardPage() {
                                 <div className="w-full bg-zinc-200" style={{ height: "8%" }} />
                               ) : (
                                 <>
-                                  {hasDayIssueBreakdown ? (
+                                  {hasDayBreakdown ? (
                                     <>
+                                      <div className="w-full bg-zinc-300 transition-all" style={{ height: `${otherH}%` }} />
+                                      <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
                                       <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
                                       <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
                                       <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
