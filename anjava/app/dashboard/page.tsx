@@ -76,6 +76,24 @@ type DailySlot = Pick<
   "slotIndex" | "startHour" | "goodPostureCount" | "singleBadCount" | "overlappingCount"
 >;
 
+type LiveWeeklyDurations = {
+  totalSec: number;
+  goodSec: number;
+  turtleNeckSec: number;
+  roundShoulderSec: number;
+  shoulderAsymmetrySec: number;
+  darkEnvSec: number;
+};
+
+const EMPTY_LIVE_WEEKLY_DURATIONS: LiveWeeklyDurations = {
+  totalSec: 0,
+  goodSec: 0,
+  turtleNeckSec: 0,
+  roundShoulderSec: 0,
+  shoulderAsymmetrySec: 0,
+  darkEnvSec: 0,
+};
+
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const n =
     typeof value === "number"
@@ -234,10 +252,14 @@ export default function DashboardPage() {
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
+  const lastLiveDetectionRef = useRef<{ state: DetectionState; at: number } | null>(null);
   const serverDailySlotsRef = useRef<DailySlot[]>(createEmptyDailySlots());
   const realtimeDateRef = useRef(getKSTDate());
   const [serverDailySlots, setServerDailySlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
   const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
+  const [liveWeeklyDurations, setLiveWeeklyDurations] = useState<LiveWeeklyDurations>(
+    EMPTY_LIVE_WEEKLY_DURATIONS,
+  );
 
   const loadDashboardData = useCallback(() => {
     const date = getKSTDate();
@@ -427,17 +449,22 @@ export default function DashboardPage() {
   const wDiff = firstFiniteNumber(today?.vsLastWeek);
 
   // 주간 통계
-  const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec);
-  const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec);
-  const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
-  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
+  const turtleSec =
+    toFiniteNumber(weekly?.turtleNeckTotalSec) + liveWeeklyDurations.turtleNeckSec;
+  const roundShoulderSec =
+    toFiniteNumber(weekly?.roundShoulderTotalSec) + liveWeeklyDurations.roundShoulderSec;
+  const asymSec =
+    toFiniteNumber(weekly?.shoulderAsymmetryTotalSec) + liveWeeklyDurations.shoulderAsymmetrySec;
+  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec) + liveWeeklyDurations.darkEnvSec;
   const badPostureSec = turtleSec + roundShoulderSec + asymSec;
   const goodPct = weekly
     ? Math.round(clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100))
     : 0;
   const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
   const weeklyBadRatio = weeklyGoodRatio === null ? null : Math.max(0, 1 - weeklyGoodRatio);
-  const explicitWeeklyScreenSec = weekly ? toFiniteNumber(weekly.totalDetectionSec) : 0;
+  const explicitWeeklyScreenSec = weekly
+    ? toFiniteNumber(weekly.totalDetectionSec) + liveWeeklyDurations.totalSec
+    : liveWeeklyDurations.totalSec;
   const weeklyScreenSec =
     explicitWeeklyScreenSec > 0
       ? explicitWeeklyScreenSec
@@ -662,6 +689,39 @@ export default function DashboardPage() {
                 pushEnabled={me?.settings?.pushEnabled ?? true}
                 soundEnabled={me?.settings?.soundEnabled ?? true}
                 onDetectionStateChange={(state, message) => {
+                  const now = Date.now();
+                  const previousDetection = lastLiveDetectionRef.current;
+                  if (previousDetection) {
+                    const elapsedSec = Math.min(15, Math.max(0, (now - previousDetection.at) / 1000));
+                    if (elapsedSec > 0) {
+                      setLiveWeeklyDurations((current) => {
+                        const next = {
+                          ...current,
+                          totalSec: current.totalSec + elapsedSec,
+                        };
+                        switch (previousDetection.state) {
+                          case "GOOD_POSTURE":
+                            next.goodSec += elapsedSec;
+                            break;
+                          case "TURTLE_NECK":
+                            next.turtleNeckSec += elapsedSec;
+                            break;
+                          case "SHOULDER_ISSUE":
+                          case "ROUND_SHOULDER":
+                            next.roundShoulderSec += elapsedSec;
+                            break;
+                          case "SHOULDER_ASYMMETRY":
+                            next.shoulderAsymmetrySec += elapsedSec;
+                            break;
+                          case "DARK_ENV":
+                            next.darkEnvSec += elapsedSec;
+                            break;
+                        }
+                        return next;
+                      });
+                    }
+                  }
+                  lastLiveDetectionRef.current = { state, at: now };
                   setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
                   setLiveDetection({
                     state,
