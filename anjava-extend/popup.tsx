@@ -164,7 +164,7 @@ function WebcamCircle() {
           <button
             className="btn-outline"
             style={{ fontSize: 11, padding: "3px 10px" }}
-            onClick={startCamera}
+            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html") })}
           >
             권한 다시 요청
           </button>
@@ -506,7 +506,7 @@ export default function IndexPopup() {
   }
 
   const openCameraSettings = () => {
-    chrome.tabs.create({ url: "chrome://settings/content/camera" })
+    chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html") })
   }
 
   const handleLogout = () => {

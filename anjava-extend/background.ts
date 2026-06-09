@@ -49,6 +49,7 @@ type RuntimeMessage =
   | { type: "BASELINE_REQUIRED" }
   | { type: "DETECTION_ACTIVE" }
   | { type: "OFFSCREEN_CAMERA_ERROR"; name?: string; message?: string }
+  | { type: "CAMERA_PERMISSION_GRANTED" }
   | { type: "FLUSH_START"; count: number; sessionId: string }
   | { type: "OFFSCREEN_HEARTBEAT"; currentState: string; queueSize: number; hasToken: boolean }
   | { type: "FLUSH_RESULT"; ok: boolean; count?: number; accepted?: number; sessionId: string; status?: number; body?: string }
@@ -909,6 +910,18 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
       offscreenError: `${name}: ${detail}`,
     })
     sendResponse({ ok: true })
+    return true
+  }
+
+  if (msg.type === "CAMERA_PERMISSION_GRANTED") {
+    chrome.storage.local.set({ offscreenActive: false, offscreenError: null })
+      .then(async () => {
+        await stopOffscreenDetection().catch(() => {})
+        const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
+        if (currentSessionId) await startOffscreenDetection()
+      })
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: String(e?.message ?? e) }))
     return true
   }
 
