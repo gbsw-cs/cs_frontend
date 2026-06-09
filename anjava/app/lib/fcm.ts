@@ -123,17 +123,34 @@ function setupForegroundMessageListener(registration: ServiceWorkerRegistration)
   });
 }
 
-function showBrowserNotification(title: string, options: NotificationOptions) {
-  const notification = new Notification(title, options);
-  notification.onclick = () => {
-    const targetUrl =
-      typeof options.data === "object" && options.data !== null && "url" in options.data
-        ? String((options.data as { url?: unknown }).url ?? "/dashboard")
-        : "/dashboard";
-    window.focus();
-    if (window.location.pathname !== targetUrl) window.location.assign(targetUrl);
-    notification.close();
-  };
+function showBrowserNotification(title: string, options: NotificationOptions): boolean {
+  try {
+    const notification = new Notification(title, options);
+    notification.onclick = () => {
+      const targetUrl =
+        typeof options.data === "object" && options.data !== null && "url" in options.data
+          ? String((options.data as { url?: unknown }).url ?? "/dashboard")
+          : "/dashboard";
+      window.focus();
+      if (window.location.pathname !== targetUrl) window.location.assign(targetUrl);
+      notification.close();
+    };
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function showServiceWorkerNotification(title: string, options: NotificationOptions) {
+  if (!("serviceWorker" in navigator)) return false;
+  const registration =
+    (await navigator.serviceWorker.getRegistration("/").catch(() => null)) ??
+    (await getServiceWorkerRegistration(getFirebaseConfig()).catch(() => null));
+  if (!registration) return false;
+  return registration.showNotification(title, options).then(
+    () => true,
+    () => false,
+  );
 }
 
 function isMacOS() {
@@ -206,19 +223,14 @@ export async function showLocalPostureNotification({
 
   // macOS Chrome은 서비스 워커 알림이 시스템 배너와 더 안정적으로 연동된다.
   // Windows Chromium은 페이지 Notification이 배너 표시 누락을 덜 일으킨다.
-  if (isMacOS() && "serviceWorker" in navigator) {
-    const registration =
-      (await navigator.serviceWorker.getRegistration("/").catch(() => null)) ??
-      (await getServiceWorkerRegistration(getFirebaseConfig()).catch(() => null));
-    if (registration) {
-      await registration.showNotification(title, options).catch(() => {
-        showBrowserNotification(title, options);
-      });
-      return;
-    }
+  if (isMacOS()) {
+    if (await showServiceWorkerNotification(title, options)) return;
+    showBrowserNotification(title, options);
+    return;
   }
 
-  showBrowserNotification(title, options);
+  if (showBrowserNotification(title, options)) return;
+  await showServiceWorkerNotification(title, options);
 }
 
 async function isMessagingSupported() {
