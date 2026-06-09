@@ -6,11 +6,14 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Cell, LabelList,
 } from "recharts";
+import { useRouter } from "next/navigation";
 import {
   getCurrentReport,
   getReports,
   getReport,
   resendReport,
+  clearTokens,
+  getAccessToken,
   type CurrentReport,
   type ReportListItem,
   type ReportDetail,
@@ -88,6 +91,7 @@ const MOCK_REPORT: CurrentReport = {
 };
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [current, setCurrent] = useState<CurrentReport | null>(null);
   const [showSample, setShowSample] = useState(false);
   const [currentLoading, setCurrentLoading] = useState(true);
@@ -106,16 +110,31 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => {
+    if (!getAccessToken()) {
+      clearTokens();
+      router.replace("/login");
+      return;
+    }
+
     getCurrentReport()
       .then(setCurrent)
-      .catch(() => {})
+      .catch((e) => {
+        const status = e && typeof e === "object" && "status" in e
+          ? Number((e as { status?: unknown }).status) : 0;
+        if (status === 401) { clearTokens(); router.replace("/login"); }
+      })
       .finally(() => setCurrentLoading(false));
 
     getReports()
       .then((r) => setReports(r.items))
-      .catch((e) => setError(e instanceof Error ? e.message : "데이터를 불러올 수 없습니다."))
+      .catch((e) => {
+        const status = e && typeof e === "object" && "status" in e
+          ? Number((e as { status?: unknown }).status) : 0;
+        if (status === 401) { clearTokens(); router.replace("/login"); return; }
+        setError(e instanceof Error ? e.message : "데이터를 불러올 수 없습니다.");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   function showToast(msg: string) {
     setToast(msg);

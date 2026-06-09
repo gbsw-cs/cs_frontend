@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   getAllBadges,
   getBadges,
   getBadgesProgress,
+  clearTokens,
+  getAccessToken,
   type ApiBadge,
   type BadgeProgressCategory,
   type MasterBadge,
@@ -37,6 +40,7 @@ function fmtProgress(val: number, isTime: boolean) {
 }
 
 export default function BadgesPage() {
+  const router = useRouter();
   const [masterBadges, setMasterBadges] = useState<MasterBadge[]>([]);
   const [earnedBadges, setEarnedBadges] = useState<ApiBadge[]>([]);
   const [progress, setProgress] = useState<BadgeProgressCategory[]>([]);
@@ -44,6 +48,12 @@ export default function BadgesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!getAccessToken()) {
+      clearTokens();
+      router.replace("/login");
+      return;
+    }
+
     let active = true;
 
     getAllBadges()
@@ -63,7 +73,18 @@ export default function BadgesPage() {
           setProgress(prog.value.categories);
         }
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "데이터를 불러올 수 없습니다."))
+      .catch((e) => {
+        if (!active) return;
+        const status = e && typeof e === "object" && "status" in e
+          ? Number((e as { status?: unknown }).status)
+          : 0;
+        if (status === 401) {
+          clearTokens();
+          router.replace("/login");
+          return;
+        }
+        setError(e instanceof Error ? e.message : "데이터를 불러올 수 없습니다.");
+      })
       .finally(() => {
         if (active) setLoading(false);
       });
@@ -71,7 +92,7 @@ export default function BadgesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [router]);
 
   const earnedMap = new Map(earnedBadges.map((b) => [b.code, b]));
   const total = masterBadges.length;
