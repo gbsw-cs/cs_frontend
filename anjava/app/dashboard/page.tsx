@@ -270,6 +270,13 @@ export default function DashboardPage() {
     void loadDashboardData();
   }, [loadDashboardData]);
 
+  const refreshTimeline = useCallback(() => {
+    const date = getKSTDate();
+    getDashboardTimeline(date)
+      .then((tl) => setTimeline(tl))
+      .catch(() => {});
+  }, []);
+
   const handleSessionActiveChange = useCallback((active: boolean, reason?: "paused" | "stopped") => {
     sessionActiveRef.current = active;
     sessionStateChangedAtRef.current = Date.now();
@@ -755,6 +762,7 @@ export default function DashboardPage() {
                 onAuthenticationExpired={handleAuthenticationExpired}
                 onDetectionStateChange={handleDetectionStateChange}
                 onDashboardDataChanged={refreshDashboardDataSoon}
+                onTimelinePosted={refreshTimeline}
                 sessionControlState={sessionCommand}
                 onSessionControlStateChange={handleSessionControlStateChange}
               />

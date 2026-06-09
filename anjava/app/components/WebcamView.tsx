@@ -36,6 +36,7 @@ type WebcamViewProps = {
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
   onSessionActiveChange?: (active: boolean, reason?: "paused" | "stopped") => void;
   onDashboardDataChanged?: () => void;
+  onTimelinePosted?: () => void;
   onAuthenticationExpired?: () => void;
   sessionControlState?: SessionControlState;
   onSessionControlStateChange?: (state: SessionControlState, error?: string) => void;
@@ -256,6 +257,7 @@ export default function WebcamView({
   onDetectionStateChange,
   onSessionActiveChange,
   onDashboardDataChanged,
+  onTimelinePosted,
   onAuthenticationExpired,
   sessionControlState = "running",
   onSessionControlStateChange,
@@ -274,6 +276,7 @@ export default function WebcamView({
   const onDetectionStateChangeRef = useRef(onDetectionStateChange);
   const onSessionActiveChangeRef = useRef(onSessionActiveChange);
   const onDashboardDataChangedRef = useRef(onDashboardDataChanged);
+  const onTimelinePostedRef = useRef(onTimelinePosted);
   const onAuthenticationExpiredRef = useRef(onAuthenticationExpired);
   const onSessionControlStateChangeRef = useRef(onSessionControlStateChange);
   const sessionOperationRef = useRef(0);
@@ -321,9 +324,10 @@ export default function WebcamView({
     onDetectionStateChangeRef.current = onDetectionStateChange;
     onSessionActiveChangeRef.current = onSessionActiveChange;
     onDashboardDataChangedRef.current = onDashboardDataChanged;
+    onTimelinePostedRef.current = onTimelinePosted;
     onAuthenticationExpiredRef.current = onAuthenticationExpired;
     onSessionControlStateChangeRef.current = onSessionControlStateChange;
-  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged, onAuthenticationExpired, onSessionControlStateChange]);
+  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged, onTimelinePosted, onAuthenticationExpired, onSessionControlStateChange]);
 
   useEffect(() => {
     const allowBackgroundAlert = () => {
@@ -534,7 +538,9 @@ export default function WebcamView({
           const d = new Date();
           const date = d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
           const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
-          void postDashboardTimeline({ date, time, dominantState: nextState, message: message ?? "", eventId: crypto.randomUUID() }).catch(() => {});
+          postDashboardTimeline({ date, time, dominantState: nextState, message: message ?? "", eventId: crypto.randomUUID() })
+            .then(() => { onTimelinePostedRef.current?.(); })
+            .catch(() => {});
         }
       }
       onDetectionStateChangeRef.current?.(nextState, message);
