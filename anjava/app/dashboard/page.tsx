@@ -90,24 +90,6 @@ type DailySlot = Pick<
   | "hasDurationData"
 >;
 
-type LiveWeeklyDurations = {
-  totalSec: number;
-  goodSec: number;
-  turtleNeckSec: number;
-  roundShoulderSec: number;
-  shoulderAsymmetrySec: number;
-  darkEnvSec: number;
-};
-
-const EMPTY_LIVE_WEEKLY_DURATIONS: LiveWeeklyDurations = {
-  totalSec: 0,
-  goodSec: 0,
-  turtleNeckSec: 0,
-  roundShoulderSec: 0,
-  shoulderAsymmetrySec: 0,
-  darkEnvSec: 0,
-};
-
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const n =
     typeof value === "number"
@@ -177,154 +159,23 @@ function toDailySlots(daily: DailyDashboard[] | null): DailySlot[] {
   if (!daily) return slots;
   daily.forEach((item) => {
     const slotIndex = Math.max(0, Math.min(7, Math.trunc(toFiniteNumber(item.slotIndex))));
-    const previous = slots[slotIndex];
     slots[slotIndex] = {
       slotIndex,
       startHour: toFiniteNumber(item.startHour, slotIndex * 3),
-      goodPostureCount: Math.max(
-        toFiniteNumber(previous.goodPostureCount),
-        toFiniteNumber(item.goodPostureCount),
-      ),
-      singleBadCount: Math.max(
-        toFiniteNumber(previous.singleBadCount),
-        toFiniteNumber(item.singleBadCount),
-      ),
-      overlappingCount: Math.max(
-        toFiniteNumber(previous.overlappingCount),
-        toFiniteNumber(item.overlappingCount),
-      ),
-      totalDetectionSec: Math.max(
-        toFiniteNumber(previous.totalDetectionSec),
-        toFiniteNumber(item.totalDetectionSec),
-      ),
-      goodPostureSec: Math.max(toFiniteNumber(previous.goodPostureSec), toFiniteNumber(item.goodPostureSec)),
-      turtleNeckSec: Math.max(toFiniteNumber(previous.turtleNeckSec), toFiniteNumber(item.turtleNeckSec)),
-      roundShoulderSec: Math.max(
-        toFiniteNumber(previous.roundShoulderSec),
-        toFiniteNumber(item.roundShoulderSec),
-      ),
-      shoulderAsymmetrySec: Math.max(
-        toFiniteNumber(previous.shoulderAsymmetrySec),
-        toFiniteNumber(item.shoulderAsymmetrySec),
-      ),
-      darkEnvSec: Math.max(toFiniteNumber(previous.darkEnvSec), toFiniteNumber(item.darkEnvSec)),
-      unclassifiedSec: Math.max(
-        toFiniteNumber(previous.unclassifiedSec),
-        toFiniteNumber(item.unclassifiedSec),
-      ),
-      hasDurationData: previous.hasDurationData || item.hasDurationData,
+      goodPostureCount: toFiniteNumber(item.goodPostureCount),
+      singleBadCount: toFiniteNumber(item.singleBadCount),
+      overlappingCount: toFiniteNumber(item.overlappingCount),
+      totalDetectionSec: toFiniteNumber(item.totalDetectionSec),
+      goodPostureSec: toFiniteNumber(item.goodPostureSec),
+      turtleNeckSec: toFiniteNumber(item.turtleNeckSec),
+      roundShoulderSec: toFiniteNumber(item.roundShoulderSec),
+      shoulderAsymmetrySec: toFiniteNumber(item.shoulderAsymmetrySec),
+      darkEnvSec: toFiniteNumber(item.darkEnvSec),
+      unclassifiedSec: toFiniteNumber(item.unclassifiedSec),
+      hasDurationData: item.hasDurationData,
     };
   });
   return slots;
-}
-
-function mergeMaxDailySlots(previous: DailySlot[], next: DailySlot[]): DailySlot[] {
-  return createEmptyDailySlots().map((emptySlot, i) => {
-    const previousSlot = previous[i] ?? emptySlot;
-    const nextSlot = next[i] ?? emptySlot;
-    return {
-      slotIndex: i,
-      startHour: toFiniteNumber(nextSlot.startHour, toFiniteNumber(previousSlot.startHour, i * 3)),
-      goodPostureCount: Math.max(
-        toFiniteNumber(previousSlot.goodPostureCount),
-        toFiniteNumber(nextSlot.goodPostureCount),
-      ),
-      singleBadCount: Math.max(
-        toFiniteNumber(previousSlot.singleBadCount),
-        toFiniteNumber(nextSlot.singleBadCount),
-      ),
-      overlappingCount: Math.max(
-        toFiniteNumber(previousSlot.overlappingCount),
-        toFiniteNumber(nextSlot.overlappingCount),
-      ),
-      totalDetectionSec: Math.max(
-        toFiniteNumber(previousSlot.totalDetectionSec),
-        toFiniteNumber(nextSlot.totalDetectionSec),
-      ),
-      goodPostureSec: Math.max(
-        toFiniteNumber(previousSlot.goodPostureSec),
-        toFiniteNumber(nextSlot.goodPostureSec),
-      ),
-      turtleNeckSec: Math.max(
-        toFiniteNumber(previousSlot.turtleNeckSec),
-        toFiniteNumber(nextSlot.turtleNeckSec),
-      ),
-      roundShoulderSec: Math.max(
-        toFiniteNumber(previousSlot.roundShoulderSec),
-        toFiniteNumber(nextSlot.roundShoulderSec),
-      ),
-      shoulderAsymmetrySec: Math.max(
-        toFiniteNumber(previousSlot.shoulderAsymmetrySec),
-        toFiniteNumber(nextSlot.shoulderAsymmetrySec),
-      ),
-      darkEnvSec: Math.max(toFiniteNumber(previousSlot.darkEnvSec), toFiniteNumber(nextSlot.darkEnvSec)),
-      unclassifiedSec: Math.max(
-        toFiniteNumber(previousSlot.unclassifiedSec),
-        toFiniteNumber(nextSlot.unclassifiedSec),
-      ),
-      hasDurationData: previousSlot.hasDurationData || nextSlot.hasDurationData,
-    };
-  });
-}
-
-function settleRealtimeSlots(
-  realtime: DailySlot[],
-  previousServer: DailySlot[],
-  nextServer: DailySlot[],
-): DailySlot[] {
-  return createEmptyDailySlots().map((emptySlot, i) => {
-    const realtimeSlot = realtime[i] ?? emptySlot;
-    const previousSlot = previousServer[i] ?? emptySlot;
-    const nextSlot = nextServer[i] ?? emptySlot;
-    return {
-      ...realtimeSlot,
-      goodPostureCount: Math.max(
-        0,
-        toFiniteNumber(realtimeSlot.goodPostureCount) -
-          Math.max(0, toFiniteNumber(nextSlot.goodPostureCount) - toFiniteNumber(previousSlot.goodPostureCount)),
-      ),
-      singleBadCount: Math.max(
-        0,
-        toFiniteNumber(realtimeSlot.singleBadCount) -
-          Math.max(0, toFiniteNumber(nextSlot.singleBadCount) - toFiniteNumber(previousSlot.singleBadCount)),
-      ),
-      overlappingCount: Math.max(
-        0,
-        toFiniteNumber(realtimeSlot.overlappingCount) -
-          Math.max(0, toFiniteNumber(nextSlot.overlappingCount) - toFiniteNumber(previousSlot.overlappingCount)),
-      ),
-      totalDetectionSec: 0,
-      goodPostureSec: 0,
-      turtleNeckSec: 0,
-      roundShoulderSec: 0,
-      shoulderAsymmetrySec: 0,
-      darkEnvSec: 0,
-      unclassifiedSec: 0,
-      hasDurationData: false,
-    };
-  });
-}
-
-function getCurrentKSTSlotIndex() {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Seoul",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(new Date()),
-  );
-  return Math.max(0, Math.min(7, Math.floor(hour / 3)));
-}
-
-function applyRealtimeDetection(slots: DailySlot[], state: DetectionState): DailySlot[] {
-  const slotIndex = getCurrentKSTSlotIndex();
-  return slots.map((slot, i) => {
-    if (i !== slotIndex) return slot;
-    if (state === "GOOD_POSTURE") {
-      return { ...slot, goodPostureCount: slot.goodPostureCount + 1 };
-    }
-    return { ...slot, singleBadCount: slot.singleBadCount + 1 };
-  });
 }
 
 // ── 컴포넌트 ──────────────────────────────────────────────
@@ -342,6 +193,7 @@ export default function DashboardPage() {
   const [sessionCommand, setSessionCommand] = useState<SessionControlState>("checking");
   const [sessionStatus, setSessionStatus] = useState<SessionControlState>("checking");
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [liveDetection, setLiveDetection] = useState<{
     state: DetectionState;
     message: string;
@@ -353,15 +205,9 @@ export default function DashboardPage() {
   const dashboardBackoffUntilRef = useRef(0);
   const sessionActiveRef = useRef(false);
   const sessionStateChangedAtRef = useRef(0);
-  const lastLiveDetectionRef = useRef<{ state: DetectionState; at: number } | null>(null);
   const lastReportedDetectionStateRef = useRef<DetectionState | null>(null);
-  const serverDailySlotsRef = useRef<DailySlot[]>(createEmptyDailySlots());
   const realtimeDateRef = useRef(getKSTDate());
   const [serverDailySlots, setServerDailySlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
-  const [realtimeSlots, setRealtimeSlots] = useState<DailySlot[]>(() => createEmptyDailySlots());
-  const [liveWeeklyDurations, setLiveWeeklyDurations] = useState<LiveWeeklyDurations>(
-    EMPTY_LIVE_WEEKLY_DURATIONS,
-  );
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(
     "unsupported",
   );
@@ -375,16 +221,14 @@ export default function DashboardPage() {
     const monday = getMondayKST();
     if (realtimeDateRef.current !== date) {
       realtimeDateRef.current = date;
-      serverDailySlotsRef.current = createEmptyDailySlots();
       setServerDailySlots(createEmptyDailySlots());
-      setRealtimeSlots(createEmptyDailySlots());
     }
 
     try {
       const [t, w, d, tl] = await Promise.allSettled([
         getDashboardToday(),
         getDashboardWeekly(monday),
-        getDashboardDaily(),
+        getDashboardDaily(date),
         getDashboardTimeline(date),
       ]);
       const results = [t, w, d, tl];
@@ -409,28 +253,21 @@ export default function DashboardPage() {
       else if (getRequestErrorStatus(t.reason) < 429) console.error("[dashboard] today 실패:", t.reason);
       if (w.status === "fulfilled") {
         setWeekly(w.value);
-        setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
-        if (lastLiveDetectionRef.current) {
-          lastLiveDetectionRef.current = { ...lastLiveDetectionRef.current, at: Date.now() };
-        }
       } else if (getRequestErrorStatus(w.reason) < 429) console.error("[dashboard] weekly 실패:", w.reason);
       if (d.status === "fulfilled") {
-        const previousServerSlots = serverDailySlotsRef.current;
-        const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
-        setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
-        serverDailySlotsRef.current = nextServerSlots;
-        setServerDailySlots(nextServerSlots);
+        setServerDailySlots(toDailySlots(d.value));
       } else if (getRequestErrorStatus(d.reason) < 429) console.error("[dashboard] daily 실패:", d.reason);
       if (tl.status === "fulfilled") setTimeline(tl.value);
       else if (getRequestErrorStatus(tl.reason) < 429) console.error("[dashboard] timeline 실패:", tl.reason);
     } finally {
       dashboardRequestInFlightRef.current = false;
+      setDataLoading(false);
     }
   }, [router]);
 
   const refreshDashboardDataSoon = useCallback(() => {
     const now = Date.now();
-    if (now - refreshCooldownRef.current < 60_000) return;
+    if (now - refreshCooldownRef.current < 5_000) return;
     refreshCooldownRef.current = now;
     void loadDashboardData();
   }, [loadDashboardData]);
@@ -439,11 +276,7 @@ export default function DashboardPage() {
     sessionActiveRef.current = active;
     sessionStateChangedAtRef.current = Date.now();
     if (!active && reason === "stopped") {
-      lastLiveDetectionRef.current = null;
       lastReportedDetectionStateRef.current = null;
-      setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
-    } else if (!active) {
-      lastLiveDetectionRef.current = null;
     }
   }, []);
 
@@ -465,46 +298,11 @@ export default function DashboardPage() {
   }, [router]);
 
   const handleDetectionStateChange = useCallback((state: DetectionState, message: string) => {
-    const now = Date.now();
     if (!sessionActiveRef.current) {
-      lastLiveDetectionRef.current = null;
       return;
     }
-    const previousDetection = lastLiveDetectionRef.current;
-    if (previousDetection) {
-      const elapsedSec = Math.min(15, Math.max(0, (now - previousDetection.at) / 1000));
-      if (elapsedSec > 0) {
-        setLiveWeeklyDurations((current) => {
-          const next = {
-            ...current,
-            totalSec: current.totalSec + elapsedSec,
-          };
-          switch (previousDetection.state) {
-            case "GOOD_POSTURE":
-              next.goodSec += elapsedSec;
-              break;
-            case "TURTLE_NECK":
-              next.turtleNeckSec += elapsedSec;
-              break;
-            case "SHOULDER_ISSUE":
-            case "ROUND_SHOULDER":
-              next.roundShoulderSec += elapsedSec;
-              break;
-            case "SHOULDER_ASYMMETRY":
-              next.shoulderAsymmetrySec += elapsedSec;
-              break;
-            case "DARK_ENV":
-              next.darkEnvSec += elapsedSec;
-              break;
-          }
-          return next;
-        });
-      }
-    }
-    lastLiveDetectionRef.current = { state, at: now };
     if (lastReportedDetectionStateRef.current !== state) {
       lastReportedDetectionStateRef.current = state;
-      setRealtimeSlots((prev) => applyRealtimeDetection(prev, state));
       setLiveDetection({
         state,
         message,
@@ -591,39 +389,13 @@ export default function DashboardPage() {
   // ── 파생 데이터 ────────────────────────────────────────
 
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
-  const slots = serverDailySlots.map((slot, i) => ({
-    ...slot,
-    goodPostureCount:
-      toFiniteNumber(slot.goodPostureCount) + toFiniteNumber(realtimeSlots[i]?.goodPostureCount),
-    singleBadCount:
-      toFiniteNumber(slot.singleBadCount) + toFiniteNumber(realtimeSlots[i]?.singleBadCount),
-    overlappingCount:
-      toFiniteNumber(slot.overlappingCount) + toFiniteNumber(realtimeSlots[i]?.overlappingCount),
-  }));
+  const slots = serverDailySlots;
   const hasDailyDurationData = slots.some((slot) => slot.hasDurationData);
 
-  // 슬롯 집계 (실시간 반영용)
-  const slotGood = slots.reduce((s, sl) => s + sl.goodPostureCount, 0);
-  const slotBad  = slots.reduce((s, sl) => s + sl.singleBadCount + sl.overlappingCount, 0);
-  const slotTotal = slotGood + slotBad;
-  const derivedScore    = slotTotal > 0 ? Math.round((slotGood / slotTotal) * 100) : null;
-  const derivedWarnings = slotBad;
-
-  // 건강 점수 - 슬롯 데이터 있으면 실시간 계산값 우선 (API는 세션 종료 후에만 갱신)
-  const apiScore = firstFiniteNumber(today?.postureScore, today?.healthScore);
-  const rawScore: number | null = slotTotal > 0 ? derivedScore : (apiScore ?? null);
+  // 서버 값 직접 사용
+  const rawScore: number | null = firstFiniteNumber(today?.postureScore, today?.healthScore);
   const healthScore = rawScore ?? 0;
-
-  // 경고 횟수 - API 값 우선, 없으면 슬롯 기반 실시간 계산값 사용
-  const apiWarnings = firstFiniteNumber(
-    today?.warningCount,
-    toFiniteNumber(today?.breakdown?.turtleNeckCount) +
-      toFiniteNumber(today?.breakdown?.roundShoulderCount) +
-      toFiniteNumber(today?.breakdown?.shoulderAsymmetryCount) +
-      toFiniteNumber(today?.breakdown?.shoulderIssueCount) +
-      toFiniteNumber(today?.breakdown?.darkEnvCount),
-  ) ?? 0;
-  const warningCount = Math.max(apiWarnings, derivedWarnings);
+  const warningCount = firstFiniteNumber(today?.warningCount) ?? 0;
 
   // 총 이벤트 수
   const totalEventCount = slots.reduce(
@@ -655,10 +427,11 @@ export default function DashboardPage() {
     const label = `${String(slot.startHour).padStart(2, "0")}~${String((slot.startHour + 3) % 24).padStart(2, "0")}시`;
     return count > top.count ? { label, count } : top;
   }, { label: "—", count: 0 });
+  const hasTodayData = hasDailyDurationData || totalEventCount > 0 || Boolean(today?.warningCount !== undefined);
   const todaySummaryText =
     warningCount > 0
       ? `오늘 ${todayWarningLabel} ${warningCount}회, 집중 시간대 ${busiestSlot.count > 0 ? busiestSlot.label : "분석 중"}`
-      : totalEventCount > 0
+      : hasTodayData
       ? "오늘 자세 경고 없이 안정적으로 감지 중입니다."
       : "오늘 감지 데이터가 쌓이면 요약이 표시됩니다.";
 
@@ -675,63 +448,30 @@ export default function DashboardPage() {
       return bMin <= nowMin && STATE_LABEL[b.dominantState] !== undefined;
     })
     .reverse() ?? [];
-  const recentActivity = liveDetection
-    ? [
-        {
-          time: liveDetection.updatedAt,
-          dominantState: liveDetection.state,
-          message: liveDetection.message,
-        },
-        ...timelineActivity.filter((b) =>
-          b.time !== liveDetection.updatedAt || b.dominantState !== liveDetection.state
-        ),
-      ]
-    : timelineActivity;
+  const recentActivity = timelineActivity.filter((bucket, index, buckets) => {
+    const key = bucket.eventId ?? `${bucket.time ?? `${bucket.startHour}:${bucket.startMin}`}-${bucket.dominantState}`;
+    return buckets.findIndex((candidate) =>
+      (candidate.eventId ?? `${candidate.time ?? `${candidate.startHour}:${candidate.startMin}`}-${candidate.dominantState}`) === key
+    ) === index;
+  });
 
   // 비교 통계 (null이면 데이터 없음)
   const yDiff = firstFiniteNumber(today?.vsYesterday);
   const wDiff = firstFiniteNumber(today?.vsLastWeek);
 
-  // 주간 통계
-  const turtleSec =
-    toFiniteNumber(weekly?.turtleNeckTotalSec) + liveWeeklyDurations.turtleNeckSec;
-  const roundShoulderSec =
-    toFiniteNumber(weekly?.roundShoulderTotalSec) + liveWeeklyDurations.roundShoulderSec;
-  const asymSec =
-    toFiniteNumber(weekly?.shoulderAsymmetryTotalSec) + liveWeeklyDurations.shoulderAsymmetrySec;
-  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec) + liveWeeklyDurations.darkEnvSec;
-  const badPostureSec = turtleSec + roundShoulderSec + asymSec;
-  const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
-  const weeklyBadRatio = weeklyGoodRatio === null ? null : Math.max(0, 1 - weeklyGoodRatio);
-  const explicitWeeklyScreenSec = weekly
-    ? toFiniteNumber(weekly.totalDetectionSec) + liveWeeklyDurations.totalSec
-    : liveWeeklyDurations.totalSec;
-  const weeklyScreenSec =
-    explicitWeeklyScreenSec > 0
-      ? explicitWeeklyScreenSec
-      : weekly && badPostureSec > 0 && weeklyBadRatio !== null && weeklyBadRatio > 0
-      ? Math.round(badPostureSec / weeklyBadRatio)
-      : weekly
-      ? 0
-      : null;
-  const serverGoodSec = weekly ? toFiniteNumber(weekly.goodPostureSec) : 0;
-  const weeklyGoodSec =
-    weeklyScreenSec === null
-      ? null
-      : serverGoodSec > 0
-      ? Math.max(0, serverGoodSec + liveWeeklyDurations.goodSec)
-      : Math.max(0, weeklyScreenSec - badPostureSec);
-  const weeklyRiskPct = weeklyScreenSec && weeklyScreenSec > 0
-    ? clampPercent(Math.round((badPostureSec / weeklyScreenSec) * 100))
-    : weeklyBadRatio === null
-    ? 0
-    : clampPercent(Math.round(weeklyBadRatio * 100));
-  const unclassifiedSec = weeklyScreenSec === null || weeklyGoodSec === null
-    ? null
-    : Math.max(0, weeklyScreenSec - weeklyGoodSec - badPostureSec - darkSec);
-  const weeklyGoodPct = weeklyScreenSec && weeklyScreenSec > 0 && weeklyGoodSec !== null
-    ? clampPercent(Math.round((weeklyGoodSec / weeklyScreenSec) * 100))
+  // 주간 통계 (서버 값 직접 사용)
+  const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec);
+  const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec);
+  const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
+  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
+  const badPostureSec = weekly
+    ? toFiniteNumber(weekly.badPostureSec, turtleSec + roundShoulderSec + asymSec)
     : 0;
+  const weeklyScreenSec: number | null = weekly ? toFiniteNumber(weekly.totalDetectionSec) : null;
+  const weeklyGoodSec: number | null = weekly ? toFiniteNumber(weekly.goodPostureSec) : null;
+  const weeklyRiskPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.riskPercent))) : 0;
+  const unclassifiedSec: number | null = weekly ? toFiniteNumber(weekly.unclassifiedSec) : null;
+  const weeklyGoodPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.goodPostureRatio) * 100)) : 0;
 
   // 주간 선형 차트 값
   const mondayKST = getMondayKST();
@@ -742,11 +482,13 @@ export default function DashboardPage() {
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
     const isFuture = dateKey > todayKST;
     const day = isFuture ? undefined : weekly?.days.find((item) => item.date === dateKey);
+    const hasData = !isFuture && Boolean(day?.hasData);
     return {
       date: dateKey,
       isFuture,
-      badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
-      hasDetectionData: Boolean(day),
+      hasData,
+      badPostureRatio: hasData && day ? toFiniteNumber(day.badPostureRatio) : null,
+      hasDetectionData: hasData,
       totalDetectionSec: day ? toFiniteNumber(day.totalDetectionSec) : 0,
       goodPostureSec: day ? toFiniteNumber(day.goodPostureSec) : 0,
       unclassifiedSec: day ? toFiniteNumber(day.unclassifiedSec) : 0,
@@ -758,16 +500,18 @@ export default function DashboardPage() {
     };
   });
   const weeklyBadValues = weeklyDays.map((d) =>
-    !d.hasDetectionData || d.badPostureRatio === null
+    !d.hasData || d.badPostureRatio === null
       ? null
       : clampPercent(d.badPostureRatio * 100),
   );
-  const weeklyDateRangeLabel = `${formatMonthDay(mondayKST)}~${formatMonthDay(todayKST)}`;
+  const weeklyDateRangeLabel = weekly?.from && weekly?.to
+    ? `${formatMonthDay(weekly.from)}~${formatMonthDay(weekly.to)}`
+    : `${formatMonthDay(mondayKST)}~${formatMonthDay(todayKST)}`;
   const weeklyAvgBadPct = weeklyRiskPct;
   const worstWeekday =
     weekly?.worstWeekday ||
     weeklyDays.reduce<{ index: number; value: number } | null>((worst, day, index) => {
-      if (day.badPostureRatio === null) return worst;
+      if (!day.hasData || day.badPostureRatio === null) return worst;
       const value = day.badPostureRatio;
       return !worst || value > worst.value ? { index, value } : worst;
     }, null);
@@ -814,7 +558,18 @@ export default function DashboardPage() {
     : "자세 데이터 수집 중...";
 
   if (!me) {
-    return <div className="min-h-dvh bg-zinc-50" aria-label="대시보드 불러오는 중" />;
+    return (
+      <div className="min-h-dvh bg-zinc-50 px-3 py-2 sm:px-4 sm:py-3">
+        <div className="mx-auto max-w-[1600px]">
+          <div className="mb-2 h-6 w-40 animate-pulse rounded-full bg-zinc-100" />
+          <div className="grid grid-cols-12 gap-2">
+            {[3, 5, 4, 2, 6, 4, 3, 9].map((span, i) => (
+              <div key={i} className={`col-span-12 h-44 animate-pulse rounded-2xl bg-zinc-100 sm:col-span-6 lg:col-span-${span}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -835,7 +590,8 @@ export default function DashboardPage() {
         )}
         {me.settings.pushEnabled && notificationPermission === "denied" && (
           <div className="mb-2 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            브라우저에서 알림이 차단되어 있습니다. 주소창 왼쪽 사이트 설정에서 알림을 허용해주세요.
+            <span className="font-semibold">알림이 차단되어 있습니다.</span>
+            {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
         {/* Top badge */}
@@ -1092,15 +848,19 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-5 flex items-stretch gap-3">
-              {/* 좌측: 자세 이슈 측정 수 */}
+              {/* 좌측: 오늘 감지 시간 또는 자세 측정 수 */}
               <div className="flex shrink-0 flex-col justify-between">
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold text-zinc-900">
-                    {measuredPostureCount}
+                    {hasDailyDurationData
+                      ? formatDuration(slots.reduce((s, sl) => s + sl.totalDetectionSec, 0))
+                      : measuredPostureCount}
                   </span>
-                  <span className="text-[10px] text-zinc-500">건</span>
+                  {!hasDailyDurationData && <span className="text-[10px] text-zinc-500">건</span>}
                 </div>
-                <div className="translate-y-1 text-[9px] text-zinc-400">자세 측정</div>
+                <div className="translate-y-1 text-[9px] text-zinc-400">
+                  {hasDailyDurationData ? "오늘 감지" : "자세 측정"}
+                </div>
               </div>
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
@@ -1282,7 +1042,7 @@ export default function DashboardPage() {
                 <div className="text-xs font-bold text-zinc-900">이번 주 누적 스크린타임</div>
               </div>
               <div className="rounded-full bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
-                {weeklyDateRangeLabel} 누적
+                {weeklyDateRangeLabel} · 오늘까지
               </div>
             </div>
 
@@ -1307,15 +1067,25 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-1.5 space-y-0.5">
                   <div className="px-0.5 text-[8px] leading-tight text-zinc-400">자세 경고 유형별 비중</div>
-                  <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
-                  <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
-                  <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
+                  {weekly === null ? (
+                    <div className="space-y-1 py-1">
+                      {[1,2,3].map((k) => <div key={k} className="h-8 animate-pulse rounded-lg bg-zinc-100" />)}
+                    </div>
+                  ) : badPostureSec === 0 ? (
+                    <div className="flex items-center justify-center py-3 text-[9px] text-zinc-400">이번 주 자세 경고 데이터가 없습니다</div>
+                  ) : (
+                    <>
+                      <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
+                      <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
+                      <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="flex min-h-0 flex-col rounded-xl px-2.5 py-1.5 ring-1 ring-zinc-100">
                 <div className="mb-1 flex items-center justify-between">
-                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 비율 <span className="font-normal text-zinc-400">(숫자: 경고 비율)</span></div>
+                  <div className="text-[9px] font-semibold text-zinc-500">요일별 자세 시간 구성 <span className="font-normal text-zinc-400">(상단 숫자: 해당 요일의 자세 경고 시간 비율)</span></div>
                   <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[8px] text-zinc-400">
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />정상</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
@@ -1328,7 +1098,12 @@ export default function DashboardPage() {
                   const values = weeklyBadValues;
                   const dayLabels = WEEK_LABELS;
                   return (
-                    <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-2">
+                    <div className="relative grid min-h-0 flex-1 grid-cols-7 items-stretch gap-2">
+                      {weekly !== null && !weeklyDays.some(d => d.hasData) && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <span className="rounded-full bg-zinc-50/90 px-2 py-1 text-[9px] text-zinc-400">이번 주 감지 데이터가 아직 없습니다</span>
+                        </div>
+                      )}
                       {values.map((value, i) => {
                         const isFuture = weeklyDays[i]?.isFuture;
                         const hasValue = value !== null;
@@ -1371,7 +1146,7 @@ export default function DashboardPage() {
                         return (
                           <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5 px-7">
                             <div className="h-3 text-[8px] font-semibold leading-none text-zinc-400">
-                              {hasValue && !isFuture ? `${Math.round(value)}%` : ""}
+                              {hasValue && !isFuture ? `경고 ${Math.round(value)}%` : ""}
                             </div>
                             <div className="flex w-full flex-1 flex-col-reverse overflow-hidden rounded-sm bg-zinc-100">
                               {isFuture ? null : !hasValue ? (

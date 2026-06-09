@@ -602,9 +602,13 @@ export type WeeklyDashboard = {
   to: string;
   days: {
     date: string;
+    weekday?: string;
+    hasData: boolean;
     badPostureRatio: number;
+    goodPostureRatio: number;
     totalDetectionSec: number;
     goodPostureSec: number;
+    badPostureSec: number;
     unclassifiedSec: number;
     hasExplicitGoodPostureData: boolean;
     turtleNeckSec: number;
@@ -614,11 +618,14 @@ export type WeeklyDashboard = {
   }[];
   totalDetectionSec: number;
   goodPostureSec: number;
+  badPostureSec: number;
+  unclassifiedSec: number;
   turtleNeckTotalSec: number;
   roundShoulderTotalSec: number;
   shoulderAsymmetryTotalSec: number;
   darkEnvTotalSec: number;
   goodPostureRatio: number;
+  riskPercent: number;
   worstWeekday: string | null;
 };
 
@@ -679,6 +686,7 @@ type RawDailyDashboard = RawDailyDashboardSlot & {
 export type TimelineDashboard = {
   date: string;
   buckets: {
+    eventId?: string;
     // 신 API: time 문자열 / 구 API: startHour + startMin
     time?: string;
     startHour?: number;
@@ -686,6 +694,8 @@ export type TimelineDashboard = {
     dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV";
     message?: string;
     healthScore?: number;
+    detectedAt?: string;
+    source?: DetectionSessionSource;
   }[];
 };
 
@@ -700,13 +710,20 @@ export type DetectionState =
 export type DetectionSession = {
   sessionId: string;
   startedAt: string;
+  status?: "RUNNING" | "PAUSED";
+  source?: DetectionSessionSource;
+  pausedAt?: string | null;
+  totalPausedSec?: number;
 };
 
+export type DetectionSessionSource = "WEB" | "EXTENSION";
+
 export type DetectionSessionEvent = {
-  type: DetectionState;
-  severity: number;
-  durationSec: number;
-  detectedAt: string;
+  eventId: string;
+  state: DetectionState;
+  startedAt: string;
+  endedAt: string;
+  source: DetectionSessionSource;
 };
 
 export function getDashboardToday() {
@@ -756,7 +773,6 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
 
   const days = rawDays
     .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
-    .filter((day) => ("hasData" in day ? (day as { hasData?: unknown }).hasData !== false : true))
     .map((day) => {
       const turtleNeckSec = n(["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"], day);
       const roundShoulderSec = n(["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"], day);
@@ -804,11 +820,21 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       const unclassifiedSec = explicitUnclassifiedSec > 0
         ? explicitUnclassifiedSec
         : Math.max(0, totalDetectionSec - goodPostureSec - badSec - darkEnvSec);
+      const hasData = typeof day.hasData === "boolean" ? day.hasData : totalDetectionSec > 0 || badSec > 0;
+      const weekday = typeof day.weekday === "string" ? day.weekday : undefined;
+      const rawGoodRatioDay = day.goodPostureRatio ?? day.good_posture_ratio;
+      const goodPostureRatioDay = rawGoodRatioDay !== undefined && rawGoodRatioDay !== null
+        ? normalizeRatio(rawGoodRatioDay as number | string)
+        : 1 - badPostureRatio;
       return {
         date: typeof day.date === "string" ? day.date : "",
+        weekday,
+        hasData,
         badPostureRatio,
+        goodPostureRatio: goodPostureRatioDay,
         totalDetectionSec,
         goodPostureSec,
+        badPostureSec: badSec,
         unclassifiedSec,
         hasExplicitGoodPostureData,
         turtleNeckSec,
@@ -894,6 +920,12 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     explicitGoodSec > 0
       ? explicitGoodSec
       : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
+  const unclassifiedSec = n([
+    "unclassifiedSec",
+    "unclassifiedTotalSec",
+    "unclassified_sec",
+    "unclassified_total_sec",
+  ]);
 
   // 신 API: weekStartDate/weekEndDate / 구 API: from/to
   const from =
@@ -911,11 +943,18 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     days,
     totalDetectionSec,
     goodPostureSec: goodPostureSecNormalized,
+    badPostureSec: n(["badPostureSec", "bad_posture_sec"]) || badSec,
+    unclassifiedSec,
     turtleNeckTotalSec: turtleSec,
     roundShoulderTotalSec: finalRound,
     shoulderAsymmetryTotalSec: finalAsym,
     darkEnvTotalSec: darkSec,
     goodPostureRatio: normalizedGoodPostureRatio,
+    riskPercent: Number.isFinite(rawRiskPct)
+      ? Math.max(0, Math.min(100, rawRiskPct))
+      : totalDetectionSec > 0
+      ? Math.max(0, Math.min(100, (badSec / totalDetectionSec) * 100))
+      : 0,
     worstWeekday:
       typeof raw.worstWeekday === "string" ? raw.worstWeekday
       : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string)
@@ -1052,8 +1091,9 @@ function normalizeDailyDashboard(
   return rawSlots.map((slot) => normalizeDailyDashboardSlot(slot, raw));
 }
 
-export function getDashboardDaily() {
-  return request<RawDailyDashboard | RawDailyDashboardSlot[]>("/dashboard/daily", { method: "GET" }, true)
+export function getDashboardDaily(date?: string) {
+  const url = "/dashboard/daily" + (date ? "?date=" + encodeURIComponent(date) : "");
+  return request<RawDailyDashboard | RawDailyDashboardSlot[]>(url, { method: "GET" }, true)
     .then(normalizeDailyDashboard);
 }
 
@@ -1061,10 +1101,13 @@ export function getDashboardTimeline(date: string) {
   return request<TimelineDashboard>(`/dashboard/timeline?date=${date}`, { method: "GET" }, true);
 }
 
-export function startDetectionSession(startedAt = new Date().toISOString()) {
+export function startDetectionSession(
+  startedAt = new Date().toISOString(),
+  source: DetectionSessionSource = "WEB",
+) {
   return request<DetectionSession>(
     "/sessions",
-    { method: "POST", body: JSON.stringify({ startedAt }) },
+    { method: "POST", body: JSON.stringify({ startedAt, source }) },
     true,
   );
 }
@@ -1118,8 +1161,24 @@ export function endDetectionSession(sessionId: string, endedAt = new Date().toIS
   );
 }
 
+export function pauseDetectionSession(sessionId: string, pausedAt = new Date().toISOString()) {
+  return request<DetectionSession>(
+    `/sessions/${sessionId}/pause`,
+    { method: "POST", body: JSON.stringify({ pausedAt }) },
+    true,
+  );
+}
+
+export function resumeDetectionSession(sessionId: string, resumedAt = new Date().toISOString()) {
+  return request<DetectionSession>(
+    `/sessions/${sessionId}/resume`,
+    { method: "POST", body: JSON.stringify({ resumedAt }) },
+    true,
+  );
+}
+
 export function postSessionEvents(sessionId: string, events: DetectionSessionEvent[]) {
-  return request<{ accepted: number }>(
+  return request<{ accepted: number; duplicated?: number }>(
     `/sessions/${sessionId}/events`,
     { method: "POST", body: JSON.stringify({ events }) },
     true,
