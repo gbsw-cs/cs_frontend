@@ -943,7 +943,8 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
   const unclassifiedSec =
     n(["unclassifiedSec", "unclassifiedTotalSec", "unclassified_sec", "unclassified_total_sec"]) ||
-    summedUnclassifiedSec;
+    summedUnclassifiedSec ||
+    Math.max(0, totalDetectionSec - goodPostureSecNormalized - badSec - darkSec);
 
   // 신 API: weekStartDate/weekEndDate / 구 API: from/to
   const from =
