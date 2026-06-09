@@ -317,8 +317,13 @@ export default function DashboardPage() {
       }
       if (t.status === "fulfilled") setToday(t.value);
       else if (getRequestErrorStatus(t.reason) < 429) console.error("[dashboard] today 실패:", t.reason);
-      if (w.status === "fulfilled") setWeekly(w.value);
-      else if (getRequestErrorStatus(w.reason) < 429) console.error("[dashboard] weekly 실패:", w.reason);
+      if (w.status === "fulfilled") {
+        setWeekly(w.value);
+        setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+        if (lastLiveDetectionRef.current) {
+          lastLiveDetectionRef.current = { ...lastLiveDetectionRef.current, at: Date.now() };
+        }
+      } else if (getRequestErrorStatus(w.reason) < 429) console.error("[dashboard] weekly 실패:", w.reason);
       if (d.status === "fulfilled") {
         const previousServerSlots = serverDailySlotsRef.current;
         const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
