@@ -835,8 +835,13 @@ function postTimeline(rawState: string, message: string): void {
   apiCall("/dashboard/timeline", {
     method: "POST",
     body: JSON.stringify({ date, time, dominantState, message: message ?? "", eventId: crypto.randomUUID() }),
-  }).then(() => {
+  }).then(async () => {
     debugLog(`[timeline] 저장 성공: ${dominantState}`)
+    // 대시보드 탭에 타임라인 갱신 신호 전송
+    const tabs = await chrome.tabs.query({ url: `${WEB_URL}/dashboard*` }).catch(() => [] as chrome.tabs.Tab[])
+    tabs.forEach((tab) => {
+      if (tab.id) chrome.tabs.sendMessage(tab.id, { type: "TIMELINE_POSTED" }).catch(() => {})
+    })
   }).catch((e: ApiError) => {
     console.error(
       `[timeline] 저장 실패 [${dominantState}]:`,

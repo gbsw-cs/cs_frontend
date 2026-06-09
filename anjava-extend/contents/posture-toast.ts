@@ -334,11 +334,16 @@ if (window[LISTENER_KEY]) {
   chrome.runtime.onMessage.removeListener(window[LISTENER_KEY])
 }
 
-const toastListener = (msg: PostureAlertMessage) => {
+const toastListener = (msg: PostureAlertMessage | { type: string }) => {
+  if (msg.type === "TIMELINE_POSTED") {
+    window.postMessage({ type: "ANJAVA_TIMELINE_POSTED" }, "*")
+    return
+  }
   if (msg.type !== "POSTURE_ALERT") return
-  const isGood = msg.state === "GOOD_POSTURE"
-  const text = (msg.state && TOAST_MESSAGES[msg.state]) || msg.message || "자세를 확인해주세요."
-  showToast(text, msg.state, isGood, msg.soundEnabled !== false)
+  const m = msg as PostureAlertMessage
+  const isGood = m.state === "GOOD_POSTURE"
+  const text = (m.state && TOAST_MESSAGES[m.state]) || m.message || "자세를 확인해주세요."
+  showToast(text, m.state, isGood, m.soundEnabled !== false)
 }
 
 window[LISTENER_KEY] = toastListener

@@ -277,6 +277,15 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  // 확장 프로그램이 타임라인을 저장하면 content script가 ANJAVA_TIMELINE_POSTED를 릴레이
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "ANJAVA_TIMELINE_POSTED") refreshTimeline();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [refreshTimeline]);
+
   const handleSessionActiveChange = useCallback((active: boolean, reason?: "paused" | "stopped") => {
     sessionActiveRef.current = active;
     sessionStateChangedAtRef.current = Date.now();
