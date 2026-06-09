@@ -261,6 +261,10 @@ export default function WebcamView({
       const status = e && typeof e === "object" && "status" in e
         ? Number((e as { status?: unknown }).status)
         : 0;
+      if (status === 401) {
+        onAuthenticationExpiredRef.current?.();
+        return;
+      }
       if (status === 404 || status === 409) {
         sessionIdRef.current = null;
         lastBackendStateRef.current = null;
