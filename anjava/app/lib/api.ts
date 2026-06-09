@@ -537,6 +537,38 @@ export function resendReport(id: string) {
   );
 }
 
+export type WeeklyReportSummary = {
+  reportId: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  weekNumber: number;
+  status: ReportStatus;
+  sentAt: string | null;
+  deliveryWay: "EMAIL" | "NOTION";
+  totalDetectionSec: number;
+  goodPostureSec: number;
+  badPostureSec: number;
+  riskPercent: number;
+  goodPostureRatio: number;
+  healthScore: {
+    weekly: number | null;
+    daily: (number | null)[];
+  } | null;
+  topIssues: ReportTopIssue[];
+  aiSolution: string | null;
+  aiAnalyzedAt: string | null;
+};
+
+export function getReportsSummary(week?: number, limit = 10) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (week !== undefined) params.set("week", String(week));
+  return request<{ items: WeeklyReportSummary[] }>(
+    `/reports/summary?${params.toString()}`,
+    { method: "GET" },
+    true,
+  );
+}
+
 // ── Dashboard ──────────────────────────────────────────────
 
 export type TodayDashboard = {
