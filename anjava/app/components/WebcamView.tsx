@@ -32,6 +32,7 @@ type WebcamViewProps = {
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
   onSessionActiveChange?: (active: boolean) => void;
   onDashboardDataChanged?: () => void;
+  onAuthenticationExpired?: () => void;
 };
 
 const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
@@ -114,29 +115,6 @@ function getErrorStatus(error: unknown) {
   return error && typeof error === "object" && "status" in error
     ? Number((error as { status?: unknown }).status)
     : 0;
-}
-
-function findDetectedLabels(value: unknown, prefix = ""): string[] {
-  if (!value || typeof value !== "object") return [];
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => findDetectedLabels(item, `${prefix}${index}.`));
-  }
-
-  return Object.entries(value).flatMap(([key, child]) => {
-    const path = `${prefix}${key}`;
-    if (
-      typeof child === "boolean" &&
-      child &&
-      !["success", "ok", "valid"].includes(key.toLowerCase())
-    ) {
-      return [path];
-    }
-    if (typeof child === "object" && child !== null) {
-      return findDetectedLabels(child, `${path}.`);
-    }
-    return [];
-  });
 }
 
 const POSTURE_MESSAGES: Record<string, string> = {
@@ -250,6 +228,7 @@ export default function WebcamView({
   onDetectionStateChange,
   onSessionActiveChange,
   onDashboardDataChanged,
+  onAuthenticationExpired,
 }: WebcamViewProps) {
   const webcamRef = useRef<Webcam>(null);
   const analyzingRef = useRef(false);
@@ -264,6 +243,7 @@ export default function WebcamView({
   const onDetectionStateChangeRef = useRef(onDetectionStateChange);
   const onSessionActiveChangeRef = useRef(onSessionActiveChange);
   const onDashboardDataChangedRef = useRef(onDashboardDataChanged);
+  const onAuthenticationExpiredRef = useRef(onAuthenticationExpired);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -274,7 +254,6 @@ export default function WebcamView({
     const events = eventQueueRef.current.splice(0, 100);
     try {
       await postSessionEvents(sessionId, events);
-      onDashboardDataChangedRef.current?.();
     } catch (e) {
       eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
       const status = e && typeof e === "object" && "status" in e
@@ -293,7 +272,8 @@ export default function WebcamView({
     onDetectionStateChangeRef.current = onDetectionStateChange;
     onSessionActiveChangeRef.current = onSessionActiveChange;
     onDashboardDataChangedRef.current = onDashboardDataChanged;
-  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged]);
+    onAuthenticationExpiredRef.current = onAuthenticationExpired;
+  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged, onAuthenticationExpired]);
 
   useEffect(() => {
     const allowBackgroundAlert = () => {
@@ -342,7 +322,9 @@ export default function WebcamView({
         if (!cancelled) {
           onSessionActiveChangeRef.current?.(false);
           const status = getErrorStatus(error);
-          if (status === 429 || status >= 500) {
+          if (status === 401) {
+            onAuthenticationExpiredRef.current?.();
+          } else if (status === 429 || status >= 500) {
             sessionRetryTimer = window.setTimeout(
               startSessionResolution,
               status === 429 ? 65_000 : 25_000,
@@ -448,10 +430,12 @@ export default function WebcamView({
             time,
             dominantState: nextState,
             message,
-          }).then(() => {
-            onDashboardDataChangedRef.current?.();
           }).catch((e) => {
-            console.error("Dashboard timeline upload failed", e);
+            if (getErrorStatus(e) === 401) {
+              onAuthenticationExpiredRef.current?.();
+            } else {
+              console.error("Dashboard timeline upload failed", e);
+            }
           });
         }
       }
@@ -537,10 +521,6 @@ export default function WebcamView({
         const finalStatus: string = result?.data?.final_status ?? "";
         const backendState = toBackendState(finalStatus);
         const msg = POSTURE_MESSAGES[finalStatus] ?? BACKEND_STATE_MESSAGES[backendState] ?? "";
-        const detectedLabels = findDetectedLabels(result);
-        if (detectedLabels.length > 0) {
-          console.log("자세 감지됨", detectedLabels);
-        }
         // 웹이 활성 상태면 페이지 toast를 우선하고, 백그라운드에서는 웹이 직접
         // 시스템 알림을 표시해 확장 프로그램의 실행 상태에 의존하지 않는다.
         if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {

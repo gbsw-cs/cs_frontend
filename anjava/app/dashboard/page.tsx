@@ -26,7 +26,6 @@ import {
   getDashboardWeekly,
   getDashboardDaily,
   getDashboardTimeline,
-  getCurrentDetectionSession,
   type Me,
   type TodayDashboard,
   type WeeklyDashboard,
@@ -116,10 +115,6 @@ function firstFiniteNumber(...values: unknown[]): number | null {
 
 function isUnauthorizedError(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 401);
-}
-
-function isMissingSessionError(value: unknown): boolean {
-  return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 404);
 }
 
 function getRequestErrorStatus(value: unknown): number {
@@ -286,7 +281,6 @@ export default function DashboardPage() {
     dashboardRequestInFlightRef.current = true;
     const date = getKSTDate();
     const monday = getMondayKST();
-    const sessionCheckStartedAt = Date.now();
     if (realtimeDateRef.current !== date) {
       realtimeDateRef.current = date;
       serverDailySlotsRef.current = createEmptyDailySlots();
@@ -295,27 +289,6 @@ export default function DashboardPage() {
     }
 
     try {
-      const session = await getCurrentDetectionSession().then(
-        (value) => ({ status: "fulfilled" as const, value }),
-        (reason: unknown) => ({ status: "rejected" as const, reason }),
-      );
-      if (session.status === "rejected" && isUnauthorizedError(session.reason)) {
-        if (pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
-        clearTokens();
-        router.replace("/login");
-        return;
-      }
-      if (session.status === "rejected") {
-        const status = getRequestErrorStatus(session.reason);
-        if (status === 429 || status >= 500) {
-          dashboardBackoffUntilRef.current = Date.now() + (status === 429 ? 60_000 : 20_000);
-          return;
-        }
-      }
-
       const [t, w, d, tl] = await Promise.allSettled([
         getDashboardToday(),
         getDashboardWeekly(monday),
@@ -353,16 +326,6 @@ export default function DashboardPage() {
       } else if (getRequestErrorStatus(d.reason) < 429) console.error("[dashboard] daily 실패:", d.reason);
       if (tl.status === "fulfilled") setTimeline(tl.value);
       else if (getRequestErrorStatus(tl.reason) < 429) console.error("[dashboard] timeline 실패:", tl.reason);
-      if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
-        const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
-        if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
-        sessionActiveRef.current = active;
-        sessionStateChangedAtRef.current = Date.now();
-        if (!active) {
-          lastLiveDetectionRef.current = null;
-          setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
-        }
-      }
     } finally {
       dashboardRequestInFlightRef.current = false;
     }
@@ -370,7 +333,7 @@ export default function DashboardPage() {
 
   const refreshDashboardDataSoon = useCallback(() => {
     const now = Date.now();
-    if (now - refreshCooldownRef.current < 15_000) return;
+    if (now - refreshCooldownRef.current < 60_000) return;
     refreshCooldownRef.current = now;
     void loadDashboardData();
   }, [loadDashboardData]);
@@ -428,7 +391,7 @@ export default function DashboardPage() {
           if (!cancelled) setBadges(b.slice(0, 3));
         }).catch(() => {});
         void loadDashboardData();
-        pollRef.current = setInterval(loadDashboardData, 30_000);
+        pollRef.current = setInterval(loadDashboardData, 120_000);
       })
       .catch(() => {
         if (cancelled) return;
@@ -818,6 +781,10 @@ export default function DashboardPage() {
                     lastLiveDetectionRef.current = null;
                     setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
                   }
+                }}
+                onAuthenticationExpired={() => {
+                  clearTokens();
+                  router.replace("/login");
                 }}
                 onDetectionStateChange={(state, message) => {
                   const now = Date.now();
