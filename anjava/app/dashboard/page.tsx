@@ -151,17 +151,29 @@ function createEmptyDailySlots(): DailySlot[] {
   }));
 }
 
-function toDailySlots(daily: DailyDashboard | null): DailySlot[] {
+function toDailySlots(daily: DailyDashboard[] | null): DailySlot[] {
   const slots = createEmptyDailySlots();
   if (!daily) return slots;
-  const slotIndex = Math.max(0, Math.min(7, Math.trunc(toFiniteNumber(daily.slotIndex))));
-  slots[slotIndex] = {
-    slotIndex,
-    startHour: toFiniteNumber(daily.startHour, slotIndex * 3),
-    goodPostureCount: toFiniteNumber(daily.goodPostureCount),
-    singleBadCount: toFiniteNumber(daily.singleBadCount),
-    overlappingCount: toFiniteNumber(daily.overlappingCount),
-  };
+  daily.forEach((item) => {
+    const slotIndex = Math.max(0, Math.min(7, Math.trunc(toFiniteNumber(item.slotIndex))));
+    const previous = slots[slotIndex];
+    slots[slotIndex] = {
+      slotIndex,
+      startHour: toFiniteNumber(item.startHour, slotIndex * 3),
+      goodPostureCount: Math.max(
+        toFiniteNumber(previous.goodPostureCount),
+        toFiniteNumber(item.goodPostureCount),
+      ),
+      singleBadCount: Math.max(
+        toFiniteNumber(previous.singleBadCount),
+        toFiniteNumber(item.singleBadCount),
+      ),
+      overlappingCount: Math.max(
+        toFiniteNumber(previous.overlappingCount),
+        toFiniteNumber(item.overlappingCount),
+      ),
+    };
+  });
   return slots;
 }
 

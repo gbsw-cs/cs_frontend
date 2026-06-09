@@ -639,6 +639,7 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
 
 type RawDailyDashboard = RawDailyDashboardSlot & {
   slots?: RawDailyDashboardSlot[];
+  dailyStats?: RawDailyDashboardSlot[];
 };
 
 export type TimelineDashboard = {
@@ -866,21 +867,27 @@ export function getDashboardWeekly(from: string) {
     .then(normalizeWeeklyDashboard);
 }
 
-function normalizeDailyDashboard(raw: RawDailyDashboard): DailyDashboard {
-  const source = Array.isArray(raw.slots) ? raw.slots[0] ?? raw : raw;
+function normalizeDailyDashboardSlot(
+  source: RawDailyDashboardSlot,
+  fallback: RawDailyDashboard,
+): DailyDashboard {
   const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
-  const turtleNeckCount = toApiNumber(source.turtleNeckCount ?? raw.turtleNeckCount);
-  const roundShoulderCount = toApiNumber(source.roundShoulderCount ?? raw.roundShoulderCount);
-  const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount ?? raw.shoulderAsymmetryCount);
-  const shoulderIssueCount = toApiNumber(source.shoulderIssueCount ?? raw.shoulderIssueCount);
-  const darkEnvCount = toApiNumber(source.darkEnvCount ?? raw.darkEnvCount);
+  const turtleNeckCount = toApiNumber(source.turtleNeckCount);
+  const roundShoulderCount = toApiNumber(source.roundShoulderCount);
+  const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount);
+  const shoulderIssueCount = toApiNumber(source.shoulderIssueCount);
+  const darkEnvCount = toApiNumber(source.darkEnvCount);
   const singleBadCount =
     source.singleBadCount !== undefined
       ? toApiNumber(source.singleBadCount)
       : turtleNeckCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
 
   return {
-    date: typeof source.date === "string" ? source.date : "",
+    date: typeof source.date === "string"
+      ? source.date
+      : typeof fallback.date === "string"
+      ? fallback.date
+      : "",
     slotIndex,
     startHour: toApiNumber(source.startHour, slotIndex * 3),
     endHour: toApiNumber(source.endHour, slotIndex * 3 + 3),
@@ -890,8 +897,23 @@ function normalizeDailyDashboard(raw: RawDailyDashboard): DailyDashboard {
   };
 }
 
+function normalizeDailyDashboard(
+  response: RawDailyDashboard | RawDailyDashboardSlot[],
+): DailyDashboard[] {
+  const raw: RawDailyDashboard = Array.isArray(response) ? {} : response;
+  const rawSlots = Array.isArray(raw.slots)
+    ? raw.slots
+    : Array.isArray(raw.dailyStats)
+    ? raw.dailyStats
+    : Array.isArray(response)
+    ? response
+    : [raw];
+
+  return rawSlots.map((slot) => normalizeDailyDashboardSlot(slot, raw));
+}
+
 export function getDashboardDaily() {
-  return request<RawDailyDashboard>("/dashboard/daily", { method: "GET" }, true)
+  return request<RawDailyDashboard | RawDailyDashboardSlot[]>("/dashboard/daily", { method: "GET" }, true)
     .then(normalizeDailyDashboard);
 }
 
