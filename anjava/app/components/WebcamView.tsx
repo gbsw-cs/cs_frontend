@@ -312,6 +312,7 @@ export default function WebcamView({
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    let sessionRetryTimer: number | null = null;
 
     const assignSession = (session: { sessionId: string } | null) => {
       if (cancelled || !session?.sessionId) return false;
@@ -337,12 +338,21 @@ export default function WebcamView({
       }
     };
 
-    void resolveSession().catch((error) => {
+    const startSessionResolution = () => void resolveSession().catch((error) => {
         if (!cancelled) {
           onSessionActiveChangeRef.current?.(false);
-          console.error("Detection session resolution failed", error);
+          const status = getErrorStatus(error);
+          if (status === 429 || status >= 500) {
+            sessionRetryTimer = window.setTimeout(
+              startSessionResolution,
+              status === 429 ? 65_000 : 25_000,
+            );
+          } else {
+            console.error("Detection session resolution failed", error);
+          }
         }
       });
+    startSessionResolution();
 
     async function flushEvents() {
       const sessionId = sessionIdRef.current;
@@ -364,6 +374,7 @@ export default function WebcamView({
     const flushInterval = window.setInterval(flushEvents, EVENT_FLUSH_INTERVAL_MS);
     return () => {
       cancelled = true;
+      if (sessionRetryTimer !== null) window.clearTimeout(sessionRetryTimer);
       window.clearInterval(flushInterval);
       const previous = lastBackendStateRef.current;
       if (previous) {

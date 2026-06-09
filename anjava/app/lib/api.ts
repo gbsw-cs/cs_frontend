@@ -256,6 +256,8 @@ async function rawRequest<T>(
 }
 
 let refreshing: Promise<Tokens> | null = null;
+let currentSessionRequest: Promise<DetectionSession | null> | null = null;
+let currentSessionBackoffUntil = 0;
 
 async function request<T>(
   path: string,
@@ -816,11 +818,31 @@ export function startDetectionSession(startedAt = new Date().toISOString()) {
 }
 
 export function getCurrentDetectionSession() {
-  return request<DetectionSession | null>(
+  if (Date.now() < currentSessionBackoffUntil) {
+    const error = new Error("세션 조회 요청을 잠시 후 다시 시도해주세요.") as Error & {
+      status?: number;
+    };
+    error.status = 429;
+    return Promise.reject(error);
+  }
+  if (currentSessionRequest) return currentSessionRequest;
+
+  currentSessionRequest = request<DetectionSession | null>(
     "/sessions/current",
     { method: "GET" },
     true,
-  );
+  ).catch((error: unknown) => {
+    const status = error && typeof error === "object" && "status" in error
+      ? Number((error as { status?: unknown }).status)
+      : 0;
+    if (status === 429) currentSessionBackoffUntil = Date.now() + 60_000;
+    else if (status >= 500) currentSessionBackoffUntil = Date.now() + 20_000;
+    throw error;
+  }).finally(() => {
+    currentSessionRequest = null;
+  });
+
+  return currentSessionRequest;
 }
 
 export function endDetectionSession(sessionId: string, endedAt = new Date().toISOString()) {
