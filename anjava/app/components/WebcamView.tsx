@@ -7,6 +7,7 @@ import {
   endDetectionSession,
   getCurrentDetectionSession,
   pauseDetectionSession,
+  postDashboardTimeline,
   postSessionSegments,
   resumeDetectionSession,
   startDetectionSession,
@@ -526,6 +527,15 @@ export default function WebcamView({
       if (previous !== nextState) {
         stateStartRef.current = now;
         lastBackendStateRef.current = nextState;
+        // 상태 변경 시 타임라인 기록 (경고 발생 또는 정자세 복귀)
+        const isBadState = nextState !== "GOOD_POSTURE";
+        const isRecovery = nextState === "GOOD_POSTURE" && Boolean(previous) && previous !== "GOOD_POSTURE";
+        if (isBadState || isRecovery) {
+          const d = new Date();
+          const date = d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+          const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" });
+          void postDashboardTimeline({ date, time, dominantState: nextState, message: message ?? "", eventId: crypto.randomUUID() }).catch(() => {});
+        }
       }
       onDetectionStateChangeRef.current?.(nextState, message);
     }
