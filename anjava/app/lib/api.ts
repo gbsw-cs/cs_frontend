@@ -269,16 +269,16 @@ async function request<T>(
   } catch (e) {
     const err = e as Error & { status?: number };
     if (auth && err.status === 401 && getRefreshToken()) {
+      if (!refreshing) {
+        refreshing = refresh().finally(() => { refreshing = null; });
+      }
       try {
-        refreshing = refreshing ?? refresh();
         const tokens = await refreshing;
         saveTokens(tokens);
         return await rawRequest<T>(path, init, true);
       } catch {
         clearTokens();
         throw err;
-      } finally {
-        refreshing = null;
       }
     }
     throw err;

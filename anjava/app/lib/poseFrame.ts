@@ -82,7 +82,7 @@ export function captureBrightness(video: HTMLVideoElement) {
 }
 
 export async function createPostureFrame(video: HTMLVideoElement): Promise<PostureFrame | null> {
-  if (!video.videoWidth || !video.videoHeight) return null;
+  if (!video.videoWidth || !video.videoHeight || video.readyState < 2) return null;
 
   const brightness = captureBrightness(video);
   let landmarks: NormalizedLandmark[] | undefined;
