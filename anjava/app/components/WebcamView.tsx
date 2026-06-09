@@ -30,10 +30,14 @@ type WebcamViewProps = {
   pushEnabled?: boolean;
   soundEnabled?: boolean;
   onDetectionStateChange?: (state: DetectionState, message: string) => void;
-  onSessionActiveChange?: (active: boolean) => void;
+  onSessionActiveChange?: (active: boolean, reason?: "paused" | "stopped") => void;
   onDashboardDataChanged?: () => void;
   onAuthenticationExpired?: () => void;
+  sessionControlState?: SessionControlState;
+  onSessionControlStateChange?: (state: SessionControlState, error?: string) => void;
 };
+
+export type SessionControlState = "checking" | "running" | "paused" | "stopped";
 
 const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
   good: "GOOD_POSTURE",
@@ -229,6 +233,8 @@ export default function WebcamView({
   onSessionActiveChange,
   onDashboardDataChanged,
   onAuthenticationExpired,
+  sessionControlState = "running",
+  onSessionControlStateChange,
 }: WebcamViewProps) {
   const webcamRef = useRef<Webcam>(null);
   const analyzingRef = useRef(false);
@@ -244,18 +250,20 @@ export default function WebcamView({
   const onSessionActiveChangeRef = useRef(onSessionActiveChange);
   const onDashboardDataChangedRef = useRef(onDashboardDataChanged);
   const onAuthenticationExpiredRef = useRef(onAuthenticationExpired);
+  const onSessionControlStateChangeRef = useRef(onSessionControlStateChange);
+  const sessionOperationRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
-
-  const scheduleSessionRecoveryRef = useRef<((delayMs: number) => void) | null>(null);
 
   const flushQueuedEvents = useCallback(async () => {
     const sessionId = sessionIdRef.current;
-    if (!sessionId || eventQueueRef.current.length === 0) return;
+    if (!sessionId || eventQueueRef.current.length === 0) return true;
     const events = eventQueueRef.current.splice(0, 100);
     try {
       await postSessionEvents(sessionId, events);
+      return true;
     } catch (e) {
       eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
       const status = e && typeof e === "object" && "status" in e
@@ -263,15 +271,18 @@ export default function WebcamView({
         : 0;
       if (status === 401) {
         onAuthenticationExpiredRef.current?.();
-        return;
+        return false;
       }
       if (status === 404 || status === 409) {
         sessionIdRef.current = null;
         lastBackendStateRef.current = null;
-        onSessionActiveChangeRef.current?.(false);
-        scheduleSessionRecoveryRef.current?.(5_000);
+        eventQueueRef.current = [];
+        setHasSession(false);
+        onSessionActiveChangeRef.current?.(false, "stopped");
+        onSessionControlStateChangeRef.current?.("stopped", "세션이 종료되어 감지를 중단했습니다.");
       }
       console.error("Detection events upload failed", e);
+      return false;
     }
   }, []);
 
@@ -280,7 +291,8 @@ export default function WebcamView({
     onSessionActiveChangeRef.current = onSessionActiveChange;
     onDashboardDataChangedRef.current = onDashboardDataChanged;
     onAuthenticationExpiredRef.current = onAuthenticationExpired;
-  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged, onAuthenticationExpired]);
+    onSessionControlStateChangeRef.current = onSessionControlStateChange;
+  }, [onDetectionStateChange, onSessionActiveChange, onDashboardDataChanged, onAuthenticationExpired, onSessionControlStateChange]);
 
   useEffect(() => {
     const allowBackgroundAlert = () => {
@@ -296,121 +308,136 @@ export default function WebcamView({
     };
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-    let cancelled = false;
-    let sessionRetryTimer: number | null = null;
+  const queueCurrentState = useCallback(() => {
+    const currentState = lastBackendStateRef.current;
+    if (!currentState) return;
+    const now = Date.now();
+    const durationSec = Math.round((now - stateStartRef.current) / 1000);
+    if (durationSec > 0) {
+      eventQueueRef.current.push({
+        type: currentState,
+        severity: STATE_SEVERITY[currentState],
+        durationSec,
+        detectedAt: new Date(stateStartRef.current).toISOString(),
+      });
+    }
+    stateStartRef.current = now;
+    lastBackendStateRef.current = null;
+  }, []);
 
-    const assignSession = (session: { sessionId: string } | null) => {
-      if (cancelled || !session?.sessionId) return false;
+  useEffect(() => {
+    const operation = ++sessionOperationRef.current;
+
+    async function assignSession(session: { sessionId: string } | null) {
+      if (operation !== sessionOperationRef.current || !session?.sessionId) return false;
       sessionIdRef.current = session.sessionId;
+      setHasSession(true);
       stateStartRef.current = Date.now();
       onSessionActiveChangeRef.current?.(true);
       return true;
-    };
-
-    const resolveSession = async () => {
-      try {
-        const current = await getCurrentDetectionSession();
-        if (assignSession(current)) return;
-      } catch (error) {
-        if (getErrorStatus(error) !== 404) throw error;
-      }
-
-      try {
-        assignSession(await startDetectionSession());
-      } catch (error) {
-        if (!isDuplicateSessionError(error)) throw error;
-        assignSession(await getCurrentDetectionSession());
-      }
-    };
-
-    const startSessionResolution = () => void resolveSession().catch((error) => {
-        if (!cancelled) {
-          onSessionActiveChangeRef.current?.(false);
-          const status = getErrorStatus(error);
-          if (status === 401) {
-            onAuthenticationExpiredRef.current?.();
-          } else if (status === 429 || status >= 500) {
-            sessionRetryTimer = window.setTimeout(
-              startSessionResolution,
-              status === 429 ? 65_000 : 25_000,
-            );
-          } else {
-            console.error("Detection session resolution failed", error);
-          }
-        }
-      });
-    startSessionResolution();
-
-    const scheduleSessionRecovery = (delayMs: number) => {
-      if (cancelled) return;
-      if (sessionRetryTimer !== null) window.clearTimeout(sessionRetryTimer);
-      sessionRetryTimer = window.setTimeout(() => {
-        if (!cancelled && !sessionIdRef.current) {
-          startSessionResolution();
-        }
-      }, delayMs);
-    };
-    scheduleSessionRecoveryRef.current = scheduleSessionRecovery;
-
-    async function flushEvents() {
-      const sessionId = sessionIdRef.current;
-      if (!sessionId) return;
-      const currentState = lastBackendStateRef.current;
-      if (currentState) {
-        const now = Date.now();
-        eventQueueRef.current.push({
-          type: currentState,
-          severity: STATE_SEVERITY[currentState],
-          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
-          detectedAt: new Date(stateStartRef.current).toISOString(),
-        });
-        stateStartRef.current = now;
-      }
-      await flushQueuedEvents();
     }
 
-    const flushInterval = window.setInterval(flushEvents, EVENT_FLUSH_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      scheduleSessionRecoveryRef.current = null;
-      if (sessionRetryTimer !== null) window.clearTimeout(sessionRetryTimer);
-      window.clearInterval(flushInterval);
-      const previous = lastBackendStateRef.current;
-      if (previous) {
-        const now = Date.now();
-        eventQueueRef.current.push({
-          type: previous,
-          severity: STATE_SEVERITY[previous],
-          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
-          detectedAt: new Date(stateStartRef.current).toISOString(),
-        });
+    async function resolveExistingSession() {
+      try {
+        return await getCurrentDetectionSession();
+      } catch (error) {
+        if (getErrorStatus(error) === 404) return null;
+        throw error;
       }
-      const sessionId = sessionIdRef.current;
-      const events = eventQueueRef.current.splice(0, 100);
-      sessionIdRef.current = null;
-      lastBackendStateRef.current = null;
-      onSessionActiveChangeRef.current?.(false);
-      if (sessionId) {
-        const eventsPromise = events.length > 0
-          ? postSessionEvents(sessionId, events).catch((e) => {
-              console.error("Detection events final upload failed", e);
-            })
-          : Promise.resolve();
-        void eventsPromise.finally(() => {
-          void endDetectionSession(sessionId).then(() => {
-            onDashboardDataChangedRef.current?.();
-          }).catch((e) => {
-            console.error("Detection session end failed", e);
-          });
-        });
+    }
+
+    async function applySessionControl() {
+      try {
+        if (sessionControlState === "checking") {
+          const current = await resolveExistingSession();
+          if (await assignSession(current)) {
+            onSessionControlStateChangeRef.current?.("running");
+          } else if (operation === sessionOperationRef.current) {
+            setHasSession(false);
+            onSessionActiveChangeRef.current?.(false, "stopped");
+            onSessionControlStateChangeRef.current?.("stopped");
+          }
+          return;
+        }
+
+        if (sessionControlState === "running") {
+          if (!sessionIdRef.current) {
+            const current = await resolveExistingSession();
+            if (!(await assignSession(current))) {
+              if (!ready) throw new Error("카메라가 연결된 후 세션을 시작해주세요.");
+              try {
+                await assignSession(await startDetectionSession());
+              } catch (error) {
+                if (!isDuplicateSessionError(error)) throw error;
+                await assignSession(await getCurrentDetectionSession());
+              }
+            }
+          }
+          if (operation === sessionOperationRef.current) {
+            stateStartRef.current = Date.now();
+            onSessionActiveChangeRef.current?.(true);
+            onSessionControlStateChangeRef.current?.("running");
+          }
+          return;
+        }
+
+        if (sessionControlState === "paused") {
+          if (!sessionIdRef.current) {
+            onSessionActiveChangeRef.current?.(false, "stopped");
+            onSessionControlStateChangeRef.current?.("stopped", "진행 중인 세션이 없습니다.");
+            return;
+          }
+          queueCurrentState();
+          await flushQueuedEvents();
+          if (operation === sessionOperationRef.current) {
+            onSessionActiveChangeRef.current?.(false, "paused");
+            onSessionControlStateChangeRef.current?.("paused");
+          }
+          return;
+        }
+
+        queueCurrentState();
+        const flushed = await flushQueuedEvents();
+        if (!flushed && eventQueueRef.current.length > 0) {
+          throw new Error("마지막 감지 기록을 전송하지 못했습니다. 잠시 후 종료를 다시 시도해주세요.");
+        }
+        const sessionId = sessionIdRef.current;
+        sessionIdRef.current = null;
+        setHasSession(false);
+        lastBackendStateRef.current = null;
+        if (sessionId) await endDetectionSession(sessionId);
+        if (operation === sessionOperationRef.current) {
+          onSessionActiveChangeRef.current?.(false, "stopped");
+          onSessionControlStateChangeRef.current?.("stopped");
+          onDashboardDataChangedRef.current?.();
+        }
+      } catch (error) {
+        if (operation !== sessionOperationRef.current) return;
+        const status = getErrorStatus(error);
+        if (status === 401) onAuthenticationExpiredRef.current?.();
+        const message = error instanceof Error ? error.message : "세션 상태를 변경하지 못했습니다.";
+        onSessionControlStateChangeRef.current?.(sessionIdRef.current ? "paused" : "stopped", message);
       }
-    };
-  }, [ready, flushQueuedEvents]);
+    }
+
+    void applySessionControl();
+  }, [ready, sessionControlState, flushQueuedEvents, queueCurrentState]);
 
   useEffect(() => {
     if (!ready) return;
+    const flushInterval = window.setInterval(() => {
+      if (sessionControlState !== "running" || !sessionIdRef.current) return;
+      queueCurrentState();
+      void flushQueuedEvents();
+    }, EVENT_FLUSH_INTERVAL_MS);
+    return () => window.clearInterval(flushInterval);
+  }, [ready, sessionControlState, flushQueuedEvents, queueCurrentState]);
+
+  useEffect(() => {
+    if (!ready || sessionControlState !== "running" || !hasSession) {
+      setAiStatus("idle");
+      return;
+    }
 
     async function refreshBaseline(id: string, frames: PostureFrame[]) {
       const response = await fetch("/v1/baseline/cal", {
@@ -578,7 +605,7 @@ export default function WebcamView({
     analyzeFrame();
     const interval = window.setInterval(analyzeFrame, FRAME_CAPTURE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [ready, darkDetectionEnabled, pushEnabled, soundEnabled, flushQueuedEvents]);
+  }, [ready, hasSession, sessionControlState, darkDetectionEnabled, pushEnabled, soundEnabled, flushQueuedEvents]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">
@@ -600,9 +627,13 @@ export default function WebcamView({
             screenshotQuality={0.75}
             videoConstraints={VIDEO_CONSTRAINTS}
             onUserMedia={() => setReady(true)}
-            onUserMediaError={(e) =>
-              setError(typeof e === "string" ? e : (e as Error).message)
-            }
+            onUserMediaError={(e) => {
+              const message = typeof e === "string" ? e : (e as Error).message;
+              setError(message);
+              if (!sessionIdRef.current) {
+                onSessionControlStateChangeRef.current?.("stopped", `카메라를 사용할 수 없습니다: ${message}`);
+              }
+            }}
             className="h-full w-full object-cover"
           />
           {!ready && (
@@ -612,7 +643,7 @@ export default function WebcamView({
           )}
 
           {/* LIVE 배지 */}
-          {ready && (
+          {ready && sessionControlState === "running" && (
             <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1 backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />

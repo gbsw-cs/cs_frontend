@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AvatarColored from "../components/AvatarColored";
+import type { SessionControlState } from "../components/WebcamView";
 
 const WebcamView = dynamic(() => import("../components/WebcamView"), {
   ssr: false,
@@ -338,6 +339,9 @@ export default function DashboardPage() {
   const [darkPending, setDarkPending] = useState(false);
   const [badges, setBadges] = useState<ApiBadge[]>([]);
   const [webcamVisible, setWebcamVisible] = useState(false);
+  const [sessionCommand, setSessionCommand] = useState<SessionControlState>("checking");
+  const [sessionStatus, setSessionStatus] = useState<SessionControlState>("checking");
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [liveDetection, setLiveDetection] = useState<{
     state: DetectionState;
     message: string;
@@ -431,14 +435,28 @@ export default function DashboardPage() {
     void loadDashboardData();
   }, [loadDashboardData]);
 
-  const handleSessionActiveChange = useCallback((active: boolean) => {
+  const handleSessionActiveChange = useCallback((active: boolean, reason?: "paused" | "stopped") => {
     sessionActiveRef.current = active;
     sessionStateChangedAtRef.current = Date.now();
-    if (!active) {
+    if (!active && reason === "stopped") {
       lastLiveDetectionRef.current = null;
       lastReportedDetectionStateRef.current = null;
       setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+    } else if (!active) {
+      lastLiveDetectionRef.current = null;
     }
+  }, []);
+
+  const handleSessionControlStateChange = useCallback((state: SessionControlState, error?: string) => {
+    setSessionStatus(state);
+    setSessionCommand(state);
+    setSessionError(error ?? null);
+  }, []);
+
+  const requestSessionState = useCallback((state: Exclude<SessionControlState, "checking">) => {
+    setSessionError(null);
+    setSessionStatus("checking");
+    setSessionCommand(state);
   }, []);
 
   const handleAuthenticationExpired = useCallback(() => {
@@ -922,14 +940,43 @@ export default function DashboardPage() {
           {/* 웹캠 */}
           <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-full">
             <div className="flex shrink-0 items-start justify-between">
-              <div>
+              <div className="flex items-center gap-2">
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ring-1 ${
+                  sessionStatus === "running"
+                    ? "bg-emerald-50 text-emerald-600 ring-emerald-200"
+                    : sessionStatus === "paused"
+                    ? "bg-amber-50 text-amber-600 ring-amber-200"
+                    : "bg-zinc-50 text-zinc-500 ring-zinc-200"
+                }`}>
+                  {sessionStatus === "running"
+                    ? "감지 중"
+                    : sessionStatus === "paused"
+                    ? "일시정지"
+                    : sessionStatus === "checking"
+                    ? "처리 중"
+                    : "세션 없음"}
+                </span>
               </div>
-              <button
-                onClick={() => setWebcamVisible((v) => !v)}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:text-[#2563EB]"
-                aria-label={webcamVisible ? "카메라 숨기기" : "카메라 보기"}
-              >
+              <div className="flex items-center gap-1">
+                {sessionStatus === "stopped" && (
+                  <button type="button" onClick={() => requestSessionState("running")} className="rounded-md bg-[#2563EB] px-2 py-1 text-[9px] font-semibold text-white hover:bg-blue-700">시작</button>
+                )}
+                {sessionStatus === "running" && (
+                  <button type="button" onClick={() => requestSessionState("paused")} className="rounded-md bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">일시정지</button>
+                )}
+                {sessionStatus === "paused" && (
+                  <button type="button" onClick={() => requestSessionState("running")} className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100">재개</button>
+                )}
+                {(sessionStatus === "running" || sessionStatus === "paused") && (
+                  <button type="button" onClick={() => requestSessionState("stopped")} className="rounded-md bg-rose-50 px-2 py-1 text-[9px] font-semibold text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100">종료</button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setWebcamVisible((v) => !v)}
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:text-[#2563EB]"
+                  aria-label={webcamVisible ? "카메라 숨기기" : "카메라 보기"}
+                >
                 {webcamVisible ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -941,8 +988,10 @@ export default function DashboardPage() {
                     <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 )}
-              </button>
+                </button>
+              </div>
             </div>
+            {sessionError && <div role="alert" className="mt-1 text-[9px] text-rose-500">{sessionError}</div>}
             <div className="relative mt-1 min-h-[240px] flex-1 overflow-hidden rounded-xl sm:min-h-[280px] lg:min-h-0">
               <WebcamView
                 darkDetectionEnabled={darkMode}
@@ -952,7 +1001,14 @@ export default function DashboardPage() {
                 onAuthenticationExpired={handleAuthenticationExpired}
                 onDetectionStateChange={handleDetectionStateChange}
                 onDashboardDataChanged={refreshDashboardDataSoon}
+                sessionControlState={sessionCommand}
+                onSessionControlStateChange={handleSessionControlStateChange}
               />
+              {sessionStatus === "paused" && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+                  <span className="rounded-full bg-amber-500/90 px-3 py-1 text-[10px] font-semibold text-white shadow-sm">감지 일시정지됨</span>
+                </div>
+              )}
               {!webcamVisible && (
                 <div
                   className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 bg-zinc-900/60 backdrop-blur-md"

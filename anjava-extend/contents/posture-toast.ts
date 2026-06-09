@@ -25,6 +25,28 @@ const TOAST_MESSAGES: Record<string, string> = {
   GOOD_POSTURE: "자세가 교정됐어요. 바른 자세를 유지해보세요."
 }
 
+const POSTURE_IMAGE_BY_STATE: Record<string, string> = {
+  TURTLE_NECK: "assets/turtleneck.png",
+  ROUND_SHOULDER: "assets/round-shoulder.png",
+  SHOULDER_ISSUE: "assets/round-shoulder.png",
+  SHOULDER_ASYMMETRY: "assets/shoulder-notsame.png"
+}
+
+const NORMALIZED_POSTURE_STATE: Record<string, string> = {
+  turtle_neck: "TURTLE_NECK",
+  round_shoulder: "ROUND_SHOULDER",
+  shoulder_issue: "SHOULDER_ISSUE",
+  shoulder_tilted: "SHOULDER_ASYMMETRY",
+  shoulder_asymmetry: "SHOULDER_ASYMMETRY"
+}
+
+function getPostureImage(state?: string) {
+  const normalized = state
+    ? NORMALIZED_POSTURE_STATE[state.toLowerCase()] ?? state.toUpperCase()
+    : ""
+  return POSTURE_IMAGE_BY_STATE[normalized] ?? "assets/avatar.png"
+}
+
 type PostureAlertMessage = {
   type: "POSTURE_ALERT"
   state?: string
@@ -222,7 +244,7 @@ function dismissToast(el: HTMLElement) {
   window.setTimeout(() => el.remove(), 240)
 }
 
-function showToast(message: string, isGood: boolean, soundEnabled: boolean) {
+function showToast(message: string, state: string | undefined, isGood: boolean, soundEnabled: boolean) {
   injectStyle()
 
   if (dismissTimer) {
@@ -267,7 +289,7 @@ function showToast(message: string, isGood: boolean, soundEnabled: boolean) {
   avatar.className = "toast-avatar"
   avatar.setAttribute("aria-hidden", "true")
   const avatarImage = document.createElement("img")
-  avatarImage.src = chrome.runtime.getURL("assets/avatar.png")
+  avatarImage.src = chrome.runtime.getURL(getPostureImage(state))
   avatarImage.alt = ""
   avatar.append(avatarImage)
 
@@ -316,7 +338,7 @@ const toastListener = (msg: PostureAlertMessage) => {
   if (msg.type !== "POSTURE_ALERT") return
   const isGood = msg.state === "GOOD_POSTURE"
   const text = (msg.state && TOAST_MESSAGES[msg.state]) || msg.message || "자세를 확인해주세요."
-  showToast(text, isGood, msg.soundEnabled !== false)
+  showToast(text, msg.state, isGood, msg.soundEnabled !== false)
 }
 
 window[LISTENER_KEY] = toastListener

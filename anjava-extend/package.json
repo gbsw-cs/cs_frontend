@@ -59,7 +59,10 @@
         ],
         "resources": [
           "assets/avatar.png",
-          "assets/logo.png"
+          "assets/logo.png",
+          "assets/turtleneck.png",
+          "assets/round-shoulder.png",
+          "assets/shoulder-notsame.png"
         ]
       }
     ]
