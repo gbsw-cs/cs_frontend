@@ -432,9 +432,7 @@ export default function DashboardPage() {
   const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
   const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
   const badPostureSec = turtleSec + roundShoulderSec + asymSec;
-  const goodPct = slotTotal > 0
-    ? Math.round((slotGood / slotTotal) * 100)
-    : weekly
+  const goodPct = weekly
     ? Math.round(clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100))
     : 0;
   const weeklyGoodRatio = weekly ? clampPercent(toFiniteNumber(weekly.goodPostureRatio) * 100) / 100 : null;
@@ -456,25 +454,6 @@ export default function DashboardPage() {
     ? 0
     : clampPercent(Math.round(weeklyBadRatio * 100));
 
-  const todayTimelineCounts = timelineActivity.reduce(
-    (counts, item) => {
-      if (item.dominantState === "GOOD" || item.dominantState === "GOOD_POSTURE") {
-        counts.good += 1;
-      } else {
-        counts.bad += 1;
-      }
-      return counts;
-    },
-    { good: 0, bad: 0 },
-  );
-  const todayTimelineTotal = todayTimelineCounts.good + todayTimelineCounts.bad;
-  const todayObservedBadRatio =
-    todayTimelineTotal > 0
-      ? todayTimelineCounts.bad / todayTimelineTotal
-      : slotTotal > 0
-      ? slotBad / slotTotal
-      : null;
-
   // 주간 선형 차트 값
   const mondayKST = getMondayKST();
   const todayKST = getKSTDate();
@@ -484,17 +463,11 @@ export default function DashboardPage() {
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(date);
     const isFuture = dateKey > todayKST;
     const day = isFuture ? undefined : weekly?.days.find((item) => item.date === dateKey);
-    const observedBadPostureRatio =
-      dateKey === todayKST && todayObservedBadRatio !== null
-        ? todayObservedBadRatio
-        : day
-        ? toFiniteNumber(day.badPostureRatio)
-        : null;
     return {
       date: dateKey,
       isFuture,
-      badPostureRatio: observedBadPostureRatio,
-      hasDetectionData: Boolean(day) || (dateKey === todayKST && todayObservedBadRatio !== null),
+      badPostureRatio: day ? toFiniteNumber(day.badPostureRatio) : null,
+      hasDetectionData: Boolean(day),
       totalDetectionSec: day ? toFiniteNumber(day.totalDetectionSec) : 0,
       turtleNeckSec: day ? toFiniteNumber(day.turtleNeckSec) : 0,
       roundShoulderSec: day ? toFiniteNumber(day.roundShoulderSec) : 0,
@@ -506,13 +479,8 @@ export default function DashboardPage() {
       ? null
       : clampPercent(d.badPostureRatio * 100),
   );
-  const weeklyFilledValues = weeklyValues.filter((value): value is number => value !== null);
-  const weeklyFilledDays = weeklyFilledValues.length;
   const weeklyDateRangeLabel = `${formatMonthDay(mondayKST)}~${formatMonthDay(todayKST)}`;
-  const weeklyAvgBadPct =
-    weeklyFilledDays > 0
-      ? Math.round(weeklyFilledValues.reduce((sum, value) => sum + value, 0) / weeklyFilledDays)
-      : 0;
+  const weeklyAvgBadPct = weeklyRiskPct;
   const worstWeekday =
     weekly?.worstWeekday ||
     weeklyDays.reduce<{ index: number; value: number } | null>((worst, day, index) => {
@@ -985,9 +953,6 @@ export default function DashboardPage() {
                 {(() => {
                   const values = weeklyValues;
                   const dayLabels = WEEK_LABELS;
-                  const turtleRatio = badPostureSec > 0 ? turtleSec / badPostureSec : 0;
-                  const roundRatio = badPostureSec > 0 ? roundShoulderSec / badPostureSec : 0;
-                  const asymRatio = badPostureSec > 0 ? asymSec / badPostureSec : 0;
                   return (
                     <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-2">
                       {values.map((value, i) => {
@@ -1003,22 +968,16 @@ export default function DashboardPage() {
                           ? 0
                           : hasDayIssueBreakdown
                           ? clampPercent((dayTurtleSec / dayTotalSec) * 100)
-                          : badPostureSec > 0
-                          ? value * turtleRatio
                           : 0;
                         const roundH = !hasValue
                           ? 0
                           : hasDayIssueBreakdown
                           ? clampPercent((dayRoundSec / dayTotalSec) * 100)
-                          : badPostureSec > 0
-                          ? value * roundRatio
                           : 0;
                         const asymH = !hasValue
                           ? 0
                           : hasDayIssueBreakdown
                           ? clampPercent((dayAsymSec / dayTotalSec) * 100)
-                          : badPostureSec > 0
-                          ? value * asymRatio
                           : 0;
                         return (
                           <div key={dayLabels[i]} className="flex flex-col items-center gap-0.5 px-7">
@@ -1031,7 +990,7 @@ export default function DashboardPage() {
                               ) : (
                                 <>
                                   <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
-                                  {badPostureSec > 0 ? (
+                                  {hasDayIssueBreakdown ? (
                                     <>
                                       <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
                                       <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
