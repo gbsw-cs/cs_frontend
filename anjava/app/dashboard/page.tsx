@@ -193,7 +193,6 @@ export default function DashboardPage() {
   const [sessionCommand, setSessionCommand] = useState<SessionControlState>("checking");
   const [sessionStatus, setSessionStatus] = useState<SessionControlState>("checking");
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
   const [liveDetection, setLiveDetection] = useState<{
     state: DetectionState;
     message: string;
@@ -261,7 +260,6 @@ export default function DashboardPage() {
       else if (getRequestErrorStatus(tl.reason) < 429) console.error("[dashboard] timeline 실패:", tl.reason);
     } finally {
       dashboardRequestInFlightRef.current = false;
-      setDataLoading(false);
     }
   }, [router]);
 
