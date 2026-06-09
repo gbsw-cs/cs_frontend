@@ -106,7 +106,14 @@ function getApiErrorCode(value: unknown) {
 
 function isDuplicateSessionError(error: unknown) {
   if (!(error instanceof Error)) return false;
-  return /이미 진행 중인 세션|already.*session|session.*already/i.test(error.message);
+  const status = "status" in error ? Number((error as Error & { status?: unknown }).status) : 0;
+  return status === 409 || /이미 진행 중인 세션|already.*session|session.*already/i.test(error.message);
+}
+
+function getErrorStatus(error: unknown) {
+  return error && typeof error === "object" && "status" in error
+    ? Number((error as { status?: unknown }).status)
+    : 0;
 }
 
 function findDetectedLabels(value: unknown, prefix = ""): string[] {
@@ -306,33 +313,34 @@ export default function WebcamView({
     if (!ready) return;
     let cancelled = false;
 
-    startDetectionSession()
-      .then((session) => {
-        if (cancelled) return;
-        sessionIdRef.current = session.sessionId;
-        stateStartRef.current = Date.now();
-        onSessionActiveChangeRef.current?.(true);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        if (isDuplicateSessionError(e)) {
-          getCurrentDetectionSession()
-            .then((session) => {
-              if (cancelled || !session?.sessionId) {
-                onSessionActiveChangeRef.current?.(false);
-                return;
-              }
-              sessionIdRef.current = session.sessionId;
-              stateStartRef.current = Date.now();
-              onSessionActiveChangeRef.current?.(true);
-            })
-            .catch((currentError) => {
-              onSessionActiveChangeRef.current?.(false);
-              console.error("Detection current session lookup failed", currentError);
-            });
-        } else {
+    const assignSession = (session: { sessionId: string } | null) => {
+      if (cancelled || !session?.sessionId) return false;
+      sessionIdRef.current = session.sessionId;
+      stateStartRef.current = Date.now();
+      onSessionActiveChangeRef.current?.(true);
+      return true;
+    };
+
+    const resolveSession = async () => {
+      try {
+        const current = await getCurrentDetectionSession();
+        if (assignSession(current)) return;
+      } catch (error) {
+        if (getErrorStatus(error) !== 404) throw error;
+      }
+
+      try {
+        assignSession(await startDetectionSession());
+      } catch (error) {
+        if (!isDuplicateSessionError(error)) throw error;
+        assignSession(await getCurrentDetectionSession());
+      }
+    };
+
+    void resolveSession().catch((error) => {
+        if (!cancelled) {
           onSessionActiveChangeRef.current?.(false);
-          console.error("Detection session start failed", e);
+          console.error("Detection session resolution failed", error);
         }
       });
 

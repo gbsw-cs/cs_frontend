@@ -121,6 +121,12 @@ function isMissingSessionError(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 404);
 }
 
+function getRequestErrorStatus(value: unknown): number {
+  return value && typeof value === "object" && "status" in value
+    ? Number((value as { status?: unknown }).status)
+    : 0;
+}
+
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
@@ -257,6 +263,8 @@ export default function DashboardPage() {
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshCooldownRef = useRef(0);
+  const dashboardRequestInFlightRef = useRef(false);
+  const dashboardBackoffUntilRef = useRef(0);
   const sessionActiveRef = useRef(false);
   const sessionStateChangedAtRef = useRef(0);
   const lastLiveDetectionRef = useRef<{ state: DetectionState; at: number } | null>(null);
@@ -269,6 +277,8 @@ export default function DashboardPage() {
   );
 
   const loadDashboardData = useCallback(async () => {
+    if (dashboardRequestInFlightRef.current || Date.now() < dashboardBackoffUntilRef.current) return;
+    dashboardRequestInFlightRef.current = true;
     const date = getKSTDate();
     const monday = getMondayKST();
     const sessionCheckStartedAt = Date.now();
@@ -279,63 +289,83 @@ export default function DashboardPage() {
       setRealtimeSlots(createEmptyDailySlots());
     }
 
-    const session = await getCurrentDetectionSession().then(
-      (value) => ({ status: "fulfilled" as const, value }),
-      (reason: unknown) => ({ status: "rejected" as const, reason }),
-    );
-    if (session.status === "rejected" && isUnauthorizedError(session.reason)) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+    try {
+      const session = await getCurrentDetectionSession().then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (reason: unknown) => ({ status: "rejected" as const, reason }),
+      );
+      if (session.status === "rejected" && isUnauthorizedError(session.reason)) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        clearTokens();
+        router.replace("/login");
+        return;
       }
-      clearTokens();
-      router.replace("/login");
-      return;
-    }
+      if (session.status === "rejected") {
+        const status = getRequestErrorStatus(session.reason);
+        if (status === 429 || status >= 500) {
+          dashboardBackoffUntilRef.current = Date.now() + (status === 429 ? 60_000 : 20_000);
+          return;
+        }
+      }
 
-    const [t, w, d, tl] = await Promise.allSettled([
-      getDashboardToday(),
-      getDashboardWeekly(monday),
-      getDashboardDaily(),
-      getDashboardTimeline(date),
-    ]);
-    if ([t, w, d, tl].some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+      const [t, w, d, tl] = await Promise.allSettled([
+        getDashboardToday(),
+        getDashboardWeekly(monday),
+        getDashboardDaily(),
+        getDashboardTimeline(date),
+      ]);
+      const results = [t, w, d, tl];
+      if (results.some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        clearTokens();
+        router.replace("/login");
+        return;
       }
-      clearTokens();
-      router.replace("/login");
-      return;
-    }
-    if (t.status === "fulfilled") setToday(t.value);
-    else console.error("[dashboard] today 실패:", t.reason);
-    if (w.status === "fulfilled") setWeekly(w.value);
-    else console.error("[dashboard] weekly 실패:", w.reason);
-    if (d.status === "fulfilled") {
-      const previousServerSlots = serverDailySlotsRef.current;
-      const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
-      setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
-      serverDailySlotsRef.current = nextServerSlots;
-      setServerDailySlots(nextServerSlots);
-    } else console.error("[dashboard] daily 실패:", d.reason);
-    if (tl.status === "fulfilled") setTimeline(tl.value);
-    else console.error("[dashboard] timeline 실패:", tl.reason);
-    if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
-      const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
-      if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
-      sessionActiveRef.current = active;
-      sessionStateChangedAtRef.current = Date.now();
-      if (!active) {
-        lastLiveDetectionRef.current = null;
-        setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+      const retryStatus = results.reduce((status, result) => {
+        if (result.status !== "rejected") return status;
+        const next = getRequestErrorStatus(result.reason);
+        return status === 429 || next === 429 ? 429 : Math.max(status, next);
+      }, 0);
+      if (retryStatus === 429 || retryStatus >= 500) {
+        dashboardBackoffUntilRef.current = Date.now() + (retryStatus === 429 ? 60_000 : 20_000);
       }
+      if (t.status === "fulfilled") setToday(t.value);
+      else if (getRequestErrorStatus(t.reason) < 429) console.error("[dashboard] today 실패:", t.reason);
+      if (w.status === "fulfilled") setWeekly(w.value);
+      else if (getRequestErrorStatus(w.reason) < 429) console.error("[dashboard] weekly 실패:", w.reason);
+      if (d.status === "fulfilled") {
+        const previousServerSlots = serverDailySlotsRef.current;
+        const nextServerSlots = mergeMaxDailySlots(previousServerSlots, toDailySlots(d.value));
+        setRealtimeSlots((prev) => settleRealtimeSlots(prev, previousServerSlots, nextServerSlots));
+        serverDailySlotsRef.current = nextServerSlots;
+        setServerDailySlots(nextServerSlots);
+      } else if (getRequestErrorStatus(d.reason) < 429) console.error("[dashboard] daily 실패:", d.reason);
+      if (tl.status === "fulfilled") setTimeline(tl.value);
+      else if (getRequestErrorStatus(tl.reason) < 429) console.error("[dashboard] timeline 실패:", tl.reason);
+      if (session.status === "fulfilled" || isMissingSessionError(session.reason)) {
+        const active = session.status === "fulfilled" && Boolean(session.value?.sessionId);
+        if (!active && sessionStateChangedAtRef.current > sessionCheckStartedAt) return;
+        sessionActiveRef.current = active;
+        sessionStateChangedAtRef.current = Date.now();
+        if (!active) {
+          lastLiveDetectionRef.current = null;
+          setLiveWeeklyDurations(EMPTY_LIVE_WEEKLY_DURATIONS);
+        }
+      }
+    } finally {
+      dashboardRequestInFlightRef.current = false;
     }
   }, [router]);
 
   const refreshDashboardDataSoon = useCallback(() => {
     const now = Date.now();
-    if (now - refreshCooldownRef.current < 1000) return;
+    if (now - refreshCooldownRef.current < 15_000) return;
     refreshCooldownRef.current = now;
     void loadDashboardData();
   }, [loadDashboardData]);
@@ -372,7 +402,7 @@ export default function DashboardPage() {
           if (!cancelled) setBadges(b.slice(0, 3));
         }).catch(() => {});
         void loadDashboardData();
-        pollRef.current = setInterval(loadDashboardData, 5_000);
+        pollRef.current = setInterval(loadDashboardData, 30_000);
       })
       .catch(() => {
         if (cancelled) return;
