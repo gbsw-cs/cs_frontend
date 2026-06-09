@@ -116,22 +116,39 @@ function WebcamCircle() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [active, setActive] = useState(false)
   const [error, setError] = useState("")
+  const [retrying, setRetrying] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
+
+  const acquireCamera = (stream: MediaStream) => {
+    streamRef.current = stream
+    const v = videoRef.current
+    if (v) {
+      v.srcObject = stream
+      v.onloadedmetadata = () => { v.play().catch(() => {}); setActive(true) }
+    }
+  }
 
   const startCamera = () => {
     setError("")
     navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
-      .then(stream => {
-        streamRef.current = stream
-        const v = videoRef.current
-        if (v) {
-          v.srcObject = stream
-          v.onloadedmetadata = () => { v.play().catch(() => {}); setActive(true) }
-        }
-      })
+      .then(acquireCamera)
       .catch((e: DOMException) => {
         console.error("[popup] 카메라 권한 확인 실패:", e.name, e.message, e)
         setError(e.name || "CameraError")
+      })
+  }
+
+  const retryPermission = () => {
+    if (retrying) return
+    setRetrying(true)
+    setError("")
+    navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
+      .then(stream => { acquireCamera(stream); setRetrying(false) })
+      .catch((e: DOMException) => {
+        setError(e.name || "CameraError")
+        setRetrying(false)
+        // 직접 요청 실패 시 권한 설정 페이지로 이동
+        chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html"), active: true }).catch(() => {})
       })
   }
 
@@ -168,19 +185,20 @@ function WebcamCircle() {
           <button
             className="btn-outline"
             style={{ fontSize: 11, padding: "3px 10px" }}
-            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html") })}
+            disabled={retrying}
+            onClick={retryPermission}
           >
-            권한 다시 요청
+            {retrying ? "권한 요청 중..." : "권한 다시 요청"}
           </button>
           <button
             className="btn-outline"
             style={{ fontSize: 10, padding: "2px 8px", opacity: 0.7 }}
-            onClick={() => chrome.tabs.create({ url: "chrome://settings/content/camera" })}
+            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html"), active: true }).catch(() => {})}
           >
-            카메라 설정 열기
+            권한 설정 페이지 열기
           </button>
           <span style={{ fontSize: 9, color: "#a1a1aa", textAlign: "center", lineHeight: 1.4 }}>
-            설정에서 확장 프로그램 항목을<br/>허용으로 변경해주세요
+            권한 창이 안 뜨면 아래 버튼으로<br/>설정 페이지에서 직접 허용해주세요
           </span>
         </div>
       )}
