@@ -712,6 +712,16 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
   const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
   const darkSec = n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]);
   const badSec = turtleSec + finalRound + finalAsym;
+  const explicitGoodSec = n([
+    "goodPostureTotalSec",
+    "goodPostureSec",
+    "normalPostureTotalSec",
+    "normalPostureSec",
+    "good_posture_total_sec",
+    "good_posture_sec",
+    "normal_posture_total_sec",
+    "normal_posture_sec",
+  ]);
   const summedDayTotalSec = days.reduce((sum, day) => sum + day.totalDetectionSec, 0);
   const explicitTotalSec = n([
     "totalDetectionSec",
@@ -733,12 +743,18 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       : 0;
   const totalDetectionSec =
     explicitTotalSec > 0
-      ? explicitTotalSec
+      ? Math.max(explicitTotalSec, badSec)
       : summedDayTotalSec > 0
-      ? summedDayTotalSec
+      ? Math.max(summedDayTotalSec, badSec)
+      : explicitGoodSec > 0
+      ? explicitGoodSec + badSec
       : goodPostureRatio < 1 && badSec > 0
       ? Math.round(badSec / (1 - goodPostureRatio))
-      : 0;
+      : badSec;
+  const normalizedGoodPostureRatio =
+    totalDetectionSec > 0
+      ? Math.max(0, Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec))
+      : goodPostureRatio;
   return {
     from: typeof raw.from === "string" ? raw.from : "",
     to: typeof raw.to === "string" ? raw.to : "",
@@ -748,7 +764,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     roundShoulderTotalSec: finalRound,
     shoulderAsymmetryTotalSec: finalAsym,
     darkEnvTotalSec: darkSec,
-    goodPostureRatio,
+    goodPostureRatio: normalizedGoodPostureRatio,
     worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : null,
   };
 }
