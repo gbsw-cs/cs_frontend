@@ -612,8 +612,13 @@ export default function DashboardPage() {
       : weekly
       ? 0
       : null;
+  const serverGoodSec = weekly ? toFiniteNumber(weekly.goodPostureSec) : 0;
   const weeklyGoodSec =
-    weeklyScreenSec === null ? null : Math.max(0, weeklyScreenSec - badPostureSec);
+    weeklyScreenSec === null
+      ? null
+      : serverGoodSec > 0
+      ? Math.max(0, serverGoodSec + liveWeeklyDurations.goodSec)
+      : Math.max(0, weeklyScreenSec - badPostureSec);
   const weeklyRiskPct = weeklyScreenSec && weeklyScreenSec > 0
     ? clampPercent(Math.round((badPostureSec / weeklyScreenSec) * 100))
     : weeklyBadRatio === null

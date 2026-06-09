@@ -610,6 +610,7 @@ export type WeeklyDashboard = {
     darkEnvSec: number;
   }[];
   totalDetectionSec: number;
+  goodPostureSec: number;
   turtleNeckTotalSec: number;
   roundShoulderTotalSec: number;
   shoulderAsymmetryTotalSec: number;
@@ -818,10 +819,19 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       : goodPostureRatio < 1 && badSec > 0
       ? Math.round(badSec / (1 - goodPostureRatio))
       : badSec;
+  // 서버가 goodPostureRatio를 직접 제공하면 그대로 사용; 없을 때만 (total-bad)/total 추정
   const normalizedGoodPostureRatio =
-    totalDetectionSec > 0
+    rawGoodRatio !== undefined
+      ? goodPostureRatio
+      : totalDetectionSec > 0
       ? Math.max(0, Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec))
       : goodPostureRatio;
+
+  // 정자세 시간: 서버 제공값 우선, 없으면 total * goodRatio 추정
+  const goodPostureSecNormalized =
+    explicitGoodSec > 0
+      ? explicitGoodSec
+      : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
 
   // 신 API: weekStartDate/weekEndDate / 구 API: from/to
   const from =
@@ -838,6 +848,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     to,
     days,
     totalDetectionSec,
+    goodPostureSec: goodPostureSecNormalized,
     turtleNeckTotalSec: turtleSec,
     roundShoulderTotalSec: finalRound,
     shoulderAsymmetryTotalSec: finalAsym,
