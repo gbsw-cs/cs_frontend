@@ -112,14 +112,18 @@ function fmtSyncTime(value: string) {
   return `${Math.floor(h / 24)}일 전`
 }
 
+// 카메라 권한 상태: granted=자동 시작 / prompt=버튼 클릭 필요 / denied=설정 안내
+type CamPermState = "checking" | "prompt" | "granted" | "denied" | "error"
+
 function WebcamCircle() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [active, setActive] = useState(false)
-  const [error, setError] = useState("")
-  const [retrying, setRetrying] = useState(false)
+  const [permState, setPermState] = useState<CamPermState>("checking")
+  const [errorName, setErrorName] = useState("")
+  const [requesting, setRequesting] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const acquireCamera = (stream: MediaStream) => {
+  const attachStream = (stream: MediaStream) => {
     streamRef.current = stream
     const v = videoRef.current
     if (v) {
@@ -128,43 +132,83 @@ function WebcamCircle() {
     }
   }
 
-  const startCamera = () => {
-    setError("")
-    navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
-      .then(acquireCamera)
-      .catch((e: DOMException) => {
-        console.error("[popup] 카메라 권한 확인 실패:", e.name, e.message, e)
-        setError(e.name || "CameraError")
-      })
+  const doGetUserMedia = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 160, height: 160, facingMode: "user" },
+    })
+    attachStream(stream)
+    setPermState("granted")
   }
 
-  const retryPermission = () => {
-    if (retrying) return
-    setRetrying(true)
-    setError("")
-    navigator.mediaDevices.getUserMedia({ video: { width: 160, height: 160, facingMode: "user" } })
-      .then(stream => { acquireCamera(stream); setRetrying(false) })
-      .catch((e: DOMException) => {
-        setError(e.name || "CameraError")
-        setRetrying(false)
-        // 직접 요청 실패 시 권한 설정 페이지로 이동
-        chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html"), active: true }).catch(() => {})
-      })
-  }
-
+  // 마운트 시 Permissions API로 현재 상태 확인 후 분기
   useEffect(() => {
-    startCamera()
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
+    let cancelled = false
+    navigator.permissions
+      .query({ name: "camera" as PermissionName })
+      .then((status) => {
+        const update = () => {
+          if (cancelled) return
+          if (status.state === "granted") {
+            setPermState("granted")
+            doGetUserMedia().catch(() => {})
+          } else if (status.state === "denied") {
+            setPermState("denied")
+          } else {
+            // "prompt" — 아직 허용/거부 선택 안 함: 버튼 클릭을 기다림
+            setPermState("prompt")
+          }
+        }
+        update()
+        status.onchange = update
+      })
+      .catch(() => {
+        // Permissions API 미지원 시 직접 시도
+        if (!cancelled) {
+          setPermState("prompt")
+        }
+      })
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
   }, [])
 
-  const errorLabel =
-    error === "NotAllowedError"
-      ? "카메라 권한 필요"
-      : error === "NotFoundError" || error === "DevicesNotFoundError"
-      ? "카메라 없음"
-      : error === "NotReadableError" || error === "TrackStartError"
-      ? "카메라 사용 중"
-      : "카메라 오류"
+  // 사용자 클릭으로 권한 요청 (user activation → Chrome 다이얼로그 표시)
+  const requestPermission = async () => {
+    if (requesting) return
+    setRequesting(true)
+    try {
+      await doGetUserMedia()
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : "CameraError"
+      setErrorName(name)
+      if (name === "NotAllowedError") {
+        setPermState("denied")
+      } else {
+        setPermState("error")
+      }
+    } finally {
+      setRequesting(false)
+    }
+  }
+
+  const openPermissionPage = () =>
+    chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html"), active: true }).catch(() => {})
+
+  const circleIcon =
+    permState === "checking" ? <span className="webcam-circle-icon" style={{ fontSize: 24 }}>⏳</span>
+    : permState === "prompt"  ? <span className="webcam-circle-icon" style={{ fontSize: 20 }}>📷</span>
+    : (!active)               ? <span className="webcam-circle-icon">🚫</span>
+    : null
+
+  const stateLabel =
+    active             ? "● 라이브"
+    : permState === "checking" ? "확인 중..."
+    : permState === "prompt"   ? "권한 허용 필요"
+    : permState === "denied"   ? "카메라 차단됨"
+    : errorName === "NotFoundError" || errorName === "DevicesNotFoundError" ? "카메라 없음"
+    : errorName === "NotReadableError" || errorName === "TrackStartError"   ? "카메라 사용 중"
+    : "카메라 오류"
 
   return (
     <div className="webcam-circle-wrap">
@@ -176,30 +220,45 @@ function WebcamCircle() {
           className="webcam-circle-video"
           style={{ transform: "scaleX(-1)", display: active ? "block" : "none" }}
         />
-        {!active && !error && <span className="webcam-circle-icon" style={{ fontSize: 24 }}>⏳</span>}
-        {error && <span className="webcam-circle-icon">🚫</span>}
+        {!active && circleIcon}
       </div>
-      <span className="webcam-circle-label">{active ? "● 라이브" : error ? errorLabel : "연결 중..."}</span>
-      {error === "NotAllowedError" && (
+      <span className="webcam-circle-label">{stateLabel}</span>
+
+      {/* 아직 허용/거부 선택 안 한 경우: 클릭 한 번으로 Chrome 권한 다이얼로그 표시 */}
+      {permState === "prompt" && !active && (
+        <button
+          className="btn-outline"
+          style={{ marginTop: 6, fontSize: 11, padding: "3px 10px" }}
+          disabled={requesting}
+          onClick={requestPermission}
+        >
+          {requesting ? "권한 요청 중..." : "카메라 권한 허용"}
+        </button>
+      )}
+
+      {/* 명시적으로 차단된 경우: 설정 페이지 안내 */}
+      {permState === "denied" && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <button className="btn-outline" style={{ fontSize: 11, padding: "3px 10px" }} onClick={openPermissionPage}>
+            권한 설정 페이지 열기
+          </button>
+          <span style={{ fontSize: 9, color: "#a1a1aa", textAlign: "center", lineHeight: 1.4 }}>
+            설정 페이지에서<br/>"카메라 권한 허용" 버튼을 눌러주세요
+          </span>
+        </div>
+      )}
+
+      {/* 그 외 오류 (카메라 없음, 사용 중 등) */}
+      {permState === "error" && (
         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <button
             className="btn-outline"
             style={{ fontSize: 11, padding: "3px 10px" }}
-            disabled={retrying}
-            onClick={retryPermission}
+            disabled={requesting}
+            onClick={requestPermission}
           >
-            {retrying ? "권한 요청 중..." : "권한 다시 요청"}
+            {requesting ? "재시도 중..." : "다시 시도"}
           </button>
-          <button
-            className="btn-outline"
-            style={{ fontSize: 10, padding: "2px 8px", opacity: 0.7 }}
-            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL("tabs/camera-permission.html"), active: true }).catch(() => {})}
-          >
-            권한 설정 페이지 열기
-          </button>
-          <span style={{ fontSize: 9, color: "#a1a1aa", textAlign: "center", lineHeight: 1.4 }}>
-            권한 창이 안 뜨면 아래 버튼으로<br/>설정 페이지에서 직접 허용해주세요
-          </span>
         </div>
       )}
     </div>
