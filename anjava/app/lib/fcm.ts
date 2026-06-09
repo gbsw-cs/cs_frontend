@@ -136,6 +136,15 @@ function showBrowserNotification(title: string, options: NotificationOptions) {
   };
 }
 
+function isMacOS() {
+  if (typeof navigator === "undefined") return false;
+  const userAgentData = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
+  const platform = userAgentData.userAgentData?.platform ?? navigator.platform ?? "";
+  return /mac/i.test(platform);
+}
+
 function playAlertTone(soundEnabled: boolean) {
   if (!soundEnabled) return;
   try {
@@ -192,13 +201,23 @@ export async function showLocalPostureNotification({
     body: message,
     icon: "/logo.png",
     silent: !soundEnabled,
-    tag: `anjava-posture-${state}`,
     data: { url: "/dashboard", state },
   } satisfies NotificationOptions;
 
-  // 자세 감지는 열린 웹 페이지에서 실행되므로 데스크톱 알림은 페이지가 직접
-  // 생성한다. Windows Chromium에서 서비스 워커 알림이 알림 센터에만 쌓이고
-  // 배너가 생략되는 경우를 피하면서 클릭 동작도 동일하게 유지한다.
+  // macOS Chrome은 서비스 워커 알림이 시스템 배너와 더 안정적으로 연동된다.
+  // Windows Chromium은 페이지 Notification이 배너 표시 누락을 덜 일으킨다.
+  if (isMacOS() && "serviceWorker" in navigator) {
+    const registration =
+      (await navigator.serviceWorker.getRegistration("/").catch(() => null)) ??
+      (await getServiceWorkerRegistration(getFirebaseConfig()).catch(() => null));
+    if (registration) {
+      await registration.showNotification(title, options).catch(() => {
+        showBrowserNotification(title, options);
+      });
+      return;
+    }
+  }
+
   showBrowserNotification(title, options);
 }
 
