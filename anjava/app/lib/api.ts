@@ -672,9 +672,23 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     }
     return 0;
   };
-  const rawDays: unknown[] = Array.isArray(raw.days) ? raw.days : [];
+
+  // 신 API: breakdown 중첩 객체 지원
+  const breakdown =
+    raw.breakdown && typeof raw.breakdown === "object" && !Array.isArray(raw.breakdown)
+      ? (raw.breakdown as Record<string, unknown>)
+      : null;
+
+  // 신 API: dailyStats / 구 API: days
+  const rawDays: unknown[] = Array.isArray(raw.dailyStats)
+    ? raw.dailyStats
+    : Array.isArray(raw.days)
+    ? raw.days
+    : [];
+
   const days = rawDays
     .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
+    .filter((day) => ("hasData" in day ? (day as { hasData?: unknown }).hasData !== false : true))
     .map((day) => {
       const turtleNeckSec = n(["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"], day);
       const roundShoulderSec = n(["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"], day);
@@ -689,9 +703,12 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
         day,
       );
       const ratioFromDuration = totalDetectionSec > 0 ? badSec / totalDetectionSec : 0;
+      const rawBadRatio = day.badPostureRatio;
       const badPostureRatio =
-        "badPostureRatio" in day || "bad_posture_ratio" in day
-          ? normalizeRatio(day.badPostureRatio ?? day.bad_posture_ratio)
+        typeof rawBadRatio === "number" && Number.isFinite(rawBadRatio)
+          ? normalizeRatio(rawBadRatio)
+          : typeof rawBadRatio === "string"
+          ? normalizeRatio(rawBadRatio)
           : "goodPostureRatio" in day || "good_posture_ratio" in day
           ? 1 - normalizeRatio(day.goodPostureRatio ?? day.good_posture_ratio)
           : ratioFromDuration;
@@ -706,21 +723,31 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       };
     })
     .filter((day) => day.date.length > 0);
-  const turtleSec = n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
-  const roundSec = n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
-  const asymSec = n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
+
+  // 신 API: breakdown 객체에서 가져오고 없으면 루트 필드 fallback
+  const turtleSec = breakdown
+    ? n(["turtleNeckSec"], breakdown)
+    : n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
+  const roundSec = breakdown
+    ? n(["roundShoulderSec"], breakdown)
+    : n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
+  const asymSec = breakdown
+    ? n(["shoulderAsymmetrySec"], breakdown)
+    : n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
   const shoulderIssueSec = n(["shoulderIssueTotalSec", "shoulderIssueSec", "shoulder_issue_total_sec", "shoulder_issue_sec"]);
   const finalRound = roundSec > 0 ? roundSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
   const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
-  const darkSec = n(["darkEnvTotalSec", "darkEnvSec", "dark_env_total_sec", "dark_env_sec"]);
+  const darkSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"]);
   const badSec = turtleSec + finalRound + finalAsym;
+
+  // 신 API: goodPostureSec 직접 제공
   const explicitGoodSec = n([
-    "goodPostureTotalSec",
     "goodPostureSec",
+    "goodPostureTotalSec",
     "normalPostureTotalSec",
     "normalPostureSec",
-    "good_posture_total_sec",
     "good_posture_sec",
+    "good_posture_total_sec",
     "normal_posture_total_sec",
     "normal_posture_sec",
   ]);
@@ -736,13 +763,19 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     "total_screen_sec",
     "screen_time_sec",
   ]);
+
+  // 신 API: goodPostureRatio (0~1) 또는 riskPercent (0~100) 중 있는 쪽 사용
   const rawGoodRatio = raw.goodPostureRatio ?? raw.good_posture_ratio;
+  const rawRiskPct = typeof raw.riskPercent === "number" ? raw.riskPercent : NaN;
   const goodPostureRatio =
     rawGoodRatio !== undefined
       ? normalizeRatio(rawGoodRatio)
+      : Number.isFinite(rawRiskPct)
+      ? Math.max(0, 1 - rawRiskPct / 100)
       : explicitTotalSec > 0
       ? Math.max(0, 1 - badSec / explicitTotalSec)
       : 0;
+
   const totalDetectionSec =
     explicitTotalSec > 0
       ? Math.max(explicitTotalSec, badSec)
@@ -757,9 +790,20 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     totalDetectionSec > 0
       ? Math.max(0, Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec))
       : goodPostureRatio;
+
+  // 신 API: weekStartDate/weekEndDate / 구 API: from/to
+  const from =
+    typeof raw.weekStartDate === "string" ? raw.weekStartDate
+    : typeof raw.from === "string" ? raw.from
+    : "";
+  const to =
+    typeof raw.weekEndDate === "string" ? raw.weekEndDate
+    : typeof raw.to === "string" ? raw.to
+    : "";
+
   return {
-    from: typeof raw.from === "string" ? raw.from : "",
-    to: typeof raw.to === "string" ? raw.to : "",
+    from,
+    to,
     days,
     totalDetectionSec,
     turtleNeckTotalSec: turtleSec,
@@ -767,7 +811,10 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     shoulderAsymmetryTotalSec: finalAsym,
     darkEnvTotalSec: darkSec,
     goodPostureRatio: normalizedGoodPostureRatio,
-    worstWeekday: typeof raw.worstWeekday === "string" ? raw.worstWeekday : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string) : null,
+    worstWeekday:
+      typeof raw.worstWeekday === "string" ? raw.worstWeekday
+      : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string)
+      : null,
   };
 }
 
