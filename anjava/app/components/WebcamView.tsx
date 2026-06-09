@@ -6,9 +6,11 @@ import { createPostureFrame, type PostureFrame } from "../lib/poseFrame";
 import {
   endDetectionSession,
   getCurrentDetectionSession,
-  postDashboardTimeline,
-  postSessionEvents,
+  pauseDetectionSession,
+  postSessionSegments,
+  resumeDetectionSession,
   startDetectionSession,
+  type DetectionSession,
   type DetectionSessionEvent,
   type DetectionState,
 } from "../lib/api";
@@ -24,6 +26,7 @@ const BATCH_SEND_INTERVAL_MS = 5000;
 const BATCH_FRAME_COUNT = 10;
 const BASELINE_RETRY_COOLDOWN_MS = 30_000;
 const EVENT_FLUSH_INTERVAL_MS = 30_000;
+const PENDING_EVENTS_STORAGE_KEY = "anjava.pendingDetectionEvents";
 
 type WebcamViewProps = {
   darkDetectionEnabled?: boolean;
@@ -52,42 +55,62 @@ const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
   dark_environment: "DARK_ENV",
 };
 
-const STATE_SEVERITY: Record<DetectionState, number> = {
-  GOOD_POSTURE: 1,
-  TURTLE_NECK: 2,
-  SHOULDER_ISSUE: 2,
-  ROUND_SHOULDER: 2,
-  SHOULDER_ASYMMETRY: 2,
-  DARK_ENV: 1,
-};
-
 function toBackendState(finalStatus: string): DetectionState {
   return AI_STATUS_TO_BACKEND_STATE[finalStatus.toLowerCase()] ?? "GOOD_POSTURE";
 }
 
-function shouldPostTimeline(previous: DetectionState | null, next: DetectionState) {
-  if (previous === next) return false;
-  const wasWarning = previous !== null && previous !== "GOOD_POSTURE";
-  const isWarning = next !== "GOOD_POSTURE";
-  return isWarning || wasWarning;
+function createDetectionEvent(
+  state: DetectionState,
+  startedAtMs: number,
+  endedAtMs: number,
+): DetectionSessionEvent {
+  return {
+    eventId:
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `web-${endedAtMs}-${Math.random().toString(36).slice(2)}`,
+    state,
+    startedAt: new Date(startedAtMs).toISOString(),
+    endedAt: new Date(endedAtMs).toISOString(),
+    source: "WEB",
+  };
 }
 
-function getKSTDateTime() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "00";
-  return {
-    date: `${value("year")}-${value("month")}-${value("day")}`,
-    time: `${value("hour")}:${value("minute")}`,
-  };
+function persistPendingEvents(sessionId: string | null, events: DetectionSessionEvent[]) {
+  if (typeof window === "undefined") return;
+  if (!sessionId || events.length === 0) {
+    localStorage.removeItem(PENDING_EVENTS_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(PENDING_EVENTS_STORAGE_KEY, JSON.stringify({ sessionId, events }));
+}
+
+function restorePendingEvents(sessionId: string): DetectionSessionEvent[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(PENDING_EVENTS_STORAGE_KEY) ?? "null") as {
+      sessionId?: unknown;
+      events?: unknown;
+    } | null;
+    if (stored?.sessionId !== sessionId || !Array.isArray(stored.events)) {
+      localStorage.removeItem(PENDING_EVENTS_STORAGE_KEY);
+      return [];
+    }
+    return stored.events.filter((event): event is DetectionSessionEvent =>
+      Boolean(
+        event &&
+        typeof event === "object" &&
+        "eventId" in event &&
+        "startedAt" in event &&
+        "endedAt" in event &&
+        "state" in event &&
+        (event as { source?: unknown }).source === "WEB",
+      )
+    );
+  } catch {
+    localStorage.removeItem(PENDING_EVENTS_STORAGE_KEY);
+    return [];
+  }
 }
 
 function isBaselineReady() {
@@ -243,6 +266,7 @@ export default function WebcamView({
   const lastBatchSentAtRef = useRef(0);
   const baselineRetryAtRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
+  const sessionPausedRef = useRef(false);
   const eventQueueRef = useRef<DetectionSessionEvent[]>([]);
   const stateStartRef = useRef<number>(Date.now());
   const lastBackendStateRef = useRef<DetectionState | null>(null);
@@ -261,11 +285,15 @@ export default function WebcamView({
     const sessionId = sessionIdRef.current;
     if (!sessionId || eventQueueRef.current.length === 0) return true;
     const events = eventQueueRef.current.splice(0, 100);
+    persistPendingEvents(sessionId, eventQueueRef.current);
     try {
-      await postSessionEvents(sessionId, events);
+      await postSessionSegments(sessionId, events, "WEB");
+      persistPendingEvents(sessionId, eventQueueRef.current);
+      onDashboardDataChangedRef.current?.();
       return true;
     } catch (e) {
-      eventQueueRef.current = [...events, ...eventQueueRef.current].slice(0, 100);
+      eventQueueRef.current = [...events, ...eventQueueRef.current];
+      persistPendingEvents(sessionId, eventQueueRef.current);
       const status = e && typeof e === "object" && "status" in e
         ? Number((e as { status?: unknown }).status)
         : 0;
@@ -275,8 +303,10 @@ export default function WebcamView({
       }
       if (status === 404 || status === 409) {
         sessionIdRef.current = null;
+        sessionPausedRef.current = false;
         lastBackendStateRef.current = null;
         eventQueueRef.current = [];
+        persistPendingEvents(null, []);
         setHasSession(false);
         onSessionActiveChangeRef.current?.(false, "stopped");
         onSessionControlStateChangeRef.current?.("stopped", "세션이 종료되어 감지를 중단했습니다.");
@@ -314,12 +344,8 @@ export default function WebcamView({
     const now = Date.now();
     const durationSec = Math.round((now - stateStartRef.current) / 1000);
     if (durationSec > 0) {
-      eventQueueRef.current.push({
-        type: currentState,
-        severity: STATE_SEVERITY[currentState],
-        durationSec,
-        detectedAt: new Date(stateStartRef.current).toISOString(),
-      });
+      eventQueueRef.current.push(createDetectionEvent(currentState, stateStartRef.current, now));
+      persistPendingEvents(sessionIdRef.current, eventQueueRef.current);
     }
     stateStartRef.current = now;
     lastBackendStateRef.current = null;
@@ -328,9 +354,22 @@ export default function WebcamView({
   useEffect(() => {
     const operation = ++sessionOperationRef.current;
 
-    async function assignSession(session: { sessionId: string } | null) {
+    async function assignSession(session: DetectionSession | null) {
       if (operation !== sessionOperationRef.current || !session?.sessionId) return false;
+      if (session.source && session.source !== "WEB") {
+        throw new Error("확장 프로그램에서 감지 세션이 실행 중입니다. 한 곳에서만 세션을 실행해주세요.");
+      }
       sessionIdRef.current = session.sessionId;
+      sessionPausedRef.current = session.status === "PAUSED";
+      const restoredEvents = restorePendingEvents(session.sessionId);
+      if (restoredEvents.length > 0) {
+        const queuedIds = new Set(eventQueueRef.current.map((event) => event.eventId));
+        eventQueueRef.current = [
+          ...restoredEvents.filter((event) => !queuedIds.has(event.eventId)),
+          ...eventQueueRef.current,
+        ];
+        persistPendingEvents(session.sessionId, eventQueueRef.current);
+      }
       setHasSession(true);
       stateStartRef.current = Date.now();
       onSessionActiveChangeRef.current?.(true);
@@ -351,7 +390,9 @@ export default function WebcamView({
         if (sessionControlState === "checking") {
           const current = await resolveExistingSession();
           if (await assignSession(current)) {
-            onSessionControlStateChangeRef.current?.("running");
+            const nextState = sessionPausedRef.current ? "paused" : "running";
+            onSessionActiveChangeRef.current?.(!sessionPausedRef.current, sessionPausedRef.current ? "paused" : undefined);
+            onSessionControlStateChangeRef.current?.(nextState);
           } else if (operation === sessionOperationRef.current) {
             setHasSession(false);
             onSessionActiveChangeRef.current?.(false, "stopped");
@@ -366,12 +407,16 @@ export default function WebcamView({
             if (!(await assignSession(current))) {
               if (!ready) throw new Error("카메라가 연결된 후 세션을 시작해주세요.");
               try {
-                await assignSession(await startDetectionSession());
+                await assignSession(await startDetectionSession(new Date().toISOString(), "WEB"));
               } catch (error) {
                 if (!isDuplicateSessionError(error)) throw error;
                 await assignSession(await getCurrentDetectionSession());
               }
             }
+          }
+          if (sessionIdRef.current && sessionPausedRef.current) {
+            await resumeDetectionSession(sessionIdRef.current);
+            sessionPausedRef.current = false;
           }
           if (operation === sessionOperationRef.current) {
             stateStartRef.current = Date.now();
@@ -388,7 +433,10 @@ export default function WebcamView({
             return;
           }
           queueCurrentState();
-          await flushQueuedEvents();
+          const flushed = await flushQueuedEvents();
+          if (!flushed) throw new Error("일시정지 전 감지 기록을 전송하지 못했습니다.");
+          await pauseDetectionSession(sessionIdRef.current);
+          sessionPausedRef.current = true;
           if (operation === sessionOperationRef.current) {
             onSessionActiveChangeRef.current?.(false, "paused");
             onSessionControlStateChangeRef.current?.("paused");
@@ -403,9 +451,11 @@ export default function WebcamView({
         }
         const sessionId = sessionIdRef.current;
         sessionIdRef.current = null;
+        sessionPausedRef.current = false;
         setHasSession(false);
         lastBackendStateRef.current = null;
         if (sessionId) await endDetectionSession(sessionId);
+        persistPendingEvents(null, []);
         if (operation === sessionOperationRef.current) {
           onSessionActiveChangeRef.current?.(false, "stopped");
           onSessionControlStateChangeRef.current?.("stopped");
@@ -434,6 +484,15 @@ export default function WebcamView({
   }, [ready, sessionControlState, flushQueuedEvents, queueCurrentState]);
 
   useEffect(() => {
+    const preservePendingInterval = () => {
+      if (sessionControlState !== "running" || !sessionIdRef.current) return;
+      queueCurrentState();
+    };
+    window.addEventListener("pagehide", preservePendingInterval);
+    return () => window.removeEventListener("pagehide", preservePendingInterval);
+  }, [queueCurrentState, sessionControlState]);
+
+  useEffect(() => {
     if (!ready || sessionControlState !== "running" || !hasSession) {
       setAiStatus("idle");
       return;
@@ -460,32 +519,13 @@ export default function WebcamView({
       const previous = lastBackendStateRef.current;
       const now = Date.now();
       if (previous && previous !== nextState) {
-        eventQueueRef.current.push({
-          type: previous,
-          severity: STATE_SEVERITY[previous],
-          durationSec: Math.max(1, Math.round((now - stateStartRef.current) / 1000)),
-          detectedAt: new Date(stateStartRef.current).toISOString(),
-        });
+        eventQueueRef.current.push(createDetectionEvent(previous, stateStartRef.current, now));
+        persistPendingEvents(sessionIdRef.current, eventQueueRef.current);
         void flushQueuedEvents();
       }
       if (previous !== nextState) {
         stateStartRef.current = now;
         lastBackendStateRef.current = nextState;
-        if (shouldPostTimeline(previous, nextState)) {
-          const { date, time } = getKSTDateTime();
-          void postDashboardTimeline({
-            date,
-            time,
-            dominantState: nextState,
-            message,
-          }).catch((e) => {
-            if (getErrorStatus(e) === 401) {
-              onAuthenticationExpiredRef.current?.();
-            } else {
-              console.error("Dashboard timeline upload failed", e);
-            }
-          });
-        }
       }
       onDetectionStateChangeRef.current?.(nextState, message);
     }

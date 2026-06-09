@@ -710,7 +710,7 @@ export type DetectionState =
 export type DetectionSession = {
   sessionId: string;
   startedAt: string;
-  status?: "RUNNING" | "PAUSED";
+  status?: "ACTIVE" | "RUNNING" | "PAUSED";
   source?: DetectionSessionSource;
   pausedAt?: string | null;
   totalPausedSec?: number;
@@ -845,21 +845,40 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     })
     .filter((day) => day.date.length > 0);
 
-  // 신 API: breakdown 객체에서 가져오고 없으면 루트 필드 fallback
-  const turtleSec = breakdown
-    ? n(["turtleNeckSec"], breakdown)
-    : n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"]);
-  const roundSec = breakdown
-    ? n(["roundShoulderSec"], breakdown)
-    : n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"]);
-  const asymSec = breakdown
-    ? n(["shoulderAsymmetrySec"], breakdown)
-    : n(["shoulderAsymmetryTotalSec", "shoulderAsymmetrySec", "shoulder_asymmetry_total_sec", "shoulder_asymmetry_sec"]);
+  // 일별 합계 (서버가 주간 합계를 내려주지 않을 때 fallback)
+  const summedTurtleSec = days.reduce((s, d) => s + d.turtleNeckSec, 0);
+  const summedRoundSec = days.reduce((s, d) => s + d.roundShoulderSec, 0);
+  const summedAsymSec = days.reduce((s, d) => s + d.shoulderAsymmetrySec, 0);
+  const summedDarkSec = days.reduce((s, d) => s + d.darkEnvSec, 0);
+  const summedGoodSec = days.reduce((s, d) => s + d.goodPostureSec, 0);
+  const summedBadSec = days.reduce((s, d) => s + d.badPostureSec, 0);
+  const summedUnclassifiedSec = days.reduce((s, d) => s + d.unclassifiedSec, 0);
+
+  // 신 API: breakdown 객체에서 가져오고 없으면 루트 필드 fallback → 없으면 일별 합계
+  const turtleSec =
+    (breakdown
+      ? n(["turtleNeckSec"], breakdown)
+      : n(["turtleNeckTotalSec", "turtleNeckSec", "turtle_neck_total_sec", "turtle_neck_sec"])) || summedTurtleSec;
+  const roundSec =
+    (breakdown
+      ? n(["roundShoulderSec"], breakdown)
+      : n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"])) ||
+    summedRoundSec;
+  const asymSec =
+    (breakdown
+      ? n(["shoulderAsymmetrySec"], breakdown)
+      : n([
+          "shoulderAsymmetryTotalSec",
+          "shoulderAsymmetrySec",
+          "shoulder_asymmetry_total_sec",
+          "shoulder_asymmetry_sec",
+        ])) || summedAsymSec;
   const shoulderIssueSec = n(["shoulderIssueTotalSec", "shoulderIssueSec", "shoulder_issue_total_sec", "shoulder_issue_sec"]);
   const finalRound = roundSec > 0 ? roundSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
   const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
-  const darkSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"]);
-  const badSec = turtleSec + finalRound + finalAsym;
+  const darkSec =
+    n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"]) || summedDarkSec;
+  const badSec = turtleSec + finalRound + finalAsym || summedBadSec;
 
   // 신 API: goodPostureSec 직접 제공
   const explicitGoodSec = n([
@@ -915,17 +934,16 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       ? Math.max(0, Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec))
       : goodPostureRatio;
 
-  // 정자세 시간: 서버 제공값 우선, 없으면 total * goodRatio 추정
+  // 정자세 시간: 서버 제공값 우선 → 일별 합계 → total * goodRatio 추정
   const goodPostureSecNormalized =
     explicitGoodSec > 0
       ? explicitGoodSec
+      : summedGoodSec > 0
+      ? summedGoodSec
       : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
-  const unclassifiedSec = n([
-    "unclassifiedSec",
-    "unclassifiedTotalSec",
-    "unclassified_sec",
-    "unclassified_total_sec",
-  ]);
+  const unclassifiedSec =
+    n(["unclassifiedSec", "unclassifiedTotalSec", "unclassified_sec", "unclassified_total_sec"]) ||
+    summedUnclassifiedSec;
 
   // 신 API: weekStartDate/weekEndDate / 구 API: from/to
   const from =
@@ -943,7 +961,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     days,
     totalDetectionSec,
     goodPostureSec: goodPostureSecNormalized,
-    badPostureSec: n(["badPostureSec", "bad_posture_sec"]) || badSec,
+    badPostureSec: n(["badPostureSec", "bad_posture_sec"]) || badSec || summedBadSec,
     unclassifiedSec,
     turtleNeckTotalSec: turtleSec,
     roundShoulderTotalSec: finalRound,
@@ -958,7 +976,12 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     worstWeekday:
       typeof raw.worstWeekday === "string" ? raw.worstWeekday
       : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string)
-      : null,
+      : (() => {
+          const worst = days
+            .filter((d) => d.hasData && d.badPostureRatio > 0)
+            .sort((a, b) => b.badPostureRatio - a.badPostureRatio)[0];
+          return worst?.weekday ?? null;
+        })(),
   };
 }
 
@@ -1185,11 +1208,35 @@ export function postSessionEvents(sessionId: string, events: DetectionSessionEve
   );
 }
 
+export function postSessionSegments(
+  sessionId: string,
+  events: DetectionSessionEvent[],
+  source: DetectionSessionSource = "WEB",
+) {
+  return request<{ accepted: number; duplicated?: number }>(
+    `/sessions/${sessionId}/segments`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        segments: events.map(({ eventId, state, startedAt, endedAt }) => ({
+          clientEventId: eventId,
+          state,
+          startedAt,
+          endedAt,
+        })),
+        source,
+      }),
+    },
+    true,
+  );
+}
+
 export function postDashboardTimeline(body: {
   date: string;
   time: string;
   dominantState: DetectionState;
   message: string;
+  eventId?: string;
 }) {
   return request<{ accepted: number }>(
     "/dashboard/timeline",

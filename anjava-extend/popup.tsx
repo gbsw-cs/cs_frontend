@@ -43,11 +43,15 @@ type UserSettingsResponse = {
 type StartSessionResponse = {
   currentSessionId?: string
   sessionStartedAt?: string
+  error?: string
 }
 
 type ResumeSessionResponse = {
+  success?: boolean
   pausedTotalMs?: number
 }
+
+type SessionActionResponse = { success?: boolean }
 
 type LoginResponse = {
   success?: boolean
@@ -434,32 +438,51 @@ export default function IndexPopup() {
 
   // ── Pause / Resume / Stop ─────────────────────────────────
   const handlePause = () => {
-    setIsPaused(true)
-    chrome.runtime.sendMessage({ type: "PAUSE_SESSION" })
+    chrome.runtime.sendMessage({ type: "PAUSE_SESSION" }, (r: SessionActionResponse) => {
+      if (chrome.runtime.lastError || !r?.success) {
+        setOffscreenError("세션을 일시정지하지 못했습니다. 감지 기록 전송 상태를 확인해주세요.")
+        return
+      }
+      setOffscreenError("")
+      setIsPaused(true)
+    })
   }
 
   const handleResume = () => {
-    setIsPaused(false)
     chrome.runtime.sendMessage({ type: "RESUME_SESSION" }, (r: ResumeSessionResponse) => {
-      if (chrome.runtime.lastError) return
+      if (chrome.runtime.lastError || !r?.success) {
+        setOffscreenError("세션을 재개하지 못했습니다.")
+        return
+      }
+      setOffscreenError("")
+      setIsPaused(false)
       if (r?.pausedTotalMs !== undefined) setPausedTotalMs(r.pausedTotalMs)
     })
   }
 
   const handleStop = () => {
-    setSessionId(null)
-    setStart(null)
-    setIsPaused(false)
-    setPausedTotalMs(0)
-    setElapsed(0)
-    chrome.runtime.sendMessage({ type: "END_SESSION" })
+    chrome.runtime.sendMessage({ type: "END_SESSION" }, (r: SessionActionResponse) => {
+      if (chrome.runtime.lastError || !r?.success) {
+        setOffscreenError("세션 종료 전 감지 기록을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.")
+        return
+      }
+      setOffscreenError("")
+      setSessionId(null)
+      setStart(null)
+      setIsPaused(false)
+      setPausedTotalMs(0)
+      setElapsed(0)
+    })
   }
 
   const handleStartSession = () => {
     chrome.runtime.sendMessage({ type: "START_SESSION" }, (r: StartSessionResponse) => {
       if (!chrome.runtime.lastError && r?.currentSessionId) {
+        setOffscreenError("")
         setSessionId(r.currentSessionId)
-        setStart(new Date(r.sessionStartedAt))
+        setStart(r.sessionStartedAt ? new Date(r.sessionStartedAt) : new Date())
+      } else {
+        setOffscreenError(r?.error ?? "세션을 시작하지 못했습니다.")
       }
     })
   }

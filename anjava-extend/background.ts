@@ -272,12 +272,12 @@ async function syncExtensionPushToken(enabled: boolean): Promise<void> {
 
 // ─── Session ─────────────────────────────────────────────────
 async function startSession(): Promise<void> {
-  const stored = await chrome.storage.local.get(["accessToken", "currentSessionId"])
+  const stored = await chrome.storage.local.get(["accessToken", "currentSessionId", "sessionSource"])
   if (!stored.accessToken) return
 
   // 실제 세션 ID가 이미 있으면 offscreen만 시작 (local- 폴백은 무효 처리)
   const isRealSession = stored.currentSessionId && !String(stored.currentSessionId).startsWith("local-")
-  if (isRealSession) {
+  if (isRealSession && stored.sessionSource === "EXTENSION") {
     try { await startOffscreenDetection() } catch {}
     return
   }
@@ -285,52 +285,49 @@ async function startSession(): Promise<void> {
   try {
     const data = await apiCall<{ sessionId: string; startedAt: string }>(
       "/sessions",
-      { method: "POST", body: JSON.stringify({ startedAt }) }
+      { method: "POST", body: JSON.stringify({ startedAt, source: "EXTENSION" }) }
     )
     await chrome.storage.local.set({
       currentSessionId: data.sessionId,
-      sessionStartedAt: data.startedAt
+      sessionStartedAt: data.startedAt,
+      sessionSource: "EXTENSION"
     })
   } catch (apiErr: unknown) {
     const err = apiErr as ApiError
     if (err.status === 409) {
       // 이미 진행 중인 세션 → GET /sessions/current로 기존 세션 ID 복원
       try {
-        const cur = await apiCall<{ sessionId: string; startedAt: string } | null>(
+        const cur = await apiCall<{ sessionId: string; startedAt: string; source?: "WEB" | "EXTENSION" } | null>(
           "/sessions/current", { method: "GET" }
         )
         if (cur?.sessionId) {
+          if (cur.source && cur.source !== "EXTENSION") {
+            throw new Error("웹 대시보드에서 감지 세션이 실행 중입니다. 한 곳에서만 세션을 실행해주세요.")
+          }
           await chrome.storage.local.set({
             currentSessionId: cur.sessionId,
-            sessionStartedAt: cur.startedAt
+            sessionStartedAt: cur.startedAt,
+            sessionSource: "EXTENSION"
           })
           debugLog("[session] 기존 세션 복원:", cur.sessionId)
         }
-      } catch {
-        await chrome.storage.local.set({
-          currentSessionId: `local-${Date.now()}`,
-          sessionStartedAt: startedAt
-        })
+      } catch (currentError) {
+        console.error("[session] 기존 세션 복원 실패:", currentError)
+        throw currentError
       }
     } else if (err.status === 404 || String(err.message).includes("404")) {
-      console.warn("[session] API 없음 → 로컬 세션 생성")
-      await chrome.storage.local.set({
-        currentSessionId: `local-${Date.now()}`,
-        sessionStartedAt: startedAt
-      })
+      console.error("[session] 세션 API를 찾을 수 없습니다.")
+      throw err
     } else {
       console.error("[session] start 실패:", err)
-      await chrome.storage.local.set({
-        currentSessionId: `local-${Date.now()}`,
-        sessionStartedAt: startedAt
-      })
+      throw err
     }
   }
   try { await startOffscreenDetection() } catch {}
 }
 
 async function endSession(): Promise<void> {
-  try { await stopOffscreenDetection() } catch {}
+  await stopOffscreenDetection()
   const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
   if (!currentSessionId) return
   // 로컬 세션이 아닐 때만 API 호출
@@ -342,9 +339,47 @@ async function endSession(): Promise<void> {
       })
     } catch (e) {
       console.error("[session] end:", e)
+      throw e
     }
   }
-  await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt"])
+  await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt", "sessionSource"])
+}
+
+async function pauseSession(): Promise<void> {
+  await stopOffscreenDetection()
+  const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
+  if (!currentSessionId || String(currentSessionId).startsWith("local-")) return
+  try {
+    await apiCall(`/sessions/${currentSessionId}/pause`, {
+      method: "POST",
+      body: JSON.stringify({ pausedAt: new Date().toISOString() })
+    })
+  } catch (error) {
+    await startOffscreenDetection().catch(() => {})
+    throw error
+  }
+}
+
+async function resumeSession(): Promise<void> {
+  const { currentSessionId } = await chrome.storage.local.get("currentSessionId")
+  if (!currentSessionId) throw new Error("진행 중인 세션이 없습니다.")
+  if (!String(currentSessionId).startsWith("local-")) {
+    await apiCall(`/sessions/${currentSessionId}/resume`, {
+      method: "POST",
+      body: JSON.stringify({ resumedAt: new Date().toISOString() })
+    })
+  }
+  try {
+    await startOffscreenDetection()
+  } catch (error) {
+    if (!String(currentSessionId).startsWith("local-")) {
+      await apiCall(`/sessions/${currentSessionId}/pause`, {
+        method: "POST",
+        body: JSON.stringify({ pausedAt: new Date().toISOString() })
+      }).catch(() => {})
+    }
+    throw error
+  }
 }
 
 // ─── Offscreen ───────────────────────────────────────────────
@@ -420,8 +455,8 @@ async function stopOffscreenDetection(): Promise<void> {
     chrome.storage.local.set({ offscreenActive: false })
     return
   }
-  chrome.runtime.sendMessage({ type: "STOP_DETECTION" }).catch(() => {})
-  await new Promise<void>(r => setTimeout(r, 200))
+  const response = await chrome.runtime.sendMessage({ type: "STOP_DETECTION" }).catch(() => null) as { ok?: boolean } | null
+  if (!response?.ok) throw new Error("대기 중인 감지 기록을 서버에 전송하지 못했습니다.")
   chrome.storage.local.set({ offscreenActive: false })
   await closeOffscreen()
 }
@@ -799,7 +834,7 @@ function postTimeline(rawState: string, message: string): void {
   debugLog(`[timeline] POST date=${date} time=${time} state=${dominantState} msg="${message}"`)
   apiCall("/dashboard/timeline", {
     method: "POST",
-    body: JSON.stringify({ date, time, dominantState, message: message ?? "" }),
+    body: JSON.stringify({ date, time, dominantState, message: message ?? "", eventId: crypto.randomUUID() }),
   }).then(() => {
     debugLog(`[timeline] 저장 성공: ${dominantState}`)
   }).catch((e: ApiError) => {
@@ -948,7 +983,8 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
   }
 
   if (msg.type === "PAUSE_SESSION") {
-    chrome.storage.local.get("pausedTotalMs")
+    pauseSession()
+      .then(() => chrome.storage.local.get("pausedTotalMs"))
       .then(({ pausedTotalMs }) =>
         chrome.storage.local.set({
           isPaused: true,
@@ -967,10 +1003,10 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
       .then(({ pausedAt, pausedTotalMs }) => {
         const added = pausedAt ? Date.now() - pausedAt : 0
         const total = (pausedTotalMs ?? 0) + added
-        return chrome.storage.local
+        return resumeSession().then(() => chrome.storage.local
           .set({ isPaused: false, pausedAt: null, pausedTotalMs: total })
           .then(() => restartAlarms())
-          .then(() => total)
+          .then(() => total))
       })
       .then((total) => sendResponse({ success: true, pausedTotalMs: total }))
       .catch(() => sendResponse({ success: false }))
@@ -998,6 +1034,9 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
     startSession()
       .then(() => chrome.storage.local.get(["currentSessionId", "sessionStartedAt"]))
       .then(sendResponse)
+      .catch((error: unknown) => sendResponse({
+        error: error instanceof Error ? error.message : "세션을 시작하지 못했습니다."
+      }))
     return true
   }
 

@@ -3,25 +3,14 @@ import { useEffect, useRef } from "react"
 const WEB_URL = (process.env.PLASMO_PUBLIC_WEB_URL ?? "https://anjava.vercel.app").replace(/\/$/, "")
 const API_BASE = `${WEB_URL}/api/backend`
 const DEBUG_ENABLED = process.env.PLASMO_PUBLIC_DEBUG === "1"
-
-const SEVERITY: Record<string, number> = {
-  TURTLE_NECK: 2,
-  SHOULDER_ISSUE: 2,
-  ROUND_SHOULDER: 2,
-  SHOULDER_ASYMMETRY: 2,
-  shoulder_tilted: 2,
-  round_shoulder: 2,
-  turtle_neck: 2,
-  DARK_ENV: 1,
-  dark_env: 1,
-  GOOD_POSTURE: 1,
-}
+const PENDING_EVENTS_STORAGE_KEY = "pendingDetectionEvents"
 
 interface DetectionEvent {
-  type: string
-  severity: number
-  durationSec: number
-  detectedAt: string
+  eventId: string
+  state: string
+  startedAt: string
+  endedAt: string
+  source: "EXTENSION"
 }
 
 interface Landmark { x: number; y: number; z: number }
@@ -64,6 +53,24 @@ const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
+}
+
+function createDetectionEvent(state: string, startedAtMs: number, endedAtMs: number): DetectionEvent {
+  return {
+    eventId: crypto.randomUUID?.() ?? `extension-${endedAtMs}-${Math.random().toString(36).slice(2)}`,
+    state: toBackendType(state),
+    startedAt: new Date(startedAtMs).toISOString(),
+    endedAt: new Date(endedAtMs).toISOString(),
+    source: "EXTENSION",
+  }
+}
+
+function toBackendType(state: string): string {
+  if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
+  if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
+  if (state === "shoulder_tilted") return "SHOULDER_ASYMMETRY"
+  if (state === "DARK_ENV" || state === "dark_env") return "DARK_ENV"
+  return "GOOD_POSTURE"
 }
 
 function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
@@ -133,6 +140,19 @@ export default function OffscreenPage() {
   const eventQueueRef     = useRef<DetectionEvent[]>([])
   const batchTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  function persistEventQueue() {
+    const sessionId = sessionIdRef.current
+    if (!sessionId || eventQueueRef.current.length === 0) {
+      return chrome.storage.local.remove(PENDING_EVENTS_STORAGE_KEY)
+    }
+    return chrome.storage.local.set({
+      [PENDING_EVENTS_STORAGE_KEY]: {
+        sessionId,
+        events: eventQueueRef.current,
+      },
+    })
+  }
+
   useEffect(() => {
     const handleMessage = (
       msg: OffscreenMessage,
@@ -147,8 +167,7 @@ export default function OffscreenPage() {
         return true
       }
       if (msg?.type === "STOP_DETECTION") {
-        stopDetection()
-        sendResponse({ ok: true })
+        void stopDetection().then((ok) => sendResponse({ ok }))
         return true
       }
       if (msg?.type === "UPDATE_SETTINGS") {
@@ -172,18 +191,9 @@ export default function OffscreenPage() {
 
     return () => {
       chrome.runtime.onMessage.removeListener(handleMessage)
-      stopDetection()
+      void stopDetection()
     }
   }, [])
-
-  // AI 상태 → 백엔드 이벤트 타입 매핑
-  function toBackendType(state: string): string {
-    if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
-    if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
-    if (state === "shoulder_tilted") return "SHOULDER_ASYMMETRY"
-    if (state === "DARK_ENV" || state === "dark_env") return "DARK_ENV"
-    return "GOOD_POSTURE"
-  }
 
   // 상태 변경 시 이전 상태를 이벤트 큐에 추가
   function recordStateChange(newState: string) {
@@ -192,12 +202,8 @@ export default function OffscreenPage() {
     if (prev !== null && stateStartRef.current > 0) {
       const durationSec = Math.round((now - stateStartRef.current) / 1000)
       if (durationSec >= 1) {
-        eventQueueRef.current.push({
-          type: toBackendType(prev),
-          severity: SEVERITY[toBackendType(prev)] ?? 1,
-          durationSec,
-          detectedAt: new Date(stateStartRef.current).toISOString(),
-        })
+        eventQueueRef.current.push(createDetectionEvent(prev, stateStartRef.current, now))
+        void persistEventQueue()
       }
     }
     currentStateRef.current = newState
@@ -205,44 +211,48 @@ export default function OffscreenPage() {
   }
 
   // 이벤트 큐를 백엔드에 배치 전송
-  async function flushEvents() {
+  async function flushEvents(): Promise<boolean> {
     // 현재 진행 중인 상태를 스냅샷으로 큐에 추가 (상태 변화 없어도 주기적 전송)
     if (currentStateRef.current !== null && stateStartRef.current > 0) {
       const now = Date.now()
       const durationSec = Math.round((now - stateStartRef.current) / 1000)
       if (durationSec >= 5) {
-        eventQueueRef.current.push({
-          type: toBackendType(currentStateRef.current),
-          severity: SEVERITY[toBackendType(currentStateRef.current)] ?? 1,
-          durationSec,
-          detectedAt: new Date(stateStartRef.current).toISOString(),
-        })
+        eventQueueRef.current.push(createDetectionEvent(currentStateRef.current, stateStartRef.current, now))
+        void persistEventQueue()
         stateStartRef.current = now  // 스냅샷 후 타이머 리셋
       }
     }
 
-    if (eventQueueRef.current.length === 0) return
+    if (eventQueueRef.current.length === 0) return true
     const accessToken = accessTokenRef.current
-    if (!accessToken) return
+    if (!accessToken) return false
     const currentSessionId = sessionIdRef.current
     if (!currentSessionId || String(currentSessionId).startsWith("local-")) {
       chrome.runtime.sendMessage({ type: "FLUSH_RESULT", ok: false, status: -2, body: `local 세션이라 스킵: ${currentSessionId}`, sessionId: currentSessionId || "none" }).catch(() => {})
-      return
+      return false
     }
     const events = eventQueueRef.current.splice(0)
+    await persistEventQueue()
     chrome.runtime.sendMessage({ type: "FLUSH_START", count: events.length, sessionId: currentSessionId }).catch(() => {})
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000)
-      const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/events`, {
+      const segments = events.map(({ eventId, state, startedAt, endedAt }) => ({
+        clientEventId: eventId,
+        state,
+        startedAt,
+        endedAt,
+      }))
+      const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/segments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ events }),
+        body: JSON.stringify({ segments, source: "EXTENSION" }),
         signal: controller.signal,
       })
       clearTimeout(timeoutId)
       const body = await res.json().catch(() => ({})) as EventFlushResponse
       if (res.ok) {
+        await persistEventQueue()
         chrome.runtime.sendMessage({
           type: "FLUSH_RESULT",
           ok: true,
@@ -250,8 +260,10 @@ export default function OffscreenPage() {
           accepted: body.data?.accepted ?? events.length,
           sessionId: currentSessionId,
         }).catch(() => {})
+        return true
       } else {
         eventQueueRef.current.unshift(...events)
+        await persistEventQueue()
         chrome.runtime.sendMessage({
           type: "FLUSH_RESULT",
           ok: false,
@@ -259,9 +271,11 @@ export default function OffscreenPage() {
           body: JSON.stringify(body),
           sessionId: currentSessionId,
         }).catch(() => {})
+        return false
       }
     } catch (e: unknown) {
       eventQueueRef.current.unshift(...events)
+      await persistEventQueue()
       const message = e instanceof Error ? e.message : "네트워크 오류"
       chrome.runtime.sendMessage({
         type: "FLUSH_RESULT",
@@ -270,18 +284,22 @@ export default function OffscreenPage() {
         body: message,
         sessionId: currentSessionId,
       }).catch(() => {})
+      return false
     }
   }
 
-  function stopDetection() {
+  async function stopDetection(): Promise<boolean> {
     cancelledRef.current = true
     if (batchTimerRef.current) { clearInterval(batchTimerRef.current); batchTimerRef.current = null }
     // 남은 이벤트 전송
     if (currentStateRef.current !== null) recordStateChange("__end__")
-    flushEvents().catch(() => {})
+    const flushed = await flushEvents().catch(() => false)
+    currentStateRef.current = null
+    stateStartRef.current = 0
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     detectorRef.current = null
+    return flushed
   }
 
   async function startDetection(accessToken: string, userId: string, baselineData: unknown) {
@@ -291,6 +309,23 @@ export default function OffscreenPage() {
     currentStateRef.current = null
     stateStartRef.current = 0
     eventQueueRef.current = []
+    const storedQueue = await chrome.storage.local.get(PENDING_EVENTS_STORAGE_KEY)
+    const pending = storedQueue[PENDING_EVENTS_STORAGE_KEY] as {
+      sessionId?: unknown
+      events?: unknown
+    } | undefined
+    if (pending?.sessionId === sessionIdRef.current && Array.isArray(pending.events)) {
+      eventQueueRef.current = pending.events.filter((event): event is DetectionEvent =>
+        Boolean(
+          event &&
+          typeof event === "object" &&
+          "eventId" in event &&
+          "startedAt" in event &&
+          "endedAt" in event &&
+          (event as { source?: unknown }).source === "EXTENSION",
+        )
+      )
+    }
 
     // 30초마다 이벤트 배치 전송
     if (batchTimerRef.current) clearInterval(batchTimerRef.current)
