@@ -148,8 +148,6 @@ function injectStyle() {
       flex-shrink: 0;
       overflow: hidden;
       border-radius: 16px;
-      background: linear-gradient(180deg, #dbeafe, #ffffff);
-      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
     }
     #${TOAST_ID} .toast-avatar img {
       display: block;
@@ -315,18 +313,31 @@ if (!window[WEB_RELAY_KEY]) {
   window[WEB_RELAY_KEY] = true
   window.addEventListener("message", (event) => {
     if (event.source !== window) return
-    if (event.data?.type !== "ANJAVA_POSTURE_RELAY") return
-    const relayId = typeof event.data.relayId === "string" ? event.data.relayId : ""
-    chrome.runtime.sendMessage({
-      type: "POSTURE_ALERT_FROM_WEB",
-      state: event.data.state,
-      message: event.data.message,
-      soundEnabled: event.data.soundEnabled,
-      suppressSystemNotification: event.data.suppressSystemNotification === true
-    }).then(() => {
-      if (!relayId) return
-      window.postMessage({ type: "ANJAVA_POSTURE_RELAY_ACK", relayId }, "*")
-    }).catch(() => {})
+
+    if (event.data?.type === "ANJAVA_POSTURE_RELAY") {
+      const relayId = typeof event.data.relayId === "string" ? event.data.relayId : ""
+      chrome.runtime.sendMessage({
+        type: "POSTURE_ALERT_FROM_WEB",
+        state: event.data.state,
+        message: event.data.message,
+        soundEnabled: event.data.soundEnabled,
+        suppressSystemNotification: event.data.suppressSystemNotification === true
+      }).then(() => {
+        if (!relayId) return
+        window.postMessage({ type: "ANJAVA_POSTURE_RELAY_ACK", relayId }, "*")
+      }).catch(() => {})
+      return
+    }
+
+    if (event.data?.type === "ANJAVA_WEB_SESSION_STATE") {
+      chrome.runtime.sendMessage({
+        type: "SYNC_WEB_SESSION",
+        state: event.data.state,
+        sessionId: event.data.sessionId,
+        startedAt: event.data.startedAt,
+        pausedTotalMs: event.data.pausedTotalMs ?? 0,
+      }).catch(() => {})
+    }
   })
 }
 

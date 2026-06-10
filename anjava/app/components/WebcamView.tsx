@@ -269,6 +269,8 @@ export default function WebcamView({
   const lastBatchSentAtRef = useRef(0);
   const baselineRetryAtRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
+  const sessionStartedAtRef = useRef<string | null>(null);
+  const sessionPausedTotalMsRef = useRef(0);
   const sessionPausedRef = useRef(false);
   const eventQueueRef = useRef<DetectionSessionEvent[]>([]);
   const stateStartRef = useRef<number>(Date.now());
@@ -365,6 +367,8 @@ export default function WebcamView({
         throw new Error("확장 프로그램에서 감지 세션이 실행 중입니다. 한 곳에서만 세션을 실행해주세요.");
       }
       sessionIdRef.current = session.sessionId;
+      sessionStartedAtRef.current = session.startedAt;
+      sessionPausedTotalMsRef.current = (session.totalPausedSec ?? 0) * 1000;
       sessionPausedRef.current = session.status === "PAUSED";
       const restoredEvents = restorePendingEvents(session.sessionId);
       if (restoredEvents.length > 0) {
@@ -398,6 +402,13 @@ export default function WebcamView({
             const nextState = sessionPausedRef.current ? "paused" : "running";
             onSessionActiveChangeRef.current?.(!sessionPausedRef.current, sessionPausedRef.current ? "paused" : undefined);
             onSessionControlStateChangeRef.current?.(nextState);
+            window.postMessage({
+              type: "ANJAVA_WEB_SESSION_STATE",
+              state: nextState,
+              sessionId: sessionIdRef.current,
+              startedAt: sessionStartedAtRef.current,
+              pausedTotalMs: sessionPausedTotalMsRef.current,
+            }, "*");
           } else if (operation === sessionOperationRef.current) {
             setHasSession(false);
             onSessionActiveChangeRef.current?.(false, "stopped");
@@ -427,6 +438,13 @@ export default function WebcamView({
             stateStartRef.current = Date.now();
             onSessionActiveChangeRef.current?.(true);
             onSessionControlStateChangeRef.current?.("running");
+            window.postMessage({
+              type: "ANJAVA_WEB_SESSION_STATE",
+              state: "running",
+              sessionId: sessionIdRef.current,
+              startedAt: sessionStartedAtRef.current,
+              pausedTotalMs: sessionPausedTotalMsRef.current,
+            }, "*");
           }
           return;
         }
@@ -445,6 +463,12 @@ export default function WebcamView({
           if (operation === sessionOperationRef.current) {
             onSessionActiveChangeRef.current?.(false, "paused");
             onSessionControlStateChangeRef.current?.("paused");
+            window.postMessage({
+              type: "ANJAVA_WEB_SESSION_STATE",
+              state: "paused",
+              sessionId: sessionIdRef.current,
+              startedAt: sessionStartedAtRef.current,
+            }, "*");
           }
           return;
         }
@@ -465,6 +489,7 @@ export default function WebcamView({
           onSessionActiveChangeRef.current?.(false, "stopped");
           onSessionControlStateChangeRef.current?.("stopped");
           onDashboardDataChangedRef.current?.();
+          window.postMessage({ type: "ANJAVA_WEB_SESSION_STATE", state: "stopped" }, "*");
         }
       } catch (error) {
         if (operation !== sessionOperationRef.current) return;

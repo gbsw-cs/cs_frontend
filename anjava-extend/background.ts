@@ -63,6 +63,7 @@ type RuntimeMessage =
   | { type: "FETCH_USER_SETTINGS" }
   | { type: "APPROVAL_RESULT"; requestId: string; approved: boolean }
   | { type: "START_DETECTION" | "STOP_DETECTION" }
+  | { type: "SYNC_WEB_SESSION"; state: "running" | "paused" | "stopped"; sessionId?: string; startedAt?: string; pausedTotalMs?: number }
 
 type ExternalMessage =
   | { type: "PING" }
@@ -876,7 +877,30 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
             "baselineDone", "isPaused", "pausedAt", "pausedTotalMs",
             "profileImg", "userName", "offscreenActive", "offscreenError",
             "lastSettingsSyncedAt"])
-      .then(sendResponse)
+      .then(async (stored) => {
+        // 로컬에 세션이 없으면 서버에서 현재 세션을 조회해 WEB 세션 동기화
+        if (!stored.currentSessionId && stored[AUTH_STORAGE_KEY]) {
+          try {
+            const cur = await apiCall<{ sessionId: string; startedAt: string; source?: string; status?: string; totalPausedSec?: number } | null>(
+              "/sessions/current", { method: "GET" }
+            )
+            if (cur?.sessionId && cur.source === "WEB") {
+              const syncData = {
+                currentSessionId: cur.sessionId,
+                sessionStartedAt: cur.startedAt,
+                sessionSource: "WEB" as const,
+                isPaused: cur.status === "PAUSED",
+                pausedAt: null,
+                pausedTotalMs: (cur.totalPausedSec ?? 0) * 1000,
+              }
+              await chrome.storage.local.set(syncData)
+              sendResponse({ ...stored, ...syncData })
+              return
+            }
+          } catch {}
+        }
+        sendResponse(stored)
+      })
     return true
   }
 
@@ -1137,6 +1161,36 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
           sendResponse({ success: false, error: String(e?.message ?? e) })
         })
     })
+    return true
+  }
+
+  if (msg.type === "SYNC_WEB_SESSION") {
+    const { state, sessionId, startedAt, pausedTotalMs } = msg
+    if (state === "running" && sessionId && startedAt) {
+      chrome.storage.local.set({
+        currentSessionId: sessionId,
+        sessionStartedAt: startedAt,
+        sessionSource: "WEB",
+        isPaused: false,
+        pausedAt: null,
+        pausedTotalMs: pausedTotalMs ?? 0,
+      }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }))
+    } else if (state === "paused" && sessionId) {
+      chrome.storage.local.set({
+        currentSessionId: sessionId,
+        sessionSource: "WEB",
+        isPaused: true,
+        pausedAt: Date.now(),
+      }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }))
+    } else if (state === "stopped") {
+      chrome.storage.local
+        .remove(["currentSessionId", "sessionStartedAt", "sessionSource"])
+        .then(() => chrome.storage.local.set({ isPaused: false, pausedAt: null, pausedTotalMs: 0 }))
+        .then(() => sendResponse({ ok: true }))
+        .catch(() => sendResponse({ ok: false }))
+    } else {
+      sendResponse({ ok: false })
+    }
     return true
   }
 

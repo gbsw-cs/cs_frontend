@@ -22,6 +22,7 @@ type StatusResponse = {
   accessToken?: string
   currentSessionId?: string
   sessionStartedAt?: string
+  sessionSource?: "WEB" | "EXTENSION"
   settings?: Partial<ExtSettings>
   baselineDone?: boolean
   isPaused?: boolean
@@ -371,6 +372,7 @@ export default function IndexPopup() {
   const [tab, setTab]             = useState<"home" | "settings">("home")
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionStart, setStart]  = useState<Date | null>(null)
+  const [sessionSource, setSessionSource] = useState<"WEB" | "EXTENSION" | null>(null)
   const [elapsed, setElapsed]     = useState(0)
   const [settings, setSettings]   = useState<ExtSettings>(DEFAULT_SETTINGS)
   const [userName, setUserName]   = useState("")
@@ -417,9 +419,11 @@ export default function IndexPopup() {
     if (res.currentSessionId) {
       setSessionId(res.currentSessionId)
       setStart(new Date(res.sessionStartedAt))
+      setSessionSource(res.sessionSource ?? null)
     } else {
       setSessionId(null)
       setStart(null)
+      setSessionSource(null)
     }
     if (res.settings)  setSettings({ ...DEFAULT_SETTINGS, ...res.settings })
     if (res.userName)  setUserName(res.userName)
@@ -546,6 +550,7 @@ export default function IndexPopup() {
       setOffscreenError("")
       setSessionId(null)
       setStart(null)
+      setSessionSource(null)
       setIsPaused(false)
       setPausedTotalMs(0)
       setElapsed(0)
@@ -614,6 +619,7 @@ export default function IndexPopup() {
       setPhase("login")
       setSessionId(null)
       setStart(null)
+      setSessionSource(null)
       setBaselineDone(false)
       setUserName("")
       setProfileImg("")
@@ -783,14 +789,17 @@ export default function IndexPopup() {
               <span className="session-label">
                 {!sessionId ? "세션 없음" : isPaused ? "일시정지됨" : "감지 세션 진행 중"}
               </span>
-              {sessionId && !isPaused && offscreenActive && (
+              {sessionId && sessionSource === "WEB" && (
+                <span className="webcam-badge" style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}>웹 대시보드</span>
+              )}
+              {sessionId && sessionSource !== "WEB" && !isPaused && offscreenActive && (
                 <span className="webcam-badge">웹캠 작동 중</span>
               )}
             </div>
             {sessionId && elapsed > 0 && (
               <p className="session-time">{fmtDuration(elapsed)}</p>
             )}
-            {sessionId && !isPaused && offscreenError && (
+            {sessionId && !isPaused && offscreenError && sessionSource !== "WEB" && (
               <p className="error-text" style={{ marginTop: 8 }}>{offscreenError}</p>
             )}
             {sessionId ? (
