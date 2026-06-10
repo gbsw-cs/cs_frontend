@@ -541,7 +541,7 @@ export default function DashboardPage() {
   const liveJudgementText = liveDetection
     ? liveIsGood
       ? "정상"
-      : (STATE_LABEL[liveDetection.state] ?? "자세 이상")
+      : "교정 필요"
     : rawScore !== null && healthScore >= 70
     ? "정상"
     : "분석 중";
