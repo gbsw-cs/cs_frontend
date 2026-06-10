@@ -392,8 +392,16 @@ export default function OffscreenPage() {
     let brightnessOffset = 0
     let calibrated = false
 
+    const TICK_INTERVAL_MS = 5000
+
     const tick = async () => {
       if (cancelledRef.current) return
+      const tickStart = Date.now()
+      const scheduleNext = () => {
+        if (cancelledRef.current) return
+        const elapsed = Date.now() - tickStart
+        setTimeout(tick, Math.max(0, TICK_INTERVAL_MS - elapsed))
+      }
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true })!
       canvas.width = vid.videoWidth || 640
@@ -427,7 +435,7 @@ export default function OffscreenPage() {
         brightness: Math.max(0, Math.round(rawBrightness - brightnessOffset))
       }
 
-      if (frame.visibility < 0.5) { setTimeout(tick, 5000); return }
+      if (frame.visibility < 0.5) { scheduleNext(); return }
 
       framesRef.current = [...framesRef.current.slice(-9), frame]
 
@@ -506,7 +514,7 @@ export default function OffscreenPage() {
         } catch { /* silent */ }
       }
 
-      setTimeout(tick, 5000)
+      scheduleNext()
     }
 
     tick()
