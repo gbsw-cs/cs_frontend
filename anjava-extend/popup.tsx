@@ -702,7 +702,42 @@ export default function IndexPopup() {
 
         <div className="content">
           <div className="card">
-            <div className="social-divider">
+            <div className="field-group">
+              <input
+                ref={emailRef}
+                className="field"
+                type="email"
+                placeholder="이메일"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                disabled={loginLoading}
+                autoComplete="email"
+              />
+              <input
+                className="field"
+                type="password"
+                placeholder="비밀번호"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                disabled={loginLoading}
+                autoComplete="current-password"
+              />
+            </div>
+            {loginError && (
+              <p className="error-text" style={{ marginTop: 8 }}>{loginError}</p>
+            )}
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ marginTop: 10 }}
+              onClick={handleLogin}
+              disabled={loginLoading || !email || !password}>
+              {loginLoading ? "로그인 중..." : "로그인"}
+            </button>
+
+            <div className="social-divider" style={{ margin: "14px 0 10px" }}>
               <span />
               <p>간편 로그인</p>
               <span />
