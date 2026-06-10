@@ -392,7 +392,7 @@ export default function OffscreenPage() {
     let brightnessOffset = 0
     let calibrated = false
 
-    const TICK_INTERVAL_MS = 5000
+    const TICK_INTERVAL_MS = 3000
 
     const tick = async () => {
       if (cancelledRef.current) return
