@@ -292,6 +292,7 @@ export default function DashboardPage() {
     sessionStateChangedAtRef.current = Date.now();
     if (!active && reason === "stopped") {
       lastReportedDetectionStateRef.current = null;
+      setLiveDetection(null);
     }
   }, []);
 
@@ -566,6 +567,8 @@ export default function DashboardPage() {
     ? liveIsGood
       ? "정확한 자세입니다 ✅"
       : `${STATE_LABEL[liveDetection.state] ?? "자세 이상 발생"}`
+    : sessionStatus === "stopped"
+    ? "세션을 시작해주세요."
     : rawScore !== null
     ? healthScore >= 60
       ? "정확한 자세입니다 ✅"
@@ -829,13 +832,13 @@ export default function DashboardPage() {
                     ? "text-rose-500"
                     : "text-zinc-400"
                 }`}>
-                  {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : "분석 대기 중"}
+                  {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : sessionStatus === "stopped" ? "세션을 시작해주세요." : "분석 대기 중"}
                 </div>
                 {liveDetection?.message ? (
                   <div className="mt-0.5 truncate text-[9px] text-zinc-500">{liveDetection.message}</div>
                 ) : null}
                 <div className="mt-0.5 text-[8px] text-zinc-300">
-                  {liveDetection ? `${liveDetection.updatedAt} 갱신` : "웹캠 연결 후 자동 갱신"}
+                  {liveDetection ? `${liveDetection.updatedAt} 갱신` : sessionStatus === "stopped" ? "" : "웹캠 연결 후 자동 갱신"}
                 </div>
               </div>
             </div>
