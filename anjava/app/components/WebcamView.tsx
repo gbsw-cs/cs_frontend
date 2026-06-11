@@ -286,6 +286,8 @@ export default function WebcamView({
   const [ready, setReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [isExtensionSession, setIsExtensionSession] = useState(false);
+  const extensionSessionRef = useRef(false);
 
   const flushQueuedEvents = useCallback(async () => {
     const sessionId = sessionIdRef.current;
@@ -364,8 +366,16 @@ export default function WebcamView({
     async function assignSession(session: DetectionSession | null) {
       if (operation !== sessionOperationRef.current || !session?.sessionId) return false;
       if (session.source && session.source !== "WEB") {
-        throw new Error("확장 프로그램에서 감지 세션이 실행 중입니다. 한 곳에서만 세션을 실행해주세요.");
+        extensionSessionRef.current = true;
+        setIsExtensionSession(true);
+        sessionIdRef.current = session.sessionId;
+        sessionStartedAtRef.current = session.startedAt;
+        sessionPausedTotalMsRef.current = (session.totalPausedSec ?? 0) * 1000;
+        sessionPausedRef.current = session.status === "PAUSED";
+        return true;
       }
+      extensionSessionRef.current = false;
+      setIsExtensionSession(false);
       sessionIdRef.current = session.sessionId;
       sessionStartedAtRef.current = session.startedAt;
       sessionPausedTotalMsRef.current = (session.totalPausedSec ?? 0) * 1000;
@@ -402,13 +412,15 @@ export default function WebcamView({
             const nextState = sessionPausedRef.current ? "paused" : "running";
             onSessionActiveChangeRef.current?.(!sessionPausedRef.current, sessionPausedRef.current ? "paused" : undefined);
             onSessionControlStateChangeRef.current?.(nextState);
-            window.postMessage({
-              type: "ANJAVA_WEB_SESSION_STATE",
-              state: nextState,
-              sessionId: sessionIdRef.current,
-              startedAt: sessionStartedAtRef.current,
-              pausedTotalMs: sessionPausedTotalMsRef.current,
-            }, "*");
+            if (!extensionSessionRef.current) {
+              window.postMessage({
+                type: "ANJAVA_WEB_SESSION_STATE",
+                state: nextState,
+                sessionId: sessionIdRef.current,
+                startedAt: sessionStartedAtRef.current,
+                pausedTotalMs: sessionPausedTotalMsRef.current,
+              }, "*");
+            }
           } else if (operation === sessionOperationRef.current) {
             setHasSession(false);
             onSessionActiveChangeRef.current?.(false, "stopped");
@@ -455,41 +467,50 @@ export default function WebcamView({
             onSessionControlStateChangeRef.current?.("stopped", "진행 중인 세션이 없습니다.");
             return;
           }
-          queueCurrentState();
-          const flushed = await flushQueuedEvents();
-          if (!flushed) throw new Error("일시정지 전 감지 기록을 전송하지 못했습니다.");
+          if (!extensionSessionRef.current) {
+            queueCurrentState();
+            const flushed = await flushQueuedEvents();
+            if (!flushed) throw new Error("일시정지 전 감지 기록을 전송하지 못했습니다.");
+          }
           await pauseDetectionSession(sessionIdRef.current);
           sessionPausedRef.current = true;
           if (operation === sessionOperationRef.current) {
             onSessionActiveChangeRef.current?.(false, "paused");
             onSessionControlStateChangeRef.current?.("paused");
-            window.postMessage({
-              type: "ANJAVA_WEB_SESSION_STATE",
-              state: "paused",
-              sessionId: sessionIdRef.current,
-              startedAt: sessionStartedAtRef.current,
-            }, "*");
+            if (!extensionSessionRef.current) {
+              window.postMessage({
+                type: "ANJAVA_WEB_SESSION_STATE",
+                state: "paused",
+                sessionId: sessionIdRef.current,
+                startedAt: sessionStartedAtRef.current,
+              }, "*");
+            }
           }
           return;
         }
 
-        queueCurrentState();
-        const flushed = await flushQueuedEvents();
-        if (!flushed && eventQueueRef.current.length > 0) {
-          throw new Error("마지막 감지 기록을 전송하지 못했습니다. 잠시 후 종료를 다시 시도해주세요.");
+        const wasExtension = extensionSessionRef.current;
+        if (!wasExtension) {
+          queueCurrentState();
+          const flushed = await flushQueuedEvents();
+          if (!flushed && eventQueueRef.current.length > 0) {
+            throw new Error("마지막 감지 기록을 전송하지 못했습니다. 잠시 후 종료를 다시 시도해주세요.");
+          }
         }
         const sessionId = sessionIdRef.current;
         sessionIdRef.current = null;
         sessionPausedRef.current = false;
+        extensionSessionRef.current = false;
         setHasSession(false);
+        setIsExtensionSession(false);
         lastBackendStateRef.current = null;
         if (sessionId) await endDetectionSession(sessionId);
-        persistPendingEvents(null, []);
+        if (!wasExtension) persistPendingEvents(null, []);
         if (operation === sessionOperationRef.current) {
           onSessionActiveChangeRef.current?.(false, "stopped");
           onSessionControlStateChangeRef.current?.("stopped");
           onDashboardDataChangedRef.current?.();
-          window.postMessage({ type: "ANJAVA_WEB_SESSION_STATE", state: "stopped" }, "*");
+          if (!wasExtension) window.postMessage({ type: "ANJAVA_WEB_SESSION_STATE", state: "stopped" }, "*");
         }
       } catch (error) {
         if (operation !== sessionOperationRef.current) return;
@@ -521,6 +542,31 @@ export default function WebcamView({
     window.addEventListener("pagehide", preservePendingInterval);
     return () => window.removeEventListener("pagehide", preservePendingInterval);
   }, [queueCurrentState, sessionControlState]);
+
+  useEffect(() => {
+    if (!isExtensionSession) return;
+    const poll = window.setInterval(async () => {
+      try {
+        const session = await getCurrentDetectionSession();
+        if (!session || (session.source && session.source !== "EXTENSION")) {
+          extensionSessionRef.current = false;
+          setIsExtensionSession(false);
+          sessionIdRef.current = null;
+          sessionPausedRef.current = false;
+          onSessionActiveChangeRef.current?.(false, "stopped");
+          onSessionControlStateChangeRef.current?.("stopped");
+        }
+      } catch {
+        extensionSessionRef.current = false;
+        setIsExtensionSession(false);
+        sessionIdRef.current = null;
+        sessionPausedRef.current = false;
+        onSessionActiveChangeRef.current?.(false, "stopped");
+        onSessionControlStateChangeRef.current?.("stopped");
+      }
+    }, 5000);
+    return () => window.clearInterval(poll);
+  }, [isExtensionSession]);
 
   useEffect(() => {
     if (!ready || sessionControlState !== "running" || !hasSession) {
@@ -690,7 +736,16 @@ export default function WebcamView({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">
-      {error ? (
+      {isExtensionSession ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-zinc-400">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <span className="text-zinc-300">확장프로그램에서 감지 중</span>
+          <span className="text-[10px] text-zinc-500">Chrome 확장프로그램이 자세를 감지하고 있어요.</span>
+        </div>
+      ) : error ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-zinc-400">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" />
