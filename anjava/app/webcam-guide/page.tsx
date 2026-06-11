@@ -23,14 +23,22 @@ const BASELINE_MIN_FRAMES = 20;
 export default function WebcamGuidePage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [baselineDone, setBaselineDone] = useState(false);
+
+  function goToStep(next: number) {
+    setStep(next);
+    if (next !== 2) setBaselineDone(false);
+  }
 
   function onNext() {
     if (step < TOTAL) {
-      setStep((s) => s + 1);
+      goToStep(step + 1);
     } else {
       router.push("/extension-guide");
     }
   }
+
+  const nextDisabled = step === 2 && !baselineDone;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10 sm:px-8">
@@ -50,7 +58,7 @@ export default function WebcamGuidePage() {
           <div className="flex h-[520px] items-center justify-center px-8 py-12 sm:px-16 sm:py-16">
             <div className="flex h-full w-full items-center justify-center">
               {step === 1 && <Slide1 />}
-              {step === 2 && <Slide2 />}
+              {step === 2 && <Slide2 onBaselineDone={() => setBaselineDone(true)} />}
               {step === 3 && <Slide3 />}
               {step === 4 && <Slide4 />}
             </div>
@@ -59,7 +67,7 @@ export default function WebcamGuidePage() {
           {/* Footer nav */}
           <div className="flex items-center justify-between border-t border-zinc-100 px-8 py-5 sm:px-12">
             <button
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
+              onClick={() => goToStep(Math.max(1, step - 1))}
               disabled={step === 1}
               className="flex items-center gap-1.5 rounded-lg bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-600 ring-1 ring-zinc-200 transition hover:bg-zinc-100 disabled:opacity-40"
             >
@@ -72,7 +80,7 @@ export default function WebcamGuidePage() {
                 {Array.from({ length: TOTAL }).map((_, i) => (
                   <button
                     key={i}
-                    onClick={() => setStep(i + 1)}
+                    onClick={() => goToStep(i + 1)}
                     aria-label={`${i + 1}단계로 이동`}
                     className={`h-1.5 rounded-full transition-all ${
                       i + 1 === step ? "w-5 bg-[#2563EB]" : "w-1.5 bg-zinc-300 hover:bg-zinc-400"
@@ -87,7 +95,9 @@ export default function WebcamGuidePage() {
 
             <button
               onClick={onNext}
-              className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+              disabled={nextDisabled}
+              title={nextDisabled ? "베이스라인 측정을 완료해주세요." : undefined}
+              className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {step === TOTAL ? "확장 프로그램 설치하기" : "다음"}
               <ChevronRight size={14} strokeWidth={2.4} />
@@ -152,7 +162,7 @@ function FeatureChip({
   );
 }
 
-function Slide2() {
+function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [active, setActive] = useState(false);
@@ -218,6 +228,7 @@ function Slide2() {
       }
       setBaselineDone(true);
       setBaselineSecondsLeft(0);
+      onBaselineDone();
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setError(e instanceof Error ? e.message : "베이스라인 계산에 실패했습니다.");
