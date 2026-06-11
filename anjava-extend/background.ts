@@ -583,13 +583,23 @@ async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSe
     soundEnabled,
   }
 
-  const tasks: Promise<void>[] = [sendToActiveTab(alert)]
-  const suppressSystemNotification = await shouldSuppressSystemPostureNotification(msg)
-  if (!suppressSystemNotification) {
-    tasks.unshift(showPostureSystemNotification(alert, { ...settings, soundEnabled }))
+  // 웹 대시보드 탭이 열려있으면 해당 탭에 직접 토스트 전송
+  const webTabs = await chrome.tabs.query({ url: `${WEB_URL}/*` }).catch(() => [] as chrome.tabs.Tab[])
+  const toastTasks: Promise<void>[] = webTabs
+    .filter(t => t.id)
+    .map(t => chrome.tabs.sendMessage(t.id!, alert).catch(() => {}))
+
+  // 웹 대시보드 탭이 없으면 현재 활성 탭에 토스트 전송
+  if (toastTasks.length === 0) {
+    toastTasks.push(sendToActiveTab(alert))
   }
 
-  const results = await Promise.allSettled(tasks)
+  const suppressSystemNotification = await shouldSuppressSystemPostureNotification(msg)
+  if (!suppressSystemNotification) {
+    toastTasks.unshift(showPostureSystemNotification(alert, { ...settings, soundEnabled }))
+  }
+
+  const results = await Promise.allSettled(toastTasks)
 
   for (const result of results) {
     if (result.status === "rejected") {
@@ -866,7 +876,7 @@ function postTimeline(rawState: string, message: string): void {
 }
 
 // ─── Messages ────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((rawMsg, sender, sendResponse) => {
   const msg = rawMsg as RuntimeMessage
   // These types are sent FROM background TO offscreen — ignore if echoed back
   if (["START_DETECTION", "STOP_DETECTION"].includes(msg.type)) return
@@ -905,17 +915,37 @@ chrome.runtime.onMessage.addListener((rawMsg, _sender, sendResponse) => {
   }
 
   if (msg.type === "POSTURE_ALERT_FROM_WEB") {
-    chrome.storage.local.get("settings").then(({ settings: s }) => {
+    const sourceTabId = sender.tab?.id
+    chrome.storage.local.get("settings").then(async ({ settings: s }) => {
       if (s?.pushEnabled === false) {
         sendResponse({ ok: true, skipped: "push-disabled" })
         return
       }
-      deliverPostureAlert(msg, s ?? {})
-        .then(() => sendResponse({ ok: true }))
-        .catch((e) => {
-          console.error("[notification] web relay 처리 실패:", e)
-          sendResponse({ ok: false, error: String(e?.message ?? e) })
-        })
+      const soundEnabled = msg.soundEnabled ?? (s?.soundEnabled !== false)
+      const alert: PostureMessage = {
+        type: "POSTURE_ALERT",
+        state: msg.state,
+        message: getPostureAlertMessage(msg.state, msg.message),
+        soundEnabled,
+      }
+      const tasks: Promise<void>[] = []
+      // 릴레이를 보낸 탭(웹 대시보드)에 직접 토스트 전송
+      if (sourceTabId) {
+        tasks.push(
+          chrome.tabs.sendMessage(sourceTabId, alert).catch(() => {})
+        )
+      } else {
+        tasks.push(sendToActiveTab(alert))
+      }
+      // 시스템 알림: 웹 페이지가 suppressSystemNotification을 요청하지 않은 경우
+      if (!msg.suppressSystemNotification) {
+        tasks.push(showPostureSystemNotification({ ...alert, soundEnabled }, { ...s, soundEnabled }))
+      }
+      await Promise.allSettled(tasks)
+      sendResponse({ ok: true })
+    }).catch((e) => {
+      console.error("[notification] web relay 처리 실패:", e)
+      sendResponse({ ok: false, error: String(e?.message ?? e) })
     })
     return true
   }
