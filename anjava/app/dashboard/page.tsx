@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import { Pause, Play, RotateCcw, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AvatarColored from "../components/AvatarColored";
@@ -741,8 +742,9 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => requestSessionState("running")}
-                    className="h-8 rounded-lg bg-[#2563EB] px-3 text-[11px] font-bold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 text-[11px] font-bold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
                   >
+                    <Play size={13} strokeWidth={2.5} fill="currentColor" />
                     세션 시작
                   </button>
                 )}
@@ -750,8 +752,9 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => requestSessionState("paused")}
-                    className="h-8 rounded-lg bg-white px-3 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
                   >
+                    <Pause size={13} strokeWidth={2.5} fill="currentColor" />
                     일시정지
                   </button>
                 )}
@@ -759,8 +762,9 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => requestSessionState("running")}
-                    className="h-8 rounded-lg bg-emerald-500 px-3 text-[11px] font-bold text-white shadow-sm shadow-emerald-100 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-[11px] font-bold text-white shadow-sm shadow-emerald-100 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
                   >
+                    <RotateCcw size={13} strokeWidth={2.5} />
                     재개
                   </button>
                 )}
@@ -768,8 +772,9 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => requestSessionState("stopped")}
-                    className="h-8 rounded-lg bg-white px-3 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
                   >
+                    <Square size={12} strokeWidth={2.5} fill="currentColor" />
                     종료
                   </button>
                 )}
