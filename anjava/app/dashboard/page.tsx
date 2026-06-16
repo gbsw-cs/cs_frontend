@@ -559,15 +559,15 @@ export default function DashboardPage() {
     : "분석 중";
   const liveStatusTone = liveDetection
     ? liveIsGood
-      ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
-      : { text: "주의 필요", color: "text-rose-500", ring: "ring-rose-300" }
+      ? { text: "양호", sentence: "양호합니다", color: "text-emerald-500", ring: "ring-emerald-300" }
+      : { text: "주의 필요", sentence: "주의가 필요합니다", color: "text-rose-500", ring: "ring-rose-300" }
     : rawScore !== null
     ? healthScore >= 70
-      ? { text: "양호", color: "text-emerald-500", ring: "ring-emerald-300" }
+      ? { text: "양호", sentence: "양호합니다", color: "text-emerald-500", ring: "ring-emerald-300" }
       : healthScore >= 40
-      ? { text: "보통", color: "text-amber-500", ring: "ring-amber-300" }
-      : { text: "주의 필요", color: "text-rose-500", ring: "ring-rose-300" }
-    : { text: "분석 중", color: "text-zinc-400", ring: "ring-zinc-200" };
+      ? { text: "보통", sentence: "보통입니다", color: "text-amber-500", ring: "ring-amber-300" }
+      : { text: "주의 필요", sentence: "주의가 필요합니다", color: "text-rose-500", ring: "ring-rose-300" }
+    : { text: "분석 중", sentence: "분석 중입니다", color: "text-zinc-400", ring: "ring-zinc-200" };
   const liveJudgementTone =
     liveJudgementText === "정상"
       ? { dot: "bg-emerald-400", color: "text-emerald-500" }
@@ -623,7 +623,7 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(180px,0.88fr)_minmax(150px,0.62fr)_minmax(230px,1.22fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(180px,0.88fr)_minmax(165px,0.72fr)_minmax(215px,1.12fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-hidden">
 
           {/* ── Row 1 ── */}
 
@@ -831,14 +831,14 @@ export default function DashboardPage() {
 
           {/* 3D 아바타 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
-            <div className="-mt-5 flex flex-col items-center">
-              <div className="flex h-36 w-full justify-center overflow-hidden">
+            <div className="-mt-4 flex min-h-0 flex-col items-center">
+              <div className="flex h-32 w-full shrink-0 justify-center overflow-hidden lg:h-28 xl:h-32">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
                 />
               </div>
-              <button className={`-mt-1 w-full rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
+              <button className={`-mt-0.5 w-full shrink-0 rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
                 liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
@@ -851,7 +851,7 @@ export default function DashboardPage() {
               }`}>
                 {avatarStatusText}
               </button>
-              <div className="mt-2 w-full rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
+              <div className="mt-1.5 w-full shrink-0 rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
                 <div className="text-[9px] font-semibold text-zinc-400">실시간 감지 상태</div>
                 <div className={`mt-0.5 text-[11px] font-bold ${
                   liveIsGood
@@ -1042,13 +1042,13 @@ export default function DashboardPage() {
           {/* ── Row 3 ── */}
 
           {/* 실시간 감지 상태 + 어둠 감지 모드 */}
-          <div className="col-span-12 flex h-full flex-col gap-2 sm:col-span-6 lg:col-span-3">
-            <Card className="flex min-h-0 flex-1 flex-col">
+          <div className="col-span-12 flex h-full w-full flex-col gap-2 sm:col-span-6 lg:col-span-2">
+            <Card className="flex min-h-0 w-full flex-1 flex-col">
               <div className="text-xs font-bold text-zinc-900">실시간 감지 상태</div>
 
               {/* 종합 상태 메시지 */}
               <div className={`mt-1.5 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold ring-2 ${liveStatusTone.color} ${liveStatusTone.ring}`}>
-                {me?.name ?? "사용자"}님의 상태는 {liveStatusTone.text}합니다.
+                {me?.name ?? "사용자"}님의 상태는 {liveStatusTone.sentence}.
               </div>
 
               {/* 감지 항목 리스트 */}
@@ -1071,7 +1071,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* 어둠 속 코딩 감지 모드 */}
-            <Card className="shrink-0 py-2.5">
+            <Card className="w-full shrink-0 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-zinc-900">어둠 속 코딩 감지 모드</div>
@@ -1083,7 +1083,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 주간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-9">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-10">
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-bold text-zinc-900">이번 주 누적 스크린타임</div>
@@ -1105,21 +1105,21 @@ export default function DashboardPage() {
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[230px_minmax(0,1fr)]">
-              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
-                <div className="grid grid-cols-3 gap-1.5">
+            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100">
+                <div className="grid grid-cols-3 gap-2">
                   <WeeklyCompactStat label="자세 경고 비율" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${weeklyGoodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-1.5 space-y-0.5">
-                  <div className="px-0.5 text-[8px] leading-tight text-zinc-400">자세 경고 유형별 비중</div>
+                <div className="mt-2 space-y-1">
+                  <div className="px-0.5 text-[10px] font-semibold leading-tight text-zinc-500">자세 경고 유형별 비중</div>
                   {weekly === null ? (
                     <div className="space-y-1 py-1">
                       {[1,2,3].map((k) => <div key={k} className="h-8 animate-pulse rounded-lg bg-zinc-100" />)}
                     </div>
                   ) : badPostureSec === 0 ? (
-                    <div className="flex items-center justify-center py-3 text-[9px] text-zinc-400">이번 주 자세 경고 데이터가 없습니다</div>
+                    <div className="flex min-h-[70px] items-center justify-center rounded-lg bg-white px-3 py-3 text-center text-[11px] font-medium text-zinc-400 ring-1 ring-zinc-100">이번 주 자세 경고 데이터가 없습니다</div>
                   ) : (
                     <>
                       <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
@@ -1264,9 +1264,9 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="flex min-h-[34px] flex-col items-center justify-center text-center">
-      <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
-      <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
+    <div className="flex min-h-[46px] flex-col items-center justify-center rounded-lg bg-white px-1.5 text-center ring-1 ring-zinc-100">
+      <div className="text-[10px] leading-tight text-zinc-500">{label}</div>
+      <div className={`mt-0.5 text-base font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -1274,12 +1274,12 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg px-2.5 py-0.5 ring-1 ring-zinc-100">
+    <div className="rounded-lg bg-white px-2.5 py-1 ring-1 ring-zinc-100">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[9px] leading-tight text-zinc-400">{label}</div>
-        <div className="shrink-0 text-[9px] font-semibold leading-tight text-zinc-500">{pct}%</div>
+        <div className="truncate text-[10px] leading-tight text-zinc-500">{label}</div>
+        <div className="shrink-0 text-[10px] font-semibold leading-tight text-zinc-500">{pct}%</div>
       </div>
-      <div className="text-[10px] font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-0.5 text-xs font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
       <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
