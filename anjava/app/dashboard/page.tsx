@@ -963,16 +963,16 @@ export default function DashboardPage() {
 
           {/* 오늘의 건강 점수 */}
           <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-full lg:self-end">
-            <div className="mt-1 flex items-center gap-2">
-              <div className="text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
-            </div>
-            <div className="mt-2 rounded-xl bg-[#2563EB]/5 px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#2563EB] ring-1 ring-[#2563EB]/15">
-              {todaySummaryText}
+            <div className="mt-0 flex items-center justify-between gap-2">
+              <div className="shrink-0 text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
+              <div className="min-w-0 truncate rounded-full bg-[#2563EB]/5 px-2.5 py-1 text-[10px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/15">
+                {todaySummaryText}
+              </div>
             </div>
 
-            <div className="mt-0.5 flex items-start justify-between gap-1">
+            <div className="mt-1 flex items-start justify-between gap-1">
               {/* 좌측 리스트 */}
-              <div className="ml-[10px] mt-[5px] w-[146px] shrink-0 space-y-0.5 pt-[9px] text-[10px]">
+              <div className="ml-[10px] mt-0 w-[146px] shrink-0 space-y-0.5 pt-1 text-[10px]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-zinc-700"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />자세 점수</span>
                   <span className="text-[11px] font-bold text-emerald-500">{rawScore !== null ? healthScore : "—"}</span>
@@ -992,7 +992,7 @@ export default function DashboardPage() {
               </div>
 
               {/* 도넛 차트 (단색) */}
-              <div className="relative -mt-2 mr-[10px] shrink-0">
+              <div className="relative -mt-3 mr-[10px] shrink-0">
                 {(() => {
                   const size = 116;
                   const r = 38;
@@ -1025,7 +1025,7 @@ export default function DashboardPage() {
               const color = (n: number | null) =>
                 n === null ? "text-zinc-300" : n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
               return (
-                <div className="mt-0 grid grid-cols-2 gap-2 border-t border-zinc-200 pt-1">
+                <div className="-mt-1 grid grid-cols-2 gap-2 border-t border-zinc-200 pt-1">
                   <div className="text-center">
                     <div className="text-[10px] text-zinc-400">어제 대비</div>
                     <div className={`mt-0.5 text-xs font-bold ${color(yDiff)}`}>{fmt(yDiff)}</div>
@@ -1119,7 +1119,7 @@ export default function DashboardPage() {
                       {[1,2,3].map((k) => <div key={k} className="h-8 animate-pulse rounded-lg bg-zinc-100" />)}
                     </div>
                   ) : badPostureSec === 0 ? (
-                    <div className="flex min-h-[70px] items-center justify-center rounded-lg bg-white px-3 py-3 text-center text-[11px] font-medium text-zinc-400 ring-1 ring-zinc-100">이번 주 자세 경고 데이터가 없습니다</div>
+                    <div className="flex min-h-[92px] items-center justify-center rounded-lg bg-white px-3 py-3 text-center text-[11px] font-medium text-zinc-400 ring-1 ring-zinc-100">이번 주 자세 경고 데이터가 없습니다</div>
                   ) : (
                     <>
                       <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
