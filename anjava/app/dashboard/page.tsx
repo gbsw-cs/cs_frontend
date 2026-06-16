@@ -602,8 +602,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 pb-1 pt-[3px] transition-colors duration-300 sm:px-4 sm:pb-2 sm:pt-[3px] lg:h-dvh lg:overflow-y-auto lg:pb-[0.35vh] lg:pt-[3px]">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col lg:h-full lg:min-h-0">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 pb-1 pt-[3px] transition-colors duration-300 sm:px-4 sm:pb-2 sm:pt-[3px] lg:pb-[0.35vh] lg:pt-[3px]">
+      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
         {me.settings.pushEnabled && notificationPermission === "default" && (
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
             <span>백그라운드 자세 알림을 받으려면 브라우저 알림 권한이 필요합니다.</span>
@@ -623,7 +623,7 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(170px,0.88fr)_minmax(158px,0.72fr)_minmax(205px,1.12fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-visible">
+        <div className="grid w-full grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(170px,0.88fr)_minmax(158px,0.72fr)_minmax(205px,1.12fr)] lg:gap-x-2 lg:gap-y-2">
 
           {/* ── Row 1 ── */}
 
