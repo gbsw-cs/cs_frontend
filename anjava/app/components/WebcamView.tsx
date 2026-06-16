@@ -368,6 +368,7 @@ export default function WebcamView({
       if (session.source && session.source !== "WEB") {
         extensionSessionRef.current = true;
         setIsExtensionSession(true);
+        setHasSession(false);
         sessionIdRef.current = session.sessionId;
         sessionStartedAtRef.current = session.startedAt;
         sessionPausedTotalMsRef.current = (session.totalPausedSec ?? 0) * 1000;
@@ -736,16 +737,7 @@ export default function WebcamView({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-xl bg-zinc-900">
-      {isExtensionSession ? (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-zinc-400">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <path d="M8 21h8M12 17v4" />
-          </svg>
-          <span className="text-zinc-300">확장프로그램에서 감지 중</span>
-          <span className="text-[10px] text-zinc-500">Chrome 확장프로그램이 자세를 감지하고 있어요.</span>
-        </div>
-      ) : error ? (
+      {error ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-zinc-400">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" />
@@ -785,7 +777,9 @@ export default function WebcamView({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-white">Live</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white">
+                {isExtensionSession ? "Extension Live" : "Live"}
+              </span>
             </div>
           )}
           {ready && (

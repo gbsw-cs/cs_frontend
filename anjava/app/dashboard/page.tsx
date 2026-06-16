@@ -281,6 +281,7 @@ export default function DashboardPage() {
     setSessionError(null);
     setSessionStatus("checking");
     setSessionCommand("checking");
+    setWebcamVisible(true);
   }, []);
 
   // 확장 프로그램이 타임라인을 저장하면 content script가 ANJAVA_TIMELINE_POSTED를 릴레이
@@ -315,6 +316,7 @@ export default function DashboardPage() {
     setSessionError(null);
     setSessionStatus("checking");
     setSessionCommand(state);
+    if (state === "running") setWebcamVisible(true);
   }, []);
 
   const handleAuthenticationExpired = useCallback(() => {
@@ -600,8 +602,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-1 transition-colors duration-300 sm:px-4 sm:py-2 lg:py-[0.35vh]">
-      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 pb-1 pt-[3px] transition-colors duration-300 sm:px-4 sm:pb-2 sm:pt-[3px] lg:h-dvh lg:overflow-hidden lg:pb-[0.35vh] lg:pt-[3px]">
+      <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col lg:h-full lg:min-h-0">
         {me.settings.pushEnabled && notificationPermission === "default" && (
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
             <span>백그라운드 자세 알림을 받으려면 브라우저 알림 권한이 필요합니다.</span>
@@ -621,7 +623,7 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(230px,27vh)_minmax(260px,30vh)_minmax(310px,34vh)] lg:gap-x-2 lg:gap-y-[2vh]">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(180px,0.88fr)_minmax(150px,0.62fr)_minmax(230px,1.22fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-hidden">
 
           {/* ── Row 1 ── */}
 
@@ -715,10 +717,10 @@ export default function DashboardPage() {
 
           {/* 웹캠 */}
           <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-full">
-            <div className="flex shrink-0 items-start justify-between">
+            <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
-                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ring-1 ${
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${
                   sessionStatus === "running"
                     ? "bg-emerald-50 text-emerald-600 ring-emerald-200"
                     : sessionStatus === "paused"
@@ -734,23 +736,47 @@ export default function DashboardPage() {
                     : "세션 없음"}
                 </span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {sessionStatus === "stopped" && (
-                  <button type="button" onClick={() => requestSessionState("running")} className="rounded-md bg-[#2563EB] px-2 py-1 text-[9px] font-semibold text-white hover:bg-blue-700">시작</button>
+                  <button
+                    type="button"
+                    onClick={() => requestSessionState("running")}
+                    className="h-8 rounded-lg bg-[#2563EB] px-3 text-[11px] font-bold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+                  >
+                    세션 시작
+                  </button>
                 )}
                 {sessionStatus === "running" && (
-                  <button type="button" onClick={() => requestSessionState("paused")} className="rounded-md bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100">일시정지</button>
+                  <button
+                    type="button"
+                    onClick={() => requestSessionState("paused")}
+                    className="h-8 rounded-lg bg-white px-3 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200 transition hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  >
+                    일시정지
+                  </button>
                 )}
                 {sessionStatus === "paused" && (
-                  <button type="button" onClick={() => requestSessionState("running")} className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100">재개</button>
+                  <button
+                    type="button"
+                    onClick={() => requestSessionState("running")}
+                    className="h-8 rounded-lg bg-emerald-500 px-3 text-[11px] font-bold text-white shadow-sm shadow-emerald-100 transition hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+                  >
+                    재개
+                  </button>
                 )}
                 {(sessionStatus === "running" || sessionStatus === "paused") && (
-                  <button type="button" onClick={() => requestSessionState("stopped")} className="rounded-md bg-rose-50 px-2 py-1 text-[9px] font-semibold text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100">종료</button>
+                  <button
+                    type="button"
+                    onClick={() => requestSessionState("stopped")}
+                    className="h-8 rounded-lg bg-white px-3 text-[11px] font-bold text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+                  >
+                    종료
+                  </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setWebcamVisible((v) => !v)}
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:text-[#2563EB]"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-50 text-zinc-400 ring-1 ring-zinc-100 transition hover:text-[#2563EB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
                   aria-label={webcamVisible ? "카메라 숨기기" : "카메라 보기"}
                 >
                 {webcamVisible ? (
@@ -999,12 +1025,12 @@ export default function DashboardPage() {
               const color = (n: number | null) =>
                 n === null ? "text-zinc-300" : n > 0 ? "text-[#2563EB]" : n < 0 ? "text-rose-500" : "text-zinc-500";
               return (
-                <div className="mt-0 grid grid-cols-2 gap-2">
-                  <div className="border-t border-zinc-200 pt-1 text-center">
+                <div className="mt-0 grid grid-cols-2 gap-2 border-t border-zinc-200 pt-1">
+                  <div className="text-center">
                     <div className="text-[10px] text-zinc-400">어제 대비</div>
                     <div className={`mt-0.5 text-xs font-bold ${color(yDiff)}`}>{fmt(yDiff)}</div>
                   </div>
-                  <div className="border-t border-zinc-200 pt-1 text-center">
+                  <div className="text-center">
                     <div className="text-[10px] text-zinc-400">지난주 대비</div>
                     <div className={`mt-0.5 text-xs font-bold ${color(wDiff)}`}>{fmt(wDiff)}</div>
                   </div>
@@ -1209,7 +1235,7 @@ export default function DashboardPage() {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-zinc-100 sm:px-4 sm:py-3.5 ${className}`}>
+    <div className={`rounded-2xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-zinc-100 sm:px-4 sm:py-3.5 lg:px-3 lg:py-2.5 ${className}`}>
       {children}
     </div>
   );
