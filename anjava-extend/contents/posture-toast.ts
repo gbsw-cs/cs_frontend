@@ -15,6 +15,8 @@ let dismissTimer: number | null = null
 const TOAST_MESSAGES: Record<string, string> = {
   TURTLE_NECK: "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
   turtle_neck: "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
+  SLOUCH: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
+  slouch: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
   SHOULDER_ISSUE: "어깨 자세 이상이 감지됐어요. 어깨를 뒤로 펴주세요.",
   ROUND_SHOULDER: "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
   round_shoulder: "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
@@ -34,6 +36,7 @@ const POSTURE_IMAGE_BY_STATE: Record<string, string> = {
 
 const NORMALIZED_POSTURE_STATE: Record<string, string> = {
   turtle_neck: "TURTLE_NECK",
+  slouch: "SLOUCH",
   round_shoulder: "ROUND_SHOULDER",
   shoulder_issue: "SHOULDER_ISSUE",
   shoulder_tilted: "SHOULDER_ASYMMETRY",

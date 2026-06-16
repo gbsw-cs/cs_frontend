@@ -20,10 +20,19 @@ interface Frame {
   timestamp:      string
   visibility:     number
   nose:           Landmark
+  left_eye:       Landmark
+  right_eye:      Landmark
   left_ear:       Landmark
   right_ear:      Landmark
   left_shoulder:  Landmark
   right_shoulder: Landmark
+  nose_visibility: number
+  left_eye_visibility: number
+  right_eye_visibility: number
+  left_ear_visibility: number
+  right_ear_visibility: number
+  left_shoulder_visibility: number
+  right_shoulder_visibility: number
   brightness:     number
 }
 
@@ -36,6 +45,11 @@ function debugLog(...args: unknown[]): void {
 function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
   const point = arr?.[i]
   return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z } : EMPTY
+}
+
+function vis(arr: PoseLandmark[] | undefined, i: number): number {
+  const visibility = arr?.[i]?.visibility
+  return typeof visibility === "number" ? Number(visibility) : 0
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -148,10 +162,19 @@ export default function BaselinePage() {
         timestamp:      new Date().toISOString(),
         visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
         nose:           lm(pts, 0),
+        left_eye:       lm(pts, 2),
+        right_eye:      lm(pts, 5),
         left_ear:       lm(pts, 7),
         right_ear:      lm(pts, 8),
         left_shoulder:  lm(pts, 11),
         right_shoulder: lm(pts, 12),
+        nose_visibility: vis(pts, 0) || vis(ptsNorm, 0),
+        left_eye_visibility: vis(pts, 2) || vis(ptsNorm, 2),
+        right_eye_visibility: vis(pts, 5) || vis(ptsNorm, 5),
+        left_ear_visibility: vis(pts, 7) || vis(ptsNorm, 7),
+        right_ear_visibility: vis(pts, 8) || vis(ptsNorm, 8),
+        left_shoulder_visibility: vis(pts, 11) || vis(ptsNorm, 11),
+        right_shoulder_visibility: vis(pts, 12) || vis(ptsNorm, 12),
         brightness:     calcBrightness(ctx, canvas.width, canvas.height)
       }
       framesRef.current.push(frame)

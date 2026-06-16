@@ -466,6 +466,8 @@ async function stopOffscreenDetection(): Promise<void> {
 const TOAST_MESSAGES: Record<string, string> = {
   TURTLE_NECK:        "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
   turtle_neck:        "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
+  SLOUCH:             "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
+  slouch:             "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
   SHOULDER_ISSUE:     "어깨 자세 이상이 감지됐어요. 어깨를 뒤로 펴주세요.",
   ROUND_SHOULDER:     "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
   round_shoulder:     "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
@@ -824,10 +826,12 @@ async function notifyDashboard(type: string): Promise<void> {
 }
 
 // ─── Timeline ────────────────────────────────────────────────
-// 백엔드 허용값: TURTLE_NECK, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE
+// 백엔드 허용값: TURTLE_NECK, SLOUCH, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE
 const TIMELINE_STATE_MAP: Record<string, string> = {
   TURTLE_NECK:        "TURTLE_NECK",
   turtle_neck:        "TURTLE_NECK",
+  SLOUCH:             "SLOUCH",
+  slouch:             "SLOUCH",
   SHOULDER_ISSUE:     "ROUND_SHOULDER",
   ROUND_SHOULDER:     "ROUND_SHOULDER",
   round_shoulder:     "ROUND_SHOULDER",

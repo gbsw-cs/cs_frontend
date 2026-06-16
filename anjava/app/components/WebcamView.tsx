@@ -49,6 +49,7 @@ const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
   good_posture: "GOOD_POSTURE",
   normal: "GOOD_POSTURE",
   turtle_neck: "TURTLE_NECK",
+  slouch: "SLOUCH",
   round_shoulder: "ROUND_SHOULDER",
   shoulder_tilted: "SHOULDER_ASYMMETRY",
   shoulder_asymmetry: "SHOULDER_ASYMMETRY",
@@ -59,6 +60,112 @@ const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
 
 function toBackendState(finalStatus: string): DetectionState {
   return AI_STATUS_TO_BACKEND_STATE[finalStatus.toLowerCase()] ?? "GOOD_POSTURE";
+}
+
+type PostureBatchResult = {
+  data?: {
+    final_status?: unknown;
+    per_frame?: unknown;
+  };
+  dominant_state?: unknown;
+  state?: unknown;
+  result?: unknown;
+};
+
+type HealthScoreCounts = {
+  turtle_neck: number;
+  round_shoulder: number;
+  shoulder_tilted: number;
+  slouch: number;
+  dark_environment: number;
+};
+
+const HEALTH_SCORE_ISSUE_KEYS = [
+  "turtle_neck",
+  "round_shoulder",
+  "shoulder_tilted",
+  "slouch",
+  "dark_environment",
+] as const;
+
+const ISSUE_PRIORITY = [
+  "turtle_neck",
+  "slouch",
+  "round_shoulder",
+  "shoulder_tilted",
+  "shoulder_asymmetry",
+  "shoulder_issue",
+  "dark_environment",
+  "dark_env",
+] as const;
+
+function normalizeIssue(issue: unknown): string | null {
+  if (typeof issue !== "string") return null;
+  const value = issue.trim().toLowerCase();
+  if (!value || value === "good" || value === "good_posture" || value === "normal" || value === "ok") return null;
+  return value;
+}
+
+function extractPerFrameIssues(result: PostureBatchResult | null): string[] {
+  const perFrame = result?.data?.per_frame;
+  if (!Array.isArray(perFrame)) return [];
+  return perFrame.flatMap((frame) => {
+    const issues = (frame as { issues?: unknown } | null)?.issues;
+    if (!Array.isArray(issues)) return [];
+    return issues.map(normalizeIssue).filter((issue): issue is string => Boolean(issue));
+  });
+}
+
+function issuesFromFinalStatus(status: unknown): string[] {
+  if (typeof status !== "string") return [];
+  return status
+    .split("+")
+    .map(normalizeIssue)
+    .filter((issue): issue is string => Boolean(issue));
+}
+
+function countHealthScoreIssues(issues: string[]): HealthScoreCounts {
+  const counts: HealthScoreCounts = {
+    turtle_neck: 0,
+    round_shoulder: 0,
+    shoulder_tilted: 0,
+    slouch: 0,
+    dark_environment: 0,
+  };
+  issues.forEach((issue) => {
+    const key = issue === "dark_env" ? "dark_environment" : issue === "shoulder_asymmetry" ? "shoulder_tilted" : issue;
+    if ((HEALTH_SCORE_ISSUE_KEYS as readonly string[]).includes(key)) {
+      counts[key as keyof HealthScoreCounts] += 1;
+    }
+  });
+  return counts;
+}
+
+function choosePrimaryIssue(issues: string[]): string {
+  if (issues.length === 0) return "good_posture";
+  const counts = new Map<string, number>();
+  issues.forEach((issue) => counts.set(issue, (counts.get(issue) ?? 0) + 1));
+  return [...counts.entries()].sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    const aPriority = ISSUE_PRIORITY.indexOf(a[0] as (typeof ISSUE_PRIORITY)[number]);
+    const bPriority = ISSUE_PRIORITY.indexOf(b[0] as (typeof ISSUE_PRIORITY)[number]);
+    return (aPriority === -1 ? ISSUE_PRIORITY.length : aPriority) -
+      (bPriority === -1 ? ISSUE_PRIORITY.length : bPriority);
+  })[0]?.[0] ?? "good_posture";
+}
+
+function getBatchDetectionSummary(result: PostureBatchResult | null) {
+  const perFrameIssues = extractPerFrameIssues(result);
+  const fallbackStatus =
+    result?.data?.final_status ?? result?.dominant_state ?? result?.state ?? result?.result ?? "";
+  const issues = perFrameIssues.length > 0 ? perFrameIssues : issuesFromFinalStatus(fallbackStatus);
+  const primaryIssue = choosePrimaryIssue(issues);
+  return {
+    issues,
+    counts: countHealthScoreIssues(issues),
+    status: primaryIssue,
+    usedPerFrameIssues: perFrameIssues.length > 0,
+  };
 }
 
 function createDetectionEvent(
@@ -149,6 +256,8 @@ function getErrorStatus(error: unknown) {
 const POSTURE_MESSAGES: Record<string, string> = {
   turtle_neck:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
   TURTLE_NECK:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  slouch:             "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
+  SLOUCH:             "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   ROUND_SHOULDER:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
@@ -162,6 +271,7 @@ const POSTURE_MESSAGES: Record<string, string> = {
 
 const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+  SLOUCH: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
   SHOULDER_ISSUE: "어깨 자세 이상이 감지되었어요! 어깨를 바르게 펴주세요.",
@@ -693,13 +803,13 @@ export default function WebcamView({
           setAiStatus("error");
           return;
         }
-        const result = await response.json().catch(() => null);
-        const finalStatus: string = result?.data?.final_status ?? "";
-        const backendState = toBackendState(finalStatus);
-        const msg = POSTURE_MESSAGES[finalStatus] ?? BACKEND_STATE_MESSAGES[backendState] ?? "";
+        const result = await response.json().catch(() => null) as PostureBatchResult | null;
+        const detectionSummary = getBatchDetectionSummary(result);
+        const backendState = toBackendState(detectionSummary.status);
+        const msg = POSTURE_MESSAGES[detectionSummary.status] ?? BACKEND_STATE_MESSAGES[backendState] ?? "";
         // 웹이 활성 상태면 페이지 toast를 우선하고, 백그라운드에서는 웹이 직접
         // 시스템 알림을 표시해 확장 프로그램의 실행 상태에 의존하지 않는다.
-        if (pushEnabled && msg && finalStatus !== lastStatusRef.current) {
+        if (pushEnabled && msg && detectionSummary.status !== lastStatusRef.current) {
           const webIsForeground =
             document.visibilityState === "visible" && document.hasFocus();
           const notification = webIsForeground
@@ -721,7 +831,7 @@ export default function WebcamView({
           });
         }
         recordStateChange(backendState, msg);
-        lastStatusRef.current = finalStatus;
+        lastStatusRef.current = detectionSummary.status;
         setAiStatus("ok");
       } catch {
         setAiStatus("error");

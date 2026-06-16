@@ -45,8 +45,12 @@ type BaselinePayload = {
 }
 interface Frame {
   timestamp: string; visibility: number
-  nose: Landmark; left_ear: Landmark; right_ear: Landmark
-  left_shoulder: Landmark; right_shoulder: Landmark; brightness: number
+  nose: Landmark; left_eye: Landmark; right_eye: Landmark; left_ear: Landmark; right_ear: Landmark
+  left_shoulder: Landmark; right_shoulder: Landmark
+  nose_visibility: number; left_eye_visibility: number; right_eye_visibility: number
+  left_ear_visibility: number; right_ear_visibility: number
+  left_shoulder_visibility: number; right_shoulder_visibility: number
+  brightness: number
 }
 
 const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
@@ -67,15 +71,68 @@ function createDetectionEvent(state: string, startedAtMs: number, endedAtMs: num
 
 function toBackendType(state: string): string {
   if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
+  if (state === "SLOUCH" || state === "slouch") return "SLOUCH"
   if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
   if (state === "shoulder_tilted") return "SHOULDER_ASYMMETRY"
   if (state === "DARK_ENV" || state === "dark_env") return "DARK_ENV"
   return "GOOD_POSTURE"
 }
 
+const ISSUE_PRIORITY = ["turtle_neck", "slouch", "round_shoulder", "shoulder_tilted", "shoulder_asymmetry", "shoulder_issue", "dark_environment", "dark_env"]
+
+function normalizeIssue(issue: unknown): string | null {
+  if (typeof issue !== "string") return null
+  const value = issue.trim().toLowerCase()
+  if (!value || ["good", "good_posture", "normal", "ok"].includes(value)) return null
+  return value
+}
+
+function statusIssues(status: unknown): string[] {
+  if (typeof status !== "string") return []
+  return status.split("+").map(normalizeIssue).filter((issue): issue is string => Boolean(issue))
+}
+
+function perFrameIssues(data: unknown): string[] {
+  const frames = (data as { data?: { per_frame?: unknown } } | null)?.data?.per_frame
+  if (!Array.isArray(frames)) return []
+  return frames.flatMap((frame) => {
+    const issues = (frame as { issues?: unknown })?.issues
+    if (!Array.isArray(issues)) return []
+    return issues.map(normalizeIssue).filter((issue): issue is string => Boolean(issue))
+  })
+}
+
+function primaryIssue(issues: string[]) {
+  if (issues.length === 0) return "GOOD_POSTURE"
+  const counts = new Map<string, number>()
+  issues.forEach((issue) => counts.set(issue, (counts.get(issue) ?? 0) + 1))
+  return [...counts.entries()].sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1]
+    const ap = ISSUE_PRIORITY.indexOf(a[0])
+    const bp = ISSUE_PRIORITY.indexOf(b[0])
+    return (ap === -1 ? ISSUE_PRIORITY.length : ap) - (bp === -1 ? ISSUE_PRIORITY.length : bp)
+  })[0]?.[0] ?? "GOOD_POSTURE"
+}
+
+function getDetectionState(data: unknown) {
+  const fallback = typeof data === "string" ? data :
+    ((data as { data?: { final_status?: unknown }; dominant_state?: unknown; state?: unknown; result?: unknown } | null)?.data?.final_status ??
+      (data as { dominant_state?: unknown } | null)?.dominant_state ??
+      (data as { state?: unknown } | null)?.state ??
+      (data as { result?: unknown } | null)?.result ??
+      "")
+  const issues = perFrameIssues(data)
+  return issues.length > 0 ? primaryIssue(issues) : (primaryIssue(statusIssues(fallback)) || "GOOD_POSTURE")
+}
+
 function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
   if (!arr?.[i]) return EMPTY
   return { x: arr[i].x ?? EMPTY.x, y: arr[i].y ?? EMPTY.y, z: Math.max(-2, arr[i].z ?? EMPTY.z) }
+}
+
+function vis(arr: PoseLandmark[] | undefined, i: number): number {
+  const visibility = arr?.[i]?.visibility
+  return typeof visibility === "number" ? Number(visibility) : 0
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -430,8 +487,15 @@ export default function OffscreenPage() {
       const frame: Frame = {
         timestamp: new Date().toISOString(),
         visibility: pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
-        nose: lm(pts, 0), left_ear: lm(pts, 7), right_ear: lm(pts, 8),
+        nose: lm(pts, 0), left_eye: lm(pts, 2), right_eye: lm(pts, 5), left_ear: lm(pts, 7), right_ear: lm(pts, 8),
         left_shoulder: lm(pts, 11), right_shoulder: lm(pts, 12),
+        nose_visibility: vis(pts, 0) || vis(ptsNorm, 0),
+        left_eye_visibility: vis(pts, 2) || vis(ptsNorm, 2),
+        right_eye_visibility: vis(pts, 5) || vis(ptsNorm, 5),
+        left_ear_visibility: vis(pts, 7) || vis(ptsNorm, 7),
+        right_ear_visibility: vis(pts, 8) || vis(ptsNorm, 8),
+        left_shoulder_visibility: vis(pts, 11) || vis(ptsNorm, 11),
+        right_shoulder_visibility: vis(pts, 12) || vis(ptsNorm, 12),
         brightness: Math.max(0, Math.round(rawBrightness - brightnessOffset))
       }
 
@@ -474,15 +538,8 @@ export default function OffscreenPage() {
               chrome.runtime.sendMessage({ type: "DETECTION_ACTIVE" }).catch(() => {})
             }
             const data = await res.json().catch(() => null)
-            // final_status 우선, 구버전 필드 폴백
-            const rawState: string = typeof data === "string" ? data :
-              (data?.data?.final_status ?? data?.dominant_state ?? data?.state ?? data?.result ?? "")
-
-            // 정규화: 좋은 자세는 GOOD_POSTURE, 나쁜 자세는 원본 유지
-            const GOOD_STATES = ["GOOD","good","OK","ok","good_posture","GOOD_POSTURE",""]
-            const normalizedState = GOOD_STATES.includes(rawState)
-              ? "GOOD_POSTURE"
-              : rawState
+            const rawState = getDetectionState(data)
+            const normalizedState = toBackendType(rawState)
 
             // prevState 저장 후 상태 변경 처리 (순서 중요)
             const prevState = currentStateRef.current
@@ -495,6 +552,8 @@ export default function OffscreenPage() {
               const msgs: Record<string,string> = {
                 TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
                 turtle_neck: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
+                SLOUCH: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
+                slouch: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
                 SHOULDER_ISSUE: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                 ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                 round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",

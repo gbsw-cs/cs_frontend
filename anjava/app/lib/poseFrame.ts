@@ -12,10 +12,19 @@ export type PostureFrame = {
   timestamp: string;
   visibility: number;
   nose: LandmarkPoint;
+  left_eye: LandmarkPoint;
+  right_eye: LandmarkPoint;
   left_ear: LandmarkPoint;
   right_ear: LandmarkPoint;
   left_shoulder: LandmarkPoint;
   right_shoulder: LandmarkPoint;
+  nose_visibility: number;
+  left_eye_visibility: number;
+  right_eye_visibility: number;
+  left_ear_visibility: number;
+  right_ear_visibility: number;
+  left_shoulder_visibility: number;
+  right_shoulder_visibility: number;
   brightness: number;
 };
 
@@ -62,6 +71,10 @@ function visibilityOf(...landmarks: Array<NormalizedLandmark | undefined>) {
   return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(6));
 }
 
+function landmarkVisibility(landmark?: NormalizedLandmark) {
+  return typeof landmark?.visibility === "number" ? Number(landmark.visibility.toFixed(6)) : 0;
+}
+
 export function captureBrightness(video: HTMLVideoElement) {
   if (!video.videoWidth || !video.videoHeight) return 255;
 
@@ -96,6 +109,8 @@ export async function createPostureFrame(video: HTMLVideoElement): Promise<Postu
   }
 
   const nose = landmarks?.[0];
+  const leftEye = landmarks?.[2];
+  const rightEye = landmarks?.[5];
   const leftEar = landmarks?.[7];
   const rightEar = landmarks?.[8];
   const leftShoulder = landmarks?.[11];
@@ -103,12 +118,21 @@ export async function createPostureFrame(video: HTMLVideoElement): Promise<Postu
 
   return {
     timestamp: new Date().toISOString(),
-    visibility: visibilityOf(nose, leftEar, rightEar, leftShoulder, rightShoulder),
+    visibility: visibilityOf(nose, leftEye, rightEye, leftEar, rightEar, leftShoulder, rightShoulder),
     nose: toPoint(nose),
+    left_eye: toPoint(leftEye),
+    right_eye: toPoint(rightEye),
     left_ear: toPoint(leftEar),
     right_ear: toPoint(rightEar),
     left_shoulder: toPoint(leftShoulder),
     right_shoulder: toPoint(rightShoulder),
+    nose_visibility: landmarkVisibility(nose),
+    left_eye_visibility: landmarkVisibility(leftEye),
+    right_eye_visibility: landmarkVisibility(rightEye),
+    left_ear_visibility: landmarkVisibility(leftEar),
+    right_ear_visibility: landmarkVisibility(rightEar),
+    left_shoulder_visibility: landmarkVisibility(leftShoulder),
+    right_shoulder_visibility: landmarkVisibility(rightShoulder),
     brightness,
   };
 }

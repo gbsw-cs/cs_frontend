@@ -11,10 +11,19 @@ type Frame = {
   timestamp?: string;
   visibility?: number;
   nose?: Point;
+  left_eye?: Point;
+  right_eye?: Point;
   left_ear?: Point;
   right_ear?: Point;
   left_shoulder?: Point;
   right_shoulder?: Point;
+  nose_visibility?: number;
+  left_eye_visibility?: number;
+  right_eye_visibility?: number;
+  left_ear_visibility?: number;
+  right_ear_visibility?: number;
+  left_shoulder_visibility?: number;
+  right_shoulder_visibility?: number;
   brightness?: number;
 };
 
@@ -55,6 +64,12 @@ const CSV_HEADERS = [
   "nose_x",
   "nose_y",
   "nose_z",
+  "left_eye_x",
+  "left_eye_y",
+  "left_eye_z",
+  "right_eye_x",
+  "right_eye_y",
+  "right_eye_z",
   "left_ear_x",
   "left_ear_y",
   "left_ear_z",
@@ -67,6 +82,13 @@ const CSV_HEADERS = [
   "right_shoulder_x",
   "right_shoulder_y",
   "right_shoulder_z",
+  "nose_visibility",
+  "left_eye_visibility",
+  "right_eye_visibility",
+  "left_ear_visibility",
+  "right_ear_visibility",
+  "left_shoulder_visibility",
+  "right_shoulder_visibility",
   "brightness",
   "baseline_signature",
   "baseline_brightness",
@@ -112,10 +134,19 @@ function rowForFrame(route: string, payload: SentPayload, frame: Frame, index: n
     frame.timestamp,
     frame.visibility,
     ...pointValues(frame.nose),
+    ...pointValues(frame.left_eye),
+    ...pointValues(frame.right_eye),
     ...pointValues(frame.left_ear),
     ...pointValues(frame.right_ear),
     ...pointValues(frame.left_shoulder),
     ...pointValues(frame.right_shoulder),
+    frame.nose_visibility,
+    frame.left_eye_visibility,
+    frame.right_eye_visibility,
+    frame.left_ear_visibility,
+    frame.right_ear_visibility,
+    frame.left_shoulder_visibility,
+    frame.right_shoulder_visibility,
     frame.brightness,
     payload.baseline?.signature,
     payload.baseline?.brightness,

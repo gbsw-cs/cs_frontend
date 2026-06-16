@@ -584,11 +584,13 @@ export type TodayDashboard = {
   goodPostureRatio?: number;
   breakdown?: {
     turtleNeckSec?: number | string | null;
+    slouchSec?: number | string | null;
     shoulderIssueSec?: number | string | null;
     roundShoulderSec?: number | string | null;
     shoulderAsymmetrySec?: number | string | null;
     darkEnvSec?: number | string | null;
     turtleNeckCount?: number | string | null;
+    slouchCount?: number | string | null;
     shoulderIssueCount?: number | string | null;
     roundShoulderCount?: number | string | null;
     shoulderAsymmetryCount?: number | string | null;
@@ -691,7 +693,7 @@ export type TimelineDashboard = {
     time?: string;
     startHour?: number;
     startMin?: number;
-    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV";
+    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SLOUCH" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV";
     message?: string;
     healthScore?: number;
     detectedAt?: string;
@@ -702,6 +704,7 @@ export type TimelineDashboard = {
 export type DetectionState =
   | "GOOD_POSTURE"
   | "TURTLE_NECK"
+  | "SLOUCH"
   | "SHOULDER_ISSUE"
   | "ROUND_SHOULDER"
   | "SHOULDER_ASYMMETRY"
@@ -1257,6 +1260,7 @@ export type AIHealthScoreRequest = {
     turtle_neck: number;
     round_shoulder: number;
     shoulder_tilted: number;
+    slouch: number;
     dark_environment: number;
   };
   total_frames: number;
