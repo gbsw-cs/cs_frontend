@@ -277,15 +277,24 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  const refreshSessionState = useCallback(() => {
+    setSessionError(null);
+    setSessionStatus("checking");
+    setSessionCommand("checking");
+  }, []);
+
   // 확장 프로그램이 타임라인을 저장하면 content script가 ANJAVA_TIMELINE_POSTED를 릴레이
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type === "ANJAVA_TIMELINE_POSTED") refreshTimeline();
-      if (e.data?.type === "ANJAVA_SESSION_CHANGED") refreshDashboardDataSoon();
+      if (e.data?.type === "ANJAVA_SESSION_CHANGED") {
+        refreshSessionState();
+        refreshDashboardDataSoon();
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [refreshTimeline, refreshDashboardDataSoon]);
+  }, [refreshTimeline, refreshDashboardDataSoon, refreshSessionState]);
 
   const handleSessionActiveChange = useCallback((active: boolean, reason?: "paused" | "stopped") => {
     sessionActiveRef.current = active;
