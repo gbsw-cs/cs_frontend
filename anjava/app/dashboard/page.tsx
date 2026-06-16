@@ -623,12 +623,12 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        <div className="grid w-full grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(170px,0.88fr)_minmax(158px,0.72fr)_minmax(205px,1.12fr)] lg:gap-x-2 lg:gap-y-2">
+        <div className="dashboard-grid grid w-full grid-cols-12 gap-2 overflow-visible md:grid-rows-[minmax(170px,0.88fr)_minmax(158px,0.72fr)_minmax(205px,1.12fr)] md:gap-x-2 md:gap-y-2 lg:grid-rows-[minmax(170px,0.88fr)_minmax(158px,0.72fr)_minmax(205px,1.12fr)] lg:gap-x-2 lg:gap-y-2">
 
           {/* ── Row 1 ── */}
 
           {/* 프로필 */}
-          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 lg:col-span-3 lg:h-full">
+          <Card className="col-span-12 flex min-h-0 flex-col sm:col-span-6 md:col-span-3 md:h-full lg:col-span-3 lg:h-full">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-3xl">
@@ -671,7 +671,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 타임라인 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-5 lg:h-full">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 md:col-span-5 md:h-full lg:col-span-5 lg:h-full">
             <div className="flex shrink-0 items-start justify-between">
               <div>
                 <div className="text-xs font-bold text-zinc-900">타임라인</div>
@@ -716,7 +716,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 웹캠 */}
-          <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 lg:col-span-4 lg:h-full">
+          <Card className="col-span-12 flex min-h-0 flex-col px-2 py-2 sm:col-span-6 sm:px-2.5 sm:py-2.5 md:col-span-4 md:h-full lg:col-span-4 lg:h-full">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="text-xs font-bold text-zinc-900">실시간 카메라</div>
@@ -794,7 +794,7 @@ export default function DashboardPage() {
               </div>
             </div>
             {sessionError && <div role="alert" className="mt-1 text-[9px] text-rose-500">{sessionError}</div>}
-            <div className="relative mt-1 min-h-[240px] flex-1 overflow-hidden rounded-xl sm:min-h-[280px] lg:min-h-0">
+            <div className="relative mt-1 min-h-[240px] flex-1 overflow-hidden rounded-xl sm:min-h-[280px] md:min-h-0 lg:min-h-0">
               <WebcamView
                 darkDetectionEnabled={darkMode}
                 pushEnabled={me?.settings?.pushEnabled ?? true}
@@ -830,9 +830,9 @@ export default function DashboardPage() {
           {/* ── Row 2 ── */}
 
           {/* 3D 아바타 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-2">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 md:col-span-2 lg:col-span-2">
             <div className="-mt-4 flex min-h-0 flex-col items-center">
-              <div className="flex h-32 w-full shrink-0 justify-center overflow-hidden lg:h-28 xl:h-32">
+              <div className="dashboard-avatar-preview flex h-32 w-full shrink-0 justify-center overflow-hidden md:h-28 xl:h-32">
                 <AvatarColored
                   hoodColorId={me?.settings?.avatarHoodColor ?? "default"}
                   className="avatar-float h-full w-auto max-w-full"
@@ -873,7 +873,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 일간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden lg:col-span-6">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden md:col-span-6 lg:col-span-6">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <div className="text-xs font-bold text-zinc-900">일간 스크린타임</div>
               <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px]">
@@ -912,7 +912,7 @@ export default function DashboardPage() {
 
               {/* 우측: 스택 바 차트 (8개 slots) */}
               <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
+                <div className="dashboard-daily-chart flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
                     if (slot.hasDurationData) {
                       const issueSec = slot.turtleNeckSec + slot.roundShoulderSec + slot.shoulderAsymmetrySec;
@@ -962,7 +962,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* 오늘의 건강 점수 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-4 lg:h-full lg:self-end">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 md:col-span-4 md:h-full md:self-end lg:col-span-4 lg:h-full lg:self-end">
             <div className="mt-0 flex items-center justify-between gap-2">
               <div className="shrink-0 text-sm font-bold text-zinc-900">오늘의 건강 점수</div>
               <div className="min-w-0 truncate rounded-full bg-[#2563EB]/5 px-2.5 py-1 text-[10px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/15">
@@ -1042,7 +1042,7 @@ export default function DashboardPage() {
           {/* ── Row 3 ── */}
 
           {/* 실시간 감지 상태 + 어둠 감지 모드 */}
-          <div className="col-span-12 flex h-full w-full flex-col gap-2 sm:col-span-6 lg:col-span-2">
+          <div className="col-span-12 flex h-full w-full flex-col gap-2 sm:col-span-6 md:col-span-2 lg:col-span-2">
             <Card className="flex min-h-0 w-full flex-1 flex-col">
               <div className="text-xs font-bold text-zinc-900">실시간 감지 상태</div>
 
@@ -1083,7 +1083,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 주간 스크린타임 */}
-          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 lg:col-span-10">
+          <Card className="col-span-12 flex min-h-0 flex-col overflow-hidden sm:col-span-6 md:col-span-10 lg:col-span-10">
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-bold text-zinc-900">이번 주 누적 스크린타임</div>
@@ -1093,8 +1093,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 lg:grid-cols-5">
-              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-2.5 py-1 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+            <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 md:grid-cols-5 lg:grid-cols-5">
+              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-2.5 py-1 ring-1 ring-[#2563EB]/15 md:col-span-1 lg:col-span-1">
                 <div className="text-[9px] font-medium leading-tight text-[#2563EB]">총 감지 스크린타임</div>
                 <div className="text-base font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
                 <div className="text-[8px] leading-tight text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `자세 경고 비율 ${weeklyRiskPct}%`}</div>
@@ -1105,7 +1105,7 @@ export default function DashboardPage() {
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 md:grid-cols-[260px_minmax(0,1fr)] lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
               <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100">
                 <div className="grid grid-cols-3 gap-2">
                   <WeeklyCompactStat label="자세 경고 비율" value={`${weeklyAvgBadPct}%`} tone="bad" />
@@ -1119,7 +1119,7 @@ export default function DashboardPage() {
                       {[1,2,3].map((k) => <div key={k} className="h-8 animate-pulse rounded-lg bg-zinc-100" />)}
                     </div>
                   ) : badPostureSec === 0 ? (
-                    <div className="flex min-h-[92px] items-center justify-center rounded-lg bg-white px-3 py-3 text-center text-[11px] font-medium text-zinc-400 ring-1 ring-zinc-100">이번 주 자세 경고 데이터가 없습니다</div>
+                    <div className="dashboard-weekly-empty flex min-h-[92px] items-center justify-center rounded-lg bg-white px-3 py-3 text-center text-[11px] font-medium text-zinc-400 ring-1 ring-zinc-100">이번 주 자세 경고 데이터가 없습니다</div>
                   ) : (
                     <>
                       <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
@@ -1235,7 +1235,7 @@ export default function DashboardPage() {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-zinc-100 sm:px-4 sm:py-3.5 lg:px-3 lg:py-2.5 ${className}`}>
+    <div className={`dashboard-card rounded-2xl bg-white px-3.5 py-3 shadow-sm ring-1 ring-zinc-100 sm:px-4 sm:py-3.5 md:px-3 md:py-2.5 lg:px-3 lg:py-2.5 ${className}`}>
       {children}
     </div>
   );

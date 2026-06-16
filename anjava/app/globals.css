@@ -125,3 +125,30 @@ html.dark svg circle[fill="#e4e4e7"] {
   fill: #52525b;
   stroke: #000000;
 }
+
+@media (min-width: 768px) and (max-height: 760px) {
+  .dashboard-grid {
+    grid-template-rows:
+      minmax(150px, 0.82fr)
+      minmax(136px, 0.62fr)
+      minmax(176px, 1fr);
+    gap: 0.375rem;
+  }
+
+  .dashboard-card {
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .dashboard-avatar-preview {
+    height: 5.5rem;
+  }
+
+  .dashboard-daily-chart {
+    height: 4.75rem;
+  }
+
+  .dashboard-weekly-empty {
+    min-height: 3.75rem;
+  }
+}
