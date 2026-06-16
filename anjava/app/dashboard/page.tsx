@@ -600,7 +600,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-2 transition-colors duration-300 sm:px-4 sm:py-3 lg:py-[0.75vh]">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 py-1 transition-colors duration-300 sm:px-4 sm:py-2 lg:py-[0.35vh]">
       <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col">
         {me.settings.pushEnabled && notificationPermission === "default" && (
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
@@ -621,13 +621,6 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        {/* Top badge */}
-        <div className="mb-2 flex shrink-0 justify-center lg:mb-[1vh] lg:h-[2.5vh] lg:items-center">
-          <span className="rounded-full bg-[#2563EB]/10 px-3 py-0.5 text-[11px] font-semibold text-[#2563EB] ring-1 ring-[#2563EB]/20 lg:py-0">
-            ● AI 신체 활성화 중 ●
-          </span>
-        </div>
-
         <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(230px,27vh)_minmax(260px,30vh)_minmax(310px,34vh)] lg:gap-x-2 lg:gap-y-[2vh]">
 
           {/* ── Row 1 ── */}
