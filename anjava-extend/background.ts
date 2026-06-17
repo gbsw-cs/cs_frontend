@@ -837,8 +837,10 @@ const TIMELINE_STATE_MAP: Record<string, string> = {
   round_shoulder:     "ROUND_SHOULDER",
   SHOULDER_ASYMMETRY: "SHOULDER_ASYMMETRY",
   shoulder_tilted:    "SHOULDER_ASYMMETRY",
+  shoulder_asymmetry: "SHOULDER_ASYMMETRY",
   DARK_ENV:           "DARK_ENV",
   dark_env:           "DARK_ENV",
+  dark_environment:   "DARK_ENV",
   GOOD_POSTURE:       "GOOD_POSTURE",
   GOOD:               "GOOD_POSTURE",
 }

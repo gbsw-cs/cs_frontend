@@ -13,7 +13,7 @@ interface DetectionEvent {
   source: "EXTENSION"
 }
 
-interface Landmark { x: number; y: number; z: number }
+interface Landmark { x: number; y: number; z: number; visibility: number }
 type PoseLandmark = Partial<Landmark> & { visibility?: number }
 type PoseDetector = {
   detectForVideo(video: HTMLVideoElement, timestamp: number): {
@@ -53,7 +53,7 @@ interface Frame {
   brightness: number
 }
 
-const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
+const EMPTY: Landmark = { x: -2, y: -2, z: -2, visibility: 0 }
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -73,8 +73,8 @@ function toBackendType(state: string): string {
   if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
   if (state === "SLOUCH" || state === "slouch") return "SLOUCH"
   if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
-  if (state === "shoulder_tilted") return "SHOULDER_ASYMMETRY"
-  if (state === "DARK_ENV" || state === "dark_env") return "DARK_ENV"
+  if (state === "shoulder_tilted" || state === "shoulder_asymmetry") return "SHOULDER_ASYMMETRY"
+  if (state === "DARK_ENV" || state === "dark_env" || state === "dark_environment") return "DARK_ENV"
   return "GOOD_POSTURE"
 }
 
@@ -125,14 +125,20 @@ function getDetectionState(data: unknown) {
   return issues.length > 0 ? primaryIssue(issues) : (primaryIssue(statusIssues(fallback)) || "GOOD_POSTURE")
 }
 
-function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
+function lm(arr: PoseLandmark[] | undefined, i: number, visibility = 0): Landmark {
   if (!arr?.[i]) return EMPTY
-  return { x: arr[i].x ?? EMPTY.x, y: arr[i].y ?? EMPTY.y, z: Math.max(-2, arr[i].z ?? EMPTY.z) }
+  return { x: arr[i].x ?? EMPTY.x, y: arr[i].y ?? EMPTY.y, z: Math.max(-2, arr[i].z ?? EMPTY.z), visibility }
 }
 
 function vis(arr: PoseLandmark[] | undefined, i: number): number {
   const visibility = arr?.[i]?.visibility
   return typeof visibility === "number" ? Number(visibility) : 0
+}
+
+function avgVisibility(...values: number[]): number {
+  const visible = values.filter((value) => value > 0)
+  if (visible.length === 0) return 0
+  return Number((visible.reduce((sum, value) => sum + value, 0) / visible.length).toFixed(6))
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -484,18 +490,26 @@ export default function OffscreenPage() {
         }
       } catch {}
 
+      const noseVisibility = vis(pts, 0) || vis(ptsNorm, 0)
+      const leftEyeVisibility = vis(pts, 2) || vis(ptsNorm, 2)
+      const rightEyeVisibility = vis(pts, 5) || vis(ptsNorm, 5)
+      const leftEarVisibility = vis(pts, 7) || vis(ptsNorm, 7)
+      const rightEarVisibility = vis(pts, 8) || vis(ptsNorm, 8)
+      const leftShoulderVisibility = vis(pts, 11) || vis(ptsNorm, 11)
+      const rightShoulderVisibility = vis(pts, 12) || vis(ptsNorm, 12)
+
       const frame: Frame = {
         timestamp: new Date().toISOString(),
-        visibility: pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
-        nose: lm(pts, 0), left_eye: lm(pts, 2), right_eye: lm(pts, 5), left_ear: lm(pts, 7), right_ear: lm(pts, 8),
-        left_shoulder: lm(pts, 11), right_shoulder: lm(pts, 12),
-        nose_visibility: vis(pts, 0) || vis(ptsNorm, 0),
-        left_eye_visibility: vis(pts, 2) || vis(ptsNorm, 2),
-        right_eye_visibility: vis(pts, 5) || vis(ptsNorm, 5),
-        left_ear_visibility: vis(pts, 7) || vis(ptsNorm, 7),
-        right_ear_visibility: vis(pts, 8) || vis(ptsNorm, 8),
-        left_shoulder_visibility: vis(pts, 11) || vis(ptsNorm, 11),
-        right_shoulder_visibility: vis(pts, 12) || vis(ptsNorm, 12),
+        visibility: avgVisibility(noseVisibility, leftEyeVisibility, rightEyeVisibility, leftEarVisibility, rightEarVisibility, leftShoulderVisibility, rightShoulderVisibility),
+        nose: lm(pts, 0, noseVisibility), left_eye: lm(pts, 2, leftEyeVisibility), right_eye: lm(pts, 5, rightEyeVisibility), left_ear: lm(pts, 7, leftEarVisibility), right_ear: lm(pts, 8, rightEarVisibility),
+        left_shoulder: lm(pts, 11, leftShoulderVisibility), right_shoulder: lm(pts, 12, rightShoulderVisibility),
+        nose_visibility: noseVisibility,
+        left_eye_visibility: leftEyeVisibility,
+        right_eye_visibility: rightEyeVisibility,
+        left_ear_visibility: leftEarVisibility,
+        right_ear_visibility: rightEarVisibility,
+        left_shoulder_visibility: leftShoulderVisibility,
+        right_shoulder_visibility: rightShoulderVisibility,
         brightness: Math.max(0, Math.round(rawBrightness - brightnessOffset))
       }
 
@@ -559,8 +573,10 @@ export default function OffscreenPage() {
                 round_shoulder: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
                 SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
                 shoulder_tilted: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
+                shoulder_asymmetry: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
                 DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
-                dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
+                dark_env: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
+                dark_environment: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요."
               }
               const message = msgs[rawState] ?? "자세 이상이 감지되었어요! 자세를 확인해주세요."
               chrome.runtime.sendMessage({ type: "POSTURE_ALERT_OFFSCREEN", state: rawState, message })

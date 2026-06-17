@@ -6,6 +6,7 @@ export type LandmarkPoint = {
   x: number;
   y: number;
   z: number;
+  visibility: number;
 };
 
 export type PostureFrame = {
@@ -28,7 +29,7 @@ export type PostureFrame = {
   brightness: number;
 };
 
-const MISSING_POINT: LandmarkPoint = { x: -2, y: -2, z: -2 };
+const MISSING_POINT: LandmarkPoint = { x: -2, y: -2, z: -2, visibility: 0 };
 const Z_SCALE = 0.1;
 const WASM_PATH = "/mediapipe/wasm";
 const POSE_MODEL_URL =
@@ -60,6 +61,7 @@ function toPoint(landmark?: NormalizedLandmark): LandmarkPoint {
     x: Number(landmark.x.toFixed(6)),
     y: Number(landmark.y.toFixed(6)),
     z: Number((landmark.z * Z_SCALE).toFixed(6)),
+    visibility: landmarkVisibility(landmark),
   };
 }
 

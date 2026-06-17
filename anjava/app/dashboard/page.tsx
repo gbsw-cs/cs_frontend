@@ -60,12 +60,22 @@ const WEEK_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 const STATE_LABEL: Record<string, string> = {
   GOOD_POSTURE:       "자세 교정 완료",
   GOOD:               "자세 교정 완료",
+  good_posture:       "자세 교정 완료",
+  good:               "자세 교정 완료",
   TURTLE_NECK:        "거북목 발생",
+  turtle_neck:        "거북목 발생",
   SLOUCH:             "구부정한 자세 발생",
+  slouch:             "구부정한 자세 발생",
   SHOULDER_ISSUE:     "어깨 자세 이상 발생",
+  shoulder_issue:     "어깨 자세 이상 발생",
   ROUND_SHOULDER:     "라운드숄더 발생",
+  round_shoulder:     "라운드숄더 발생",
   SHOULDER_ASYMMETRY: "어깨 비대칭 발생",
+  shoulder_tilted:    "어깨 비대칭 발생",
+  shoulder_asymmetry: "어깨 비대칭 발생",
   DARK_ENV:           "어두운 환경 감지",
+  dark_env:           "어두운 환경 감지",
+  dark_environment:   "어두운 환경 감지",
 };
 const ISSUE_LABEL: Record<string, string> = {
   turtleNeckCount: "거북목",
@@ -86,6 +96,7 @@ type DailySlot = Pick<
   | "totalDetectionSec"
   | "goodPostureSec"
   | "turtleNeckSec"
+  | "slouchSec"
   | "roundShoulderSec"
   | "shoulderAsymmetrySec"
   | "darkEnvSec"
@@ -111,6 +122,18 @@ function firstFiniteNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function breakdownNumber(
+  breakdown: TodayDashboard["breakdown"] | undefined,
+  ...keys: Array<keyof NonNullable<TodayDashboard["breakdown"]>>
+): number {
+  for (const key of keys) {
+    const value = breakdown?.[key];
+    const n = toFiniteNumber(value, NaN);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
 function isUnauthorizedError(value: unknown): boolean {
   return Boolean(value && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === 401);
 }
@@ -123,6 +146,17 @@ function getRequestErrorStatus(value: unknown): number {
 
 function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
+}
+
+function normalizeTimelineState(state: string): string {
+  const value = state.toLowerCase();
+  if (value === "good" || value === "good_posture") return "GOOD_POSTURE";
+  if (value === "turtle_neck") return "TURTLE_NECK";
+  if (value === "slouch") return "SLOUCH";
+  if (value === "round_shoulder" || value === "shoulder_issue") return "ROUND_SHOULDER";
+  if (value === "shoulder_tilted" || value === "shoulder_asymmetry") return "SHOULDER_ASYMMETRY";
+  if (value === "dark_env" || value === "dark_environment") return "DARK_ENV";
+  return state;
 }
 
 function formatDuration(sec: number | null): string {
@@ -149,6 +183,7 @@ function createEmptyDailySlots(): DailySlot[] {
     totalDetectionSec: 0,
     goodPostureSec: 0,
     turtleNeckSec: 0,
+    slouchSec: 0,
     roundShoulderSec: 0,
     shoulderAsymmetrySec: 0,
     darkEnvSec: 0,
@@ -171,6 +206,7 @@ function toDailySlots(daily: DailyDashboard[] | null): DailySlot[] {
       totalDetectionSec: toFiniteNumber(item.totalDetectionSec),
       goodPostureSec: toFiniteNumber(item.goodPostureSec),
       turtleNeckSec: toFiniteNumber(item.turtleNeckSec),
+      slouchSec: toFiniteNumber(item.slouchSec),
       roundShoulderSec: toFiniteNumber(item.roundShoulderSec),
       shoulderAsymmetrySec: toFiniteNumber(item.shoulderAsymmetrySec),
       darkEnvSec: toFiniteNumber(item.darkEnvSec),
@@ -438,8 +474,8 @@ export default function DashboardPage() {
   );
 
   const todayIssueEntries = [
-    { key: "turtleNeckCount", count: toFiniteNumber(today?.breakdown?.turtleNeckCount) },
-    { key: "slouchCount", count: toFiniteNumber(today?.breakdown?.slouchCount) },
+    { key: "turtleNeckCount", count: breakdownNumber(today?.breakdown, "turtleNeckCount") },
+    { key: "slouchCount", count: breakdownNumber(today?.breakdown, "slouchCount", "slouch_count") },
     { key: "roundShoulderCount", count: toFiniteNumber(today?.breakdown?.roundShoulderCount) },
     { key: "shoulderAsymmetryCount", count: toFiniteNumber(today?.breakdown?.shoulderAsymmetryCount) },
     { key: "shoulderIssueCount", count: toFiniteNumber(today?.breakdown?.shoulderIssueCount) },
@@ -476,7 +512,8 @@ export default function DashboardPage() {
       const bMin = b.time
         ? (() => { const [h, m] = b.time.split(":").map(Number); return h * 60 + m; })()
         : ((b.startHour ?? 0) * 60 + (b.startMin ?? 0));
-      return bMin <= nowMin && STATE_LABEL[b.dominantState] !== undefined;
+      const state = normalizeTimelineState(String(b.dominantState));
+      return bMin <= nowMin && STATE_LABEL[state] !== undefined;
     })
     .reverse() ?? [];
   const recentActivity = timelineActivity.filter((bucket, index, buckets) => {
@@ -492,11 +529,12 @@ export default function DashboardPage() {
 
   // 주간 통계 (서버 값 직접 사용)
   const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec);
+  const slouchSec = toFiniteNumber(weekly?.slouchTotalSec);
   const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec);
   const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
   const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
   const badPostureSec = weekly
-    ? toFiniteNumber(weekly.badPostureSec, turtleSec + roundShoulderSec + asymSec)
+    ? toFiniteNumber(weekly.badPostureSec, turtleSec + slouchSec + roundShoulderSec + asymSec)
     : 0;
   const weeklyScreenSec: number | null = weekly ? toFiniteNumber(weekly.totalDetectionSec) : null;
   const weeklyGoodSec: number | null = weekly ? toFiniteNumber(weekly.goodPostureSec) : null;
@@ -525,6 +563,7 @@ export default function DashboardPage() {
       unclassifiedSec: day ? toFiniteNumber(day.unclassifiedSec) : 0,
       hasExplicitGoodPostureData: Boolean(day?.hasExplicitGoodPostureData),
       turtleNeckSec: day ? toFiniteNumber(day.turtleNeckSec) : 0,
+      slouchSec: day ? toFiniteNumber(day.slouchSec) : 0,
       roundShoulderSec: day ? toFiniteNumber(day.roundShoulderSec) : 0,
       shoulderAsymmetrySec: day ? toFiniteNumber(day.shoulderAsymmetrySec) : 0,
       darkEnvSec: day ? toFiniteNumber(day.darkEnvSec) : 0,
@@ -687,20 +726,23 @@ export default function DashboardPage() {
               <ul className="mt-2 max-h-40 flex-1 space-y-1.5 overflow-y-auto pr-1 [scrollbar-color:#a1a1aa_transparent] [scrollbar-width:thin]">
                 {recentActivity.map((b, i) => {
                   const timeStr = b.time ?? `${String(b.startHour ?? 0).padStart(2,"0")}:${String(b.startMin ?? 0).padStart(2,"0")}`;
-                  const isGoodState = b.dominantState === "GOOD" || b.dominantState === "GOOD_POSTURE";
+                  const state = normalizeTimelineState(String(b.dominantState));
+                  const isGoodState = state === "GOOD" || state === "GOOD_POSTURE";
                   const icon =
                     isGoodState
                       ? "✅"
-                      : b.dominantState === "DARK_ENV"
+                      : state === "DARK_ENV"
                       ? "🌙"
                       : "⚠️";
                   const dotColor =
                     isGoodState
                       ? "bg-emerald-400"
-                      : b.dominantState === "DARK_ENV"
+                      : state === "DARK_ENV"
                       ? "bg-zinc-400"
+                      : state === "SLOUCH"
+                      ? "bg-sky-400"
                       : "bg-amber-400";
-                  const label = `${STATE_LABEL[b.dominantState] ?? "자세 이상 발생"} ${icon}`;
+                  const label = `${STATE_LABEL[state] ?? "자세 이상 발생"} ${icon}`;
                   return (
                     <li key={i} className="flex items-center gap-2 text-[11px]">
                       <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
@@ -889,6 +931,7 @@ export default function DashboardPage() {
                   <>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />정상</span>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />구부정</span>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
                   </>
@@ -923,7 +966,7 @@ export default function DashboardPage() {
                 <div className="flex h-24 items-end justify-around gap-1.5 border-b border-zinc-200 pb-1">
                   {slots.map((slot, i) => {
                     if (slot.hasDurationData) {
-                      const issueSec = slot.turtleNeckSec + slot.roundShoulderSec + slot.shoulderAsymmetrySec;
+                      const issueSec = slot.turtleNeckSec + slot.slouchSec + slot.roundShoulderSec + slot.shoulderAsymmetrySec;
                       const categorizedSec = slot.goodPostureSec + issueSec + slot.darkEnvSec + slot.unclassifiedSec;
                       const totalSec = Math.max(slot.totalDetectionSec, categorizedSec);
                       const pct = (sec: number) => totalSec > 0 ? clampPercent((sec / totalSec) * 100) : 0;
@@ -937,6 +980,7 @@ export default function DashboardPage() {
                             <div className="bg-zinc-300" style={{ height: `${pct(otherSec)}%` }} />
                             <div className="bg-emerald-400" style={{ height: `${pct(slot.goodPostureSec)}%` }} />
                             <div className="bg-rose-400" style={{ height: `${pct(slot.turtleNeckSec)}%` }} />
+                            <div className="bg-sky-400" style={{ height: `${pct(slot.slouchSec)}%` }} />
                             <div className="bg-amber-400" style={{ height: `${pct(slot.roundShoulderSec)}%` }} />
                             <div className="bg-violet-400" style={{ height: `${pct(slot.shoulderAsymmetrySec)}%` }} />
                           </div>
@@ -1131,6 +1175,7 @@ export default function DashboardPage() {
                   ) : (
                     <>
                       <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
+                      <IssueBar label="구부정한 자세" sec={slouchSec} totalSec={badPostureSec} color="bg-sky-400" />
                       <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
                       <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
                     </>
@@ -1144,6 +1189,7 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[8px] text-zinc-400">
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />정상</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-sky-400" />구부정</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />기타</span>
@@ -1166,10 +1212,11 @@ export default function DashboardPage() {
                         const dayGoodSec = weeklyDays[i]?.goodPostureSec ?? 0;
                         const dayUnclassifiedSec = weeklyDays[i]?.unclassifiedSec ?? 0;
                         const dayTurtleSec = weeklyDays[i]?.turtleNeckSec ?? 0;
+                        const daySlouchSec = weeklyDays[i]?.slouchSec ?? 0;
                         const dayRoundSec = weeklyDays[i]?.roundShoulderSec ?? 0;
                         const dayAsymSec = weeklyDays[i]?.shoulderAsymmetrySec ?? 0;
                         const dayDarkSec = weeklyDays[i]?.darkEnvSec ?? 0;
-                        const dayIssueSec = dayTurtleSec + dayRoundSec + dayAsymSec;
+                        const dayIssueSec = dayTurtleSec + daySlouchSec + dayRoundSec + dayAsymSec;
                         const dayCategorizedSec = dayGoodSec + dayIssueSec + dayDarkSec + dayUnclassifiedSec;
                         const chartTotalSec = Math.max(dayTotalSec, dayCategorizedSec);
                         const hasDayBreakdown = chartTotalSec > 0 && dayCategorizedSec > 0;
@@ -1185,6 +1232,11 @@ export default function DashboardPage() {
                           ? 0
                           : hasDayBreakdown
                           ? clampPercent((dayRoundSec / chartTotalSec) * 100)
+                          : 0;
+                        const slouchH = !hasValue
+                          ? 0
+                          : hasDayBreakdown
+                          ? clampPercent((daySlouchSec / chartTotalSec) * 100)
                           : 0;
                         const asymH = !hasValue
                           ? 0
@@ -1213,6 +1265,7 @@ export default function DashboardPage() {
                                       <div className="w-full bg-zinc-300 transition-all" style={{ height: `${otherH}%` }} />
                                       <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
                                       <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
+                                      <div className="w-full bg-sky-400 transition-all" style={{ height: `${slouchH}%` }} />
                                       <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
                                       <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
                                     </>

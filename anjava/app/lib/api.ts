@@ -585,12 +585,14 @@ export type TodayDashboard = {
   breakdown?: {
     turtleNeckSec?: number | string | null;
     slouchSec?: number | string | null;
+    slouch_sec?: number | string | null;
     shoulderIssueSec?: number | string | null;
     roundShoulderSec?: number | string | null;
     shoulderAsymmetrySec?: number | string | null;
     darkEnvSec?: number | string | null;
     turtleNeckCount?: number | string | null;
     slouchCount?: number | string | null;
+    slouch_count?: number | string | null;
     shoulderIssueCount?: number | string | null;
     roundShoulderCount?: number | string | null;
     shoulderAsymmetryCount?: number | string | null;
@@ -614,6 +616,7 @@ export type WeeklyDashboard = {
     unclassifiedSec: number;
     hasExplicitGoodPostureData: boolean;
     turtleNeckSec: number;
+    slouchSec: number;
     roundShoulderSec: number;
     shoulderAsymmetrySec: number;
     darkEnvSec: number;
@@ -623,6 +626,7 @@ export type WeeklyDashboard = {
   badPostureSec: number;
   unclassifiedSec: number;
   turtleNeckTotalSec: number;
+  slouchTotalSec: number;
   roundShoulderTotalSec: number;
   shoulderAsymmetryTotalSec: number;
   darkEnvTotalSec: number;
@@ -642,6 +646,7 @@ export type DailyDashboard = {
   totalDetectionSec: number;
   goodPostureSec: number;
   turtleNeckSec: number;
+  slouchSec: number;
   roundShoulderSec: number;
   shoulderAsymmetrySec: number;
   darkEnvSec: number;
@@ -651,6 +656,7 @@ export type DailyDashboard = {
 
 type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   turtleNeckCount?: number | string | null;
+  slouchCount?: number | string | null;
   roundShoulderCount?: number | string | null;
   shoulderAsymmetryCount?: number | string | null;
   shoulderIssueCount?: number | string | null;
@@ -658,6 +664,7 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   totalDurationSec?: number | string | null;
   goodPostureTotalSec?: number | string | null;
   turtleNeckTotalSec?: number | string | null;
+  slouchTotalSec?: number | string | null;
   roundShoulderTotalSec?: number | string | null;
   shoulderAsymmetryTotalSec?: number | string | null;
   darkEnvTotalSec?: number | string | null;
@@ -668,6 +675,8 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   good_posture_total_sec?: number | string | null;
   turtle_neck_sec?: number | string | null;
   turtle_neck_total_sec?: number | string | null;
+  slouch_sec?: number | string | null;
+  slouch_total_sec?: number | string | null;
   round_shoulder_sec?: number | string | null;
   round_shoulder_total_sec?: number | string | null;
   shoulder_asymmetry_sec?: number | string | null;
@@ -778,13 +787,14 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
     .map((day) => {
       const turtleNeckSec = n(["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"], day);
+      const slouchSec = n(["slouchSec", "slouchTotalSec", "slouch_sec", "slouch_total_sec"], day);
       const roundShoulderSec = n(["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"], day);
       const shoulderAsymmetrySec = n(["shoulderAsymmetrySec", "shoulderAsymmetryTotalSec", "shoulder_asymmetry_sec", "shoulder_asymmetry_total_sec"], day);
       const shoulderIssueSec = n(["shoulderIssueSec", "shoulderIssueTotalSec", "shoulder_issue_sec", "shoulder_issue_total_sec"], day);
       const finalRoundSec = roundShoulderSec > 0 ? roundShoulderSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
       const finalAsymSec = shoulderAsymmetrySec > 0 ? shoulderAsymmetrySec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
       const darkEnvSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"], day);
-      const badSec = turtleNeckSec + finalRoundSec + finalAsymSec;
+      const badSec = turtleNeckSec + slouchSec + finalRoundSec + finalAsymSec;
       const totalDetectionSec = n(
         ["totalDetectionSec", "totalDurationSec", "totalScreenSec", "screenTimeSec", "detectionSec", "total_detection_sec", "total_duration_sec", "total_screen_sec", "screen_time_sec"],
         day,
@@ -841,6 +851,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
         unclassifiedSec,
         hasExplicitGoodPostureData,
         turtleNeckSec,
+        slouchSec,
         roundShoulderSec: finalRoundSec,
         shoulderAsymmetrySec: finalAsymSec,
         darkEnvSec,
@@ -850,6 +861,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
 
   // 일별 합계 (서버가 주간 합계를 내려주지 않을 때 fallback)
   const summedTurtleSec = days.reduce((s, d) => s + d.turtleNeckSec, 0);
+  const summedSlouchSec = days.reduce((s, d) => s + d.slouchSec, 0);
   const summedRoundSec = days.reduce((s, d) => s + d.roundShoulderSec, 0);
   const summedAsymSec = days.reduce((s, d) => s + d.shoulderAsymmetrySec, 0);
   const summedDarkSec = days.reduce((s, d) => s + d.darkEnvSec, 0);
@@ -867,6 +879,10 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       ? n(["roundShoulderSec"], breakdown)
       : n(["roundShoulderTotalSec", "roundShoulderSec", "round_shoulder_total_sec", "round_shoulder_sec"])) ||
     summedRoundSec;
+  const slouchSec =
+    (breakdown
+      ? n(["slouchSec"], breakdown)
+      : n(["slouchTotalSec", "slouchSec", "slouch_total_sec", "slouch_sec"])) || summedSlouchSec;
   const asymSec =
     (breakdown
       ? n(["shoulderAsymmetrySec"], breakdown)
@@ -881,7 +897,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
   const finalAsym = asymSec > 0 ? asymSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
   const darkSec =
     n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"]) || summedDarkSec;
-  const badSec = turtleSec + finalRound + finalAsym || summedBadSec;
+  const badSec = turtleSec + slouchSec + finalRound + finalAsym || summedBadSec;
 
   // 신 API: goodPostureSec 직접 제공
   const explicitGoodSec = n([
@@ -968,6 +984,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     badPostureSec: n(["badPostureSec", "bad_posture_sec"]) || badSec || summedBadSec,
     unclassifiedSec,
     turtleNeckTotalSec: turtleSec,
+    slouchTotalSec: slouchSec,
     roundShoulderTotalSec: finalRound,
     shoulderAsymmetryTotalSec: finalAsym,
     darkEnvTotalSec: darkSec,
@@ -1000,6 +1017,7 @@ function normalizeDailyDashboardSlot(
 ): DailyDashboard {
   const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
   const turtleNeckCount = toApiNumber(source.turtleNeckCount);
+  const slouchCount = toApiNumber(source.slouchCount);
   const roundShoulderCount = toApiNumber(source.roundShoulderCount);
   const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount);
   const shoulderIssueCount = toApiNumber(source.shoulderIssueCount);
@@ -1007,7 +1025,7 @@ function normalizeDailyDashboardSlot(
   const singleBadCount =
     source.singleBadCount !== undefined
       ? toApiNumber(source.singleBadCount)
-      : turtleNeckCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
+      : turtleNeckCount + slouchCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
   const totalDetectionSec = toApiNumber(
     source.totalDetectionSec ?? source.totalDurationSec ?? source.total_detection_sec ?? source.total_duration_sec,
   );
@@ -1022,6 +1040,9 @@ function normalizeDailyDashboardSlot(
     : 0;
   const turtleNeckSec = toApiNumber(
     source.turtleNeckSec ?? source.turtleNeckTotalSec ?? source.turtle_neck_sec ?? source.turtle_neck_total_sec,
+  );
+  const slouchSec = toApiNumber(
+    source.slouchSec ?? source.slouchTotalSec ?? source.slouch_sec ?? source.slouch_total_sec,
   );
   const roundShoulderSec = toApiNumber(
     source.roundShoulderSec ?? source.roundShoulderTotalSec ?? source.round_shoulder_sec ?? source.round_shoulder_total_sec,
@@ -1045,7 +1066,7 @@ function normalizeDailyDashboardSlot(
     ? explicitUnclassifiedSec
     : Math.max(
         0,
-        totalDetectionSec - goodPostureSec - turtleNeckSec - roundShoulderSec - shoulderAsymmetrySec - darkEnvSec,
+        totalDetectionSec - goodPostureSec - turtleNeckSec - slouchSec - roundShoulderSec - shoulderAsymmetrySec - darkEnvSec,
       );
   const hasDurationData = [
     source.totalDetectionSec,
@@ -1054,6 +1075,8 @@ function normalizeDailyDashboardSlot(
     source.goodPostureTotalSec,
     source.turtleNeckSec,
     source.turtleNeckTotalSec,
+    source.slouchSec,
+    source.slouchTotalSec,
     source.roundShoulderSec,
     source.roundShoulderTotalSec,
     source.shoulderAsymmetrySec,
@@ -1068,6 +1091,8 @@ function normalizeDailyDashboardSlot(
     source.good_posture_total_sec,
     source.turtle_neck_sec,
     source.turtle_neck_total_sec,
+    source.slouch_sec,
+    source.slouch_total_sec,
     source.round_shoulder_sec,
     source.round_shoulder_total_sec,
     source.shoulder_asymmetry_sec,
@@ -1095,6 +1120,7 @@ function normalizeDailyDashboardSlot(
     totalDetectionSec,
     goodPostureSec,
     turtleNeckSec,
+    slouchSec,
     roundShoulderSec,
     shoulderAsymmetrySec,
     darkEnvSec,
@@ -1173,10 +1199,12 @@ export function endDetectionSession(sessionId: string, endedAt = new Date().toIS
     totalDurationSec: number;
     goodPostureSec: number;
     turtleNeckSec: number;
+    slouchSec: number;
     shoulderIssueSec: number;
     darkEnvSec: number;
     goodPostureCount: number;
     turtleNeckCount: number;
+    slouchCount: number;
     shoulderIssueCount: number;
     darkEnvCount: number;
     healthScore: number;

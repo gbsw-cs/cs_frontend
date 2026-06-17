@@ -11,7 +11,7 @@ const DURATION_MS = 10_000
 const INTERVAL_MS = 200
 const DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG === "1"
 
-interface Landmark { x: number; y: number; z: number }
+interface Landmark { x: number; y: number; z: number; visibility: number }
 type PoseLandmark = Partial<Landmark> & { visibility?: number }
 type PoseLandmarker = {
   detectForVideo(video: HTMLVideoElement, timestamp: number): {
@@ -50,20 +50,26 @@ interface Frame {
   brightness: number
 }
 
-const EMPTY: Landmark = { x: -2, y: -2, z: -2 }
+const EMPTY: Landmark = { x: -2, y: -2, z: -2, visibility: 0 }
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
 }
 
-function lm(arr: PoseLandmark[] | undefined, i: number): Landmark {
+function lm(arr: PoseLandmark[] | undefined, i: number, visibility = 0): Landmark {
   const point = arr?.[i]
-  return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z } : EMPTY
+  return point ? { x: point.x ?? EMPTY.x, y: point.y ?? EMPTY.y, z: point.z ?? EMPTY.z, visibility } : EMPTY
 }
 
 function vis(arr: PoseLandmark[] | undefined, i: number): number {
   const visibility = arr?.[i]?.visibility
   return typeof visibility === "number" ? Number(visibility) : 0
+}
+
+function avgVisibility(...values: number[]): number {
+  const visible = values.filter((value) => value > 0)
+  if (visible.length === 0) return 0
+  return Number((visible.reduce((sum, value) => sum + value, 0) / visible.length).toFixed(6))
 }
 
 function calcBrightness(ctx: CanvasRenderingContext2D, w: number, h: number): number {
@@ -182,23 +188,31 @@ function WebcamTest() {
         debugLog(`[frame ${framesRef.current.length}] norm  z → nose:${noseZNorm} lShoulder:${lSNorm}`)
       }
 
+      const noseVisibility = vis(pts, 0) || vis(ptsNorm, 0)
+      const leftEyeVisibility = vis(pts, 2) || vis(ptsNorm, 2)
+      const rightEyeVisibility = vis(pts, 5) || vis(ptsNorm, 5)
+      const leftEarVisibility = vis(pts, 7) || vis(ptsNorm, 7)
+      const rightEarVisibility = vis(pts, 8) || vis(ptsNorm, 8)
+      const leftShoulderVisibility = vis(pts, 11) || vis(ptsNorm, 11)
+      const rightShoulderVisibility = vis(pts, 12) || vis(ptsNorm, 12)
+
       framesRef.current.push({
         timestamp:      new Date().toISOString(),
-        visibility:     pts?.[0]?.visibility ?? ptsNorm?.[0]?.visibility ?? 0,
-        nose:           lm(pts, 0),
-        left_eye:       lm(pts, 2),
-        right_eye:      lm(pts, 5),
-        left_ear:       lm(pts, 7),
-        right_ear:      lm(pts, 8),
-        left_shoulder:  lm(pts, 11),
-        right_shoulder: lm(pts, 12),
-        nose_visibility: vis(pts, 0) || vis(ptsNorm, 0),
-        left_eye_visibility: vis(pts, 2) || vis(ptsNorm, 2),
-        right_eye_visibility: vis(pts, 5) || vis(ptsNorm, 5),
-        left_ear_visibility: vis(pts, 7) || vis(ptsNorm, 7),
-        right_ear_visibility: vis(pts, 8) || vis(ptsNorm, 8),
-        left_shoulder_visibility: vis(pts, 11) || vis(ptsNorm, 11),
-        right_shoulder_visibility: vis(pts, 12) || vis(ptsNorm, 12),
+        visibility:     avgVisibility(noseVisibility, leftEyeVisibility, rightEyeVisibility, leftEarVisibility, rightEarVisibility, leftShoulderVisibility, rightShoulderVisibility),
+        nose:           lm(pts, 0, noseVisibility),
+        left_eye:       lm(pts, 2, leftEyeVisibility),
+        right_eye:      lm(pts, 5, rightEyeVisibility),
+        left_ear:       lm(pts, 7, leftEarVisibility),
+        right_ear:      lm(pts, 8, rightEarVisibility),
+        left_shoulder:  lm(pts, 11, leftShoulderVisibility),
+        right_shoulder: lm(pts, 12, rightShoulderVisibility),
+        nose_visibility: noseVisibility,
+        left_eye_visibility: leftEyeVisibility,
+        right_eye_visibility: rightEyeVisibility,
+        left_ear_visibility: leftEarVisibility,
+        right_ear_visibility: rightEarVisibility,
+        left_shoulder_visibility: leftShoulderVisibility,
+        right_shoulder_visibility: rightShoulderVisibility,
         brightness:     calcBrightness(ctx, canvas.width, canvas.height),
       })
       setTimeout(tick, INTERVAL_MS)

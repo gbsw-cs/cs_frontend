@@ -40,7 +40,9 @@ const NORMALIZED_POSTURE_STATE: Record<string, string> = {
   round_shoulder: "ROUND_SHOULDER",
   shoulder_issue: "SHOULDER_ISSUE",
   shoulder_tilted: "SHOULDER_ASYMMETRY",
-  shoulder_asymmetry: "SHOULDER_ASYMMETRY"
+  shoulder_asymmetry: "SHOULDER_ASYMMETRY",
+  dark_environment: "DARK_ENV",
+  dark_env: "DARK_ENV"
 }
 
 function getPostureImage(state?: string) {
