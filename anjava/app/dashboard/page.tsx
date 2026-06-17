@@ -251,6 +251,30 @@ export default function DashboardPage() {
   );
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
 
+  const redirectToLogin = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    clearTokens();
+    router.replace("/login");
+  }, [router]);
+
+  const redirectToLoginIfAuthExpired = useCallback(async () => {
+    try {
+      await getMe();
+      return false;
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        redirectToLogin();
+        return true;
+      }
+      dashboardBackoffUntilRef.current = Date.now() + 20_000;
+      console.warn("[dashboard] 인증 확인 실패, 로그인 상태를 유지합니다:", error);
+      return false;
+    }
+  }, [redirectToLogin]);
+
   const loadDashboardData = useCallback(async () => {
     if (document.hidden) return;
     if (dashboardRequestInFlightRef.current || Date.now() < dashboardBackoffUntilRef.current) return;
@@ -271,12 +295,7 @@ export default function DashboardPage() {
       ]);
       const results = [t, w, d, tl];
       if (results.some((result) => result.status === "rejected" && isUnauthorizedError(result.reason))) {
-        if (pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
-        clearTokens();
-        router.replace("/login");
+        await redirectToLoginIfAuthExpired();
         return;
       }
       const retryStatus = results.reduce((status, result) => {
@@ -300,7 +319,7 @@ export default function DashboardPage() {
     } finally {
       dashboardRequestInFlightRef.current = false;
     }
-  }, [router]);
+  }, [redirectToLoginIfAuthExpired]);
 
   const refreshDashboardDataSoon = useCallback(() => {
     const now = Date.now();
@@ -359,9 +378,8 @@ export default function DashboardPage() {
   }, []);
 
   const handleAuthenticationExpired = useCallback(() => {
-    clearTokens();
-    router.replace("/login");
-  }, [router]);
+    void redirectToLoginIfAuthExpired();
+  }, [redirectToLoginIfAuthExpired]);
 
   const handleDetectionStateChange = useCallback((state: DetectionState, message: string) => {
     if (!sessionActiveRef.current) {
@@ -436,10 +454,14 @@ export default function DashboardPage() {
         void loadDashboardData();
         pollRef.current = setInterval(loadDashboardData, 120_000);
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
-        clearTokens();
-        router.replace("/login");
+        if (isUnauthorizedError(error)) {
+          redirectToLogin();
+          return;
+        }
+        dashboardBackoffUntilRef.current = Date.now() + 20_000;
+        console.warn("[dashboard] 사용자 정보 조회 실패, 로그인 상태를 유지합니다:", error);
       });
 
     return () => {
@@ -450,7 +472,7 @@ export default function DashboardPage() {
         pollRef.current = null;
       }
     };
-  }, [loadDashboardData, router]);
+  }, [loadDashboardData, redirectToLogin, router]);
 
   // ── 파생 데이터 ────────────────────────────────────────
 

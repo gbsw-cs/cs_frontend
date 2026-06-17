@@ -13,21 +13,15 @@ import {
   Square,
   Video,
 } from "lucide-react";
-import { createPostureFrame, isUsablePostureFrame, type PostureFrame } from "../lib/poseFrame";
 
 const TOTAL = 4;
-const BASELINE_SECONDS = 10;
-const BASELINE_FRAME_INTERVAL_MS = 250;
-const BASELINE_MIN_FRAMES = 20;
 
 export default function WebcamGuidePage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [baselineDone, setBaselineDone] = useState(false);
 
   function goToStep(next: number) {
     setStep(next);
-    if (next !== 2) setBaselineDone(false);
   }
 
   function onNext() {
@@ -37,8 +31,6 @@ export default function WebcamGuidePage() {
       router.push("/extension-guide");
     }
   }
-
-  const nextDisabled = step === 2 && !baselineDone;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-10 sm:px-8">
@@ -58,7 +50,7 @@ export default function WebcamGuidePage() {
           <div className="flex h-[520px] items-center justify-center px-8 py-12 sm:px-16 sm:py-16">
             <div className="flex h-full w-full items-center justify-center">
               {step === 1 && <Slide1 />}
-              {step === 2 && <Slide2 onBaselineDone={() => setBaselineDone(true)} />}
+              {step === 2 && <Slide2 />}
               {step === 3 && <Slide3 />}
               {step === 4 && <Slide4 />}
             </div>
@@ -95,8 +87,6 @@ export default function WebcamGuidePage() {
 
             <button
               onClick={onNext}
-              disabled={nextDisabled}
-              title={nextDisabled ? "베이스라인 측정을 완료해주세요." : undefined}
               className="flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {step === TOTAL ? "확장 프로그램 설치하기" : "다음"}
@@ -162,84 +152,12 @@ function FeatureChip({
   );
 }
 
-function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
+function Slide2() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [baselineSecondsLeft, setBaselineSecondsLeft] = useState(0);
-  const [baselineDone, setBaselineDone] = useState(false);
-  const baselineRequestRef = useRef<AbortController | null>(null);
-
-  const runBaseline = useCallback(async () => {
-    baselineRequestRef.current?.abort();
-    const controller = new AbortController();
-    baselineRequestRef.current = controller;
-    setBaselineDone(false);
-    setBaselineSecondsLeft(BASELINE_SECONDS);
-
-    const countdown = window.setInterval(() => {
-      setBaselineSecondsLeft((seconds) => Math.max(0, seconds - 1));
-    }, 1000);
-
-    try {
-      const id =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}`;
-      const frames: PostureFrame[] = [];
-      const video = videoRef.current;
-      if (!video) throw new Error("카메라 영상이 준비되지 않았습니다.");
-
-      // MediaPipe 모델 로딩 시간을 baseline 10초 측정창에 섞지 않기 위한 워밍업입니다.
-      await createPostureFrame(video);
-      const startedAt = Date.now();
-
-      while (Date.now() - startedAt < BASELINE_SECONDS * 1000) {
-        if (controller.signal.aborted) throw new DOMException("aborted", "AbortError");
-        const frame = await createPostureFrame(video);
-        if (frame && isUsablePostureFrame(frame)) frames.push(frame);
-        await new Promise((resolve) => window.setTimeout(resolve, BASELINE_FRAME_INTERVAL_MS));
-      }
-
-      if (frames.length < BASELINE_MIN_FRAMES) {
-        throw new Error(
-          `베이스라인 측정 실패: 유효 프레임이 ${frames.length}개입니다. 얼굴과 양쪽 어깨가 보이게 다시 측정해주세요.`,
-        );
-      }
-
-      setBaselineSecondsLeft(0);
-      const response = await fetch("/v1/baseline/cal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, frames }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.message ?? "베이스라인 계산에 실패했습니다.");
-      }
-      const baselineResponse = await response.json().catch(() => null);
-      const baseline = baselineResponse?.data?.baseline ?? baselineResponse?.baseline ?? baselineResponse;
-      if (baseline && typeof window !== "undefined") {
-        localStorage.setItem("aiBaseline", JSON.stringify(baseline));
-        localStorage.setItem("aiSessionId", id);
-      }
-      setBaselineDone(true);
-      setBaselineSecondsLeft(0);
-      onBaselineDone();
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") {
-        setError(e instanceof Error ? e.message : "베이스라인 계산에 실패했습니다.");
-      }
-    } finally {
-      window.clearInterval(countdown);
-      if (baselineRequestRef.current === controller) {
-        baselineRequestRef.current = null;
-      }
-    }
-  }, []);
 
   const stop = useCallback(() => {
     if (streamRef.current) {
@@ -247,11 +165,7 @@ function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
-    baselineRequestRef.current?.abort();
-    baselineRequestRef.current = null;
     setActive(false);
-    setBaselineSecondsLeft(0);
-    setBaselineDone(false);
   }, []);
 
   const start = useCallback(async () => {
@@ -271,7 +185,6 @@ function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
         await videoRef.current.play().catch(() => {});
       }
       setActive(true);
-      window.setTimeout(runBaseline, 250);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "웹캠 접근 실패";
       if (/Permission|NotAllowed/i.test(msg)) {
@@ -286,7 +199,7 @@ function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
     } finally {
       setBusy(false);
     }
-  }, [runBaseline]);
+  }, []);
 
   useEffect(() => {
     return () => stop();
@@ -323,30 +236,7 @@ function Slide2({ onBaselineDone }: { onBaselineDone: () => void }) {
             LIVE
           </div>
         )}
-        {active && (
-          <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white">
-            {baselineDone
-              ? "베이스라인 완료"
-              : baselineSecondsLeft > 0
-                ? `베이스라인 ${baselineSecondsLeft}초`
-                : "베이스라인 요청 중"}
-          </div>
-        )}
       </div>
-      {active && (
-        <div className="mt-3 w-full max-w-[480px] overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200">
-          <div
-            className={`h-2 rounded-full transition-all ${
-              baselineDone ? "bg-emerald-500" : "bg-[#2563EB]"
-            }`}
-            style={{
-              width: baselineDone
-                ? "100%"
-                : `${Math.max(0, Math.min(100, ((10 - baselineSecondsLeft) / 10) * 100))}%`,
-            }}
-          />
-        </div>
-      )}
       {error && (
         <p className="mt-3 w-full max-w-[480px] rounded-lg bg-rose-50 px-3 py-2 text-left text-[11px] text-rose-600 ring-1 ring-rose-100">
           {error}

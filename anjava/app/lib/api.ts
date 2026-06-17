@@ -585,7 +585,13 @@ export type TodayDashboard = {
   breakdown?: {
     turtleNeckSec?: number | string | null;
     slouchSec?: number | string | null;
+    slouchDurationSec?: number | string | null;
+    slouchTotalSec?: number | string | null;
+    slouchTotalDurationSec?: number | string | null;
     slouch_sec?: number | string | null;
+    slouch_duration_sec?: number | string | null;
+    slouch_total_sec?: number | string | null;
+    slouch_total_duration_sec?: number | string | null;
     shoulderIssueSec?: number | string | null;
     roundShoulderSec?: number | string | null;
     shoulderAsymmetrySec?: number | string | null;
@@ -657,6 +663,7 @@ export type DailyDashboard = {
 type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   turtleNeckCount?: number | string | null;
   slouchCount?: number | string | null;
+  slouch_count?: number | string | null;
   roundShoulderCount?: number | string | null;
   shoulderAsymmetryCount?: number | string | null;
   shoulderIssueCount?: number | string | null;
@@ -665,6 +672,8 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   goodPostureTotalSec?: number | string | null;
   turtleNeckTotalSec?: number | string | null;
   slouchTotalSec?: number | string | null;
+  slouchDurationSec?: number | string | null;
+  slouchTotalDurationSec?: number | string | null;
   roundShoulderTotalSec?: number | string | null;
   shoulderAsymmetryTotalSec?: number | string | null;
   darkEnvTotalSec?: number | string | null;
@@ -677,6 +686,8 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   turtle_neck_total_sec?: number | string | null;
   slouch_sec?: number | string | null;
   slouch_total_sec?: number | string | null;
+  slouch_duration_sec?: number | string | null;
+  slouch_total_duration_sec?: number | string | null;
   round_shoulder_sec?: number | string | null;
   round_shoulder_total_sec?: number | string | null;
   shoulder_asymmetry_sec?: number | string | null;
@@ -787,7 +798,16 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
     .map((day) => {
       const turtleNeckSec = n(["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"], day);
-      const slouchSec = n(["slouchSec", "slouchTotalSec", "slouch_sec", "slouch_total_sec"], day);
+      const slouchSec = n([
+        "slouchSec",
+        "slouchTotalSec",
+        "slouchDurationSec",
+        "slouchTotalDurationSec",
+        "slouch_sec",
+        "slouch_total_sec",
+        "slouch_duration_sec",
+        "slouch_total_duration_sec",
+      ], day);
       const roundShoulderSec = n(["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"], day);
       const shoulderAsymmetrySec = n(["shoulderAsymmetrySec", "shoulderAsymmetryTotalSec", "shoulder_asymmetry_sec", "shoulder_asymmetry_total_sec"], day);
       const shoulderIssueSec = n(["shoulderIssueSec", "shoulderIssueTotalSec", "shoulder_issue_sec", "shoulder_issue_total_sec"], day);
@@ -881,8 +901,17 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     summedRoundSec;
   const slouchSec =
     (breakdown
-      ? n(["slouchSec"], breakdown)
-      : n(["slouchTotalSec", "slouchSec", "slouch_total_sec", "slouch_sec"])) || summedSlouchSec;
+      ? n(["slouchSec", "slouchTotalSec", "slouchDurationSec", "slouchTotalDurationSec"], breakdown)
+      : n([
+          "slouchTotalSec",
+          "slouchSec",
+          "slouchDurationSec",
+          "slouchTotalDurationSec",
+          "slouch_total_sec",
+          "slouch_sec",
+          "slouch_duration_sec",
+          "slouch_total_duration_sec",
+        ])) || summedSlouchSec;
   const asymSec =
     (breakdown
       ? n(["shoulderAsymmetrySec"], breakdown)
@@ -981,7 +1010,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     days,
     totalDetectionSec,
     goodPostureSec: goodPostureSecNormalized,
-    badPostureSec: n(["badPostureSec", "bad_posture_sec"]) || badSec || summedBadSec,
+    badPostureSec: n(["badPostureSec", "badPostureTotalSec", "bad_posture_sec", "bad_posture_total_sec"]) || badSec || summedBadSec,
     unclassifiedSec,
     turtleNeckTotalSec: turtleSec,
     slouchTotalSec: slouchSec,
@@ -1017,7 +1046,7 @@ function normalizeDailyDashboardSlot(
 ): DailyDashboard {
   const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
   const turtleNeckCount = toApiNumber(source.turtleNeckCount);
-  const slouchCount = toApiNumber(source.slouchCount);
+  const slouchCount = toApiNumber(source.slouchCount ?? source.slouch_count);
   const roundShoulderCount = toApiNumber(source.roundShoulderCount);
   const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount);
   const shoulderIssueCount = toApiNumber(source.shoulderIssueCount);
@@ -1042,7 +1071,14 @@ function normalizeDailyDashboardSlot(
     source.turtleNeckSec ?? source.turtleNeckTotalSec ?? source.turtle_neck_sec ?? source.turtle_neck_total_sec,
   );
   const slouchSec = toApiNumber(
-    source.slouchSec ?? source.slouchTotalSec ?? source.slouch_sec ?? source.slouch_total_sec,
+    source.slouchSec
+      ?? source.slouchTotalSec
+      ?? source.slouchDurationSec
+      ?? source.slouchTotalDurationSec
+      ?? source.slouch_sec
+      ?? source.slouch_total_sec
+      ?? source.slouch_duration_sec
+      ?? source.slouch_total_duration_sec,
   );
   const roundShoulderSec = toApiNumber(
     source.roundShoulderSec ?? source.roundShoulderTotalSec ?? source.round_shoulder_sec ?? source.round_shoulder_total_sec,
@@ -1077,6 +1113,8 @@ function normalizeDailyDashboardSlot(
     source.turtleNeckTotalSec,
     source.slouchSec,
     source.slouchTotalSec,
+    source.slouchDurationSec,
+    source.slouchTotalDurationSec,
     source.roundShoulderSec,
     source.roundShoulderTotalSec,
     source.shoulderAsymmetrySec,
@@ -1093,6 +1131,8 @@ function normalizeDailyDashboardSlot(
     source.turtle_neck_total_sec,
     source.slouch_sec,
     source.slouch_total_sec,
+    source.slouch_duration_sec,
+    source.slouch_total_duration_sec,
     source.round_shoulder_sec,
     source.round_shoulder_total_sec,
     source.shoulder_asymmetry_sec,

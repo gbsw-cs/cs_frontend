@@ -551,8 +551,13 @@ export default function SettingsPage() {
             <Group title="웹캠 & 캘리브레이션">
               <Row
                 title="웹캠 설정 튜토리얼 다시 보기"
-                desc="최초 설치 시 진행한 캘리브레이션 가이드를 다시 확인합니다."
+                desc="카메라 권한, 위치, 조명 가이드를 다시 확인합니다."
                 action={<StartButton href="/webcam-guide" />}
+              />
+              <Row
+                title="베이스라인 다시 측정"
+                desc="현재 바른 자세를 기준으로 10초 동안 새 캘리브레이션을 저장합니다."
+                action={<StartButton href="/baseline-calibration" label="측정" />}
               />
               <Row
                 title="확장 프로그램 설정 다시 보기"
