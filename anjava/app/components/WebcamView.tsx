@@ -278,42 +278,6 @@ const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
-function relayPostureAlertToExtension(state: DetectionState, message: string, soundEnabled: boolean) {
-  return new Promise<boolean>((resolve) => {
-    if (typeof window === "undefined") {
-      resolve(false);
-      return;
-    }
-    const suppressSystemNotification =
-      document.visibilityState === "visible" && document.hasFocus();
-    const relayId =
-      typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `posture-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const timeout = window.setTimeout(() => {
-      window.removeEventListener("message", onAck);
-      resolve(false);
-    }, 400);
-    function onAck(event: MessageEvent) {
-      if (event.source !== window) return;
-      if (event.data?.type !== "ANJAVA_POSTURE_RELAY_ACK" || event.data.relayId !== relayId) return;
-      window.clearTimeout(timeout);
-      window.removeEventListener("message", onAck);
-      resolve(true);
-    }
-    window.addEventListener("message", onAck);
-    window.postMessage({
-      type: "ANJAVA_POSTURE_RELAY",
-      relayId,
-      state,
-      message,
-      soundEnabled,
-      suppressSystemNotification,
-    }, "*");
-  });
-}
-
-/*
 const TOAST_STYLE = `
   #anjava-web-toast {
     position: fixed; top: 20px; right: 20px;
@@ -358,7 +322,86 @@ const TOAST_STYLE = `
     to   { transform: scaleX(0); }
   }
 `;
-*/
+
+let webToastTimer: number | null = null;
+
+function playWebToastTone(soundEnabled: boolean) {
+  if (!soundEnabled || typeof window === "undefined") return;
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return;
+    const ctx = new AudioContextCtor();
+    const playNote = (frequency: number, start: number, duration: number) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.16, start + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.02);
+    };
+    const now = ctx.currentTime;
+    playNote(1046.5, now, 0.17);
+    playNote(1318.5, now + 0.14, 0.24);
+    window.setTimeout(() => ctx.close().catch(() => {}), 650);
+  } catch {}
+}
+
+function dismissWebToast(el: HTMLElement) {
+  el.classList.add("out");
+  window.setTimeout(() => el.remove(), 240);
+}
+
+function showWebPostureToast(state: DetectionState, message: string, soundEnabled: boolean) {
+  if (typeof document === "undefined") return;
+  let style = document.getElementById("anjava-web-toast-style");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "anjava-web-toast-style";
+    style.textContent = TOAST_STYLE;
+    document.head.appendChild(style);
+  }
+  if (webToastTimer) {
+    window.clearTimeout(webToastTimer);
+    webToastTimer = null;
+  }
+  const previous = document.getElementById("anjava-web-toast");
+  if (previous) previous.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "anjava-web-toast";
+  const header = document.createElement("div");
+  header.className = "anjava-web-header";
+  const icon = document.createElement("div");
+  icon.className = "anjava-web-icon";
+  icon.textContent = state === "GOOD_POSTURE" ? "✓" : "!";
+  const title = document.createElement("div");
+  title.className = "anjava-web-title";
+  title.textContent = state === "GOOD_POSTURE" ? "자세 교정 완료" : "자세 교정 알림";
+  const close = document.createElement("button");
+  close.className = "anjava-web-close";
+  close.type = "button";
+  close.textContent = "×";
+  close.setAttribute("aria-label", "닫기");
+  close.onclick = () => dismissWebToast(toast);
+  const body = document.createElement("div");
+  body.className = "anjava-web-body";
+  body.textContent = message;
+  const progress = document.createElement("div");
+  progress.className = "anjava-web-progress";
+
+  header.append(icon, title, close);
+  toast.append(header, body, progress);
+  document.body.appendChild(toast);
+  playWebToastTone(soundEnabled);
+  webToastTimer = window.setTimeout(() => dismissWebToast(toast), 6000);
+}
 
 export default function WebcamView({
   darkDetectionEnabled = false,
@@ -813,14 +856,7 @@ export default function WebcamView({
           const webIsForeground =
             document.visibilityState === "visible" && document.hasFocus();
           const notification = webIsForeground
-            ? relayPostureAlertToExtension(backendState, msg, soundEnabled).then((handledByExtension) => {
-                if (handledByExtension) return;
-                return showLocalPostureNotification({
-                  state: backendState,
-                  message: msg,
-                  soundEnabled,
-                });
-              })
+            ? Promise.resolve(showWebPostureToast(backendState, msg, soundEnabled))
             : showLocalPostureNotification({
               state: backendState,
               message: msg,
