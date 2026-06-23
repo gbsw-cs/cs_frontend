@@ -1359,10 +1359,10 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg bg-white px-2.5 py-1 ring-1 ring-zinc-100">
-      <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[10px] leading-tight text-zinc-500">{label}</div>
-        <div className="shrink-0 text-[10px] font-semibold leading-tight text-zinc-500">{pct}%</div>
+    <div className="rounded-lg bg-white px-2 py-1 ring-1 ring-zinc-100">
+      <div className="flex min-w-0 items-center justify-between gap-1.5">
+        <div className="min-w-0 flex-1 whitespace-nowrap text-[8px] font-medium leading-tight text-zinc-500 sm:text-[9px]">{label}</div>
+        <div className="shrink-0 text-[8px] font-semibold leading-tight text-zinc-500 sm:text-[9px]">{pct}%</div>
       </div>
       <div className="mt-0.5 text-xs font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
       <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
