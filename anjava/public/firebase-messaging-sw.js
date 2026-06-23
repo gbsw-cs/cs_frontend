@@ -25,7 +25,6 @@ messaging.onBackgroundMessage((payload) => {
     body,
     icon: notification.icon || "/avatar.png",
     badge: "/avatar.png",
-    image: notification.image || data.image || "/avatar.png",
     data: {
       ...data,
       url: data.url || "/dashboard",

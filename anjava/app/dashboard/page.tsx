@@ -669,7 +669,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 pb-1 pt-[3px] transition-colors duration-300 sm:px-4 sm:pb-2 sm:pt-[3px] lg:h-dvh lg:overflow-hidden lg:pb-[0.35vh] lg:pt-[3px]">
+    <div className="min-h-dvh overflow-y-auto bg-zinc-50 px-3 pb-3 pt-[3px] transition-colors duration-300 sm:px-4 sm:pb-4 sm:pt-[3px] lg:h-dvh lg:overflow-y-auto lg:pb-3 lg:pt-[3px]">
       <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-col lg:h-full lg:min-h-0">
         {me.settings.pushEnabled && notificationPermission === "default" && (
           <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
@@ -690,7 +690,7 @@ export default function DashboardPage() {
             {" "}주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경한 후 페이지를 새로고침하세요.
           </div>
         )}
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(180px,0.88fr)_minmax(165px,0.72fr)_minmax(215px,1.12fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-2 overflow-visible lg:grid-rows-[minmax(176px,0.82fr)_minmax(156px,0.68fr)_minmax(236px,1.2fr)] lg:gap-x-2 lg:gap-y-2 lg:overflow-visible">
 
           {/* ── Row 1 ── */}
 
@@ -1170,9 +1170,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-1 grid shrink-0 grid-cols-2 gap-1 lg:grid-cols-5">
-              <div className="col-span-2 rounded-xl bg-[#2563EB]/5 px-2.5 py-1 ring-1 ring-[#2563EB]/15 lg:col-span-1">
+              <div className="col-span-2 rounded-lg bg-[#2563EB]/5 px-2 py-0.5 ring-1 ring-[#2563EB]/15 lg:col-span-1">
                 <div className="text-[9px] font-medium leading-tight text-[#2563EB]">총 감지 스크린타임</div>
-                <div className="text-base font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
+                <div className="text-sm font-bold leading-tight text-zinc-900">{formatDuration(weeklyScreenSec)}</div>
                 <div className="text-[8px] leading-tight text-zinc-400">{weeklyScreenSec === null ? "데이터 수집 중" : `자세 경고 비율 ${weeklyRiskPct}%`}</div>
               </div>
               <WeeklyMetric label="정자세 시간" value={formatDuration(weeklyGoodSec)} tone="good" />
@@ -1181,15 +1181,15 @@ export default function DashboardPage() {
               <WeeklyMetric label="어둠 감지 시간" value={formatDuration(darkSec)} tone="dark" />
             </div>
 
-            <div className="mt-1.5 grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-3 py-2 ring-1 ring-zinc-100">
-                <div className="grid grid-cols-3 gap-2">
+            <div className="mt-1 grid min-h-0 flex-1 grid-cols-1 gap-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="flex min-h-0 flex-col justify-start rounded-xl bg-zinc-50 px-2 py-1.5 ring-1 ring-zinc-100">
+                <div className="grid grid-cols-3 gap-1.5">
                   <WeeklyCompactStat label="자세 경고 비율" value={`${weeklyAvgBadPct}%`} tone="bad" />
                   <WeeklyCompactStat label="정자세 비율" value={`${weeklyGoodPct}%`} tone="good" />
                   <WeeklyCompactStat label="주의 요일" value={worstWeekdayLabel} tone="dark" />
                 </div>
-                <div className="mt-2 space-y-1">
-                  <div className="px-0.5 text-[10px] font-semibold leading-tight text-zinc-500">자세 경고 유형별 비중</div>
+                <div className="mt-1.5 space-y-0.5">
+                  <div className="px-0.5 text-[9px] font-semibold leading-tight text-zinc-500">자세 경고 유형별 비중</div>
                   {weekly === null ? (
                     <div className="space-y-1 py-1">
                       {[1,2,3].map((k) => <div key={k} className="h-8 animate-pulse rounded-lg bg-zinc-100" />)}
@@ -1334,9 +1334,9 @@ function WeeklyMetric({ label, value, tone }: { label: string; value: string; to
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="rounded-xl px-2.5 py-1 ring-1 ring-zinc-100">
-      <div className="text-[9px] leading-tight text-zinc-400">{label}</div>
-      <div className={`text-[13px] font-bold leading-tight ${toneClass}`}>{value}</div>
+    <div className="rounded-lg px-2 py-0.5 ring-1 ring-zinc-100">
+      <div className="text-[8px] leading-tight text-zinc-400">{label}</div>
+      <div className={`text-xs font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -1349,9 +1349,9 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
       ? "text-rose-500"
       : "text-zinc-700";
   return (
-    <div className="flex min-h-[46px] flex-col items-center justify-center rounded-lg bg-white px-1.5 text-center ring-1 ring-zinc-100">
-      <div className="text-[10px] leading-tight text-zinc-500">{label}</div>
-      <div className={`mt-0.5 text-base font-bold leading-tight ${toneClass}`}>{value}</div>
+    <div className="flex min-h-[38px] flex-col items-center justify-center rounded-lg bg-white px-1 text-center ring-1 ring-zinc-100">
+      <div className="text-[8px] leading-tight text-zinc-500">{label}</div>
+      <div className={`mt-0.5 text-sm font-bold leading-tight ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -1359,13 +1359,13 @@ function WeeklyCompactStat({ label, value, tone }: { label: string; value: strin
 function IssueBar({ label, sec, totalSec, color }: { label: string; sec: number; totalSec: number; color: string }) {
   const pct = totalSec > 0 ? clampPercent(Math.round((sec / totalSec) * 100)) : 0;
   return (
-    <div className="rounded-lg bg-white px-2 py-1 ring-1 ring-zinc-100">
+    <div className="rounded-lg bg-white px-2 py-0.5 ring-1 ring-zinc-100">
       <div className="flex min-w-0 items-center justify-between gap-1.5">
         <div className="min-w-0 flex-1 whitespace-nowrap text-[8px] font-medium leading-tight text-zinc-500 sm:text-[9px]">{label}</div>
         <div className="shrink-0 text-[8px] font-semibold leading-tight text-zinc-500 sm:text-[9px]">{pct}%</div>
       </div>
-      <div className="mt-0.5 text-xs font-bold leading-tight text-zinc-900">{formatDuration(sec)}</div>
-      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+      <div className="mt-0.5 text-[11px] font-bold leading-none text-zinc-900">{formatDuration(sec)}</div>
+      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-zinc-100">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
