@@ -192,6 +192,14 @@ function playAlertTone(soundEnabled: boolean) {
   } catch {}
 }
 
+function getPostureNotificationIcon(state: string) {
+  const normalized = state.trim().toUpperCase();
+  if (normalized === "TURTLE_NECK") return "/turtleneck.png";
+  if (normalized === "ROUND_SHOULDER" || normalized === "SHOULDER_ISSUE") return "/round-shoulder.png";
+  if (normalized === "SHOULDER_ASYMMETRY") return "/shoulder-notsame.png";
+  return "/avatar.png";
+}
+
 export async function showLocalPostureNotification({
   state,
   message,
@@ -216,7 +224,7 @@ export async function showLocalPostureNotification({
   const title = "자세 교정 알림";
   const options = {
     body: message,
-    icon: "/avatar.png",
+    icon: getPostureNotificationIcon(state),
     badge: "/avatar.png",
     silent: !soundEnabled,
     data: { url: "/dashboard", state },

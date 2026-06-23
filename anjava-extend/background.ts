@@ -115,7 +115,7 @@ type PendingApproval = {
 const pendingApprovals = new Map<string, PendingApproval>()
 const lastPostureAlertAt = new Map<string, number>()
 const notificationClickTargets = new Map<string, string>()
-let paddedNotificationIconUrlPromise: Promise<string> | null = null
+const paddedNotificationIconUrlPromises = new Map<string, Promise<string>>()
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -134,10 +134,19 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-async function getNotificationIcon(): Promise<string> {
-  if (!paddedNotificationIconUrlPromise) {
-    paddedNotificationIconUrlPromise = (async () => {
-      const fallback = chrome.runtime.getURL("assets/avatar.png")
+function getPostureNotificationAsset(state?: unknown): string {
+  const normalized = typeof state === "string" ? state.trim().toUpperCase() : ""
+  if (normalized === "TURTLE_NECK") return "assets/turtleneck.png"
+  if (normalized === "ROUND_SHOULDER" || normalized === "SHOULDER_ISSUE") return "assets/round-shoulder.png"
+  if (normalized === "SHOULDER_ASYMMETRY") return "assets/shoulder-notsame.png"
+  return "assets/avatar.png"
+}
+
+async function getNotificationIcon(state?: unknown): Promise<string> {
+  const asset = getPostureNotificationAsset(state)
+  if (!paddedNotificationIconUrlPromises.has(asset)) {
+    paddedNotificationIconUrlPromises.set(asset, (async () => {
+      const fallback = chrome.runtime.getURL(asset)
       try {
         const source = await fetch(fallback)
         const blob = await source.blob()
@@ -160,10 +169,11 @@ async function getNotificationIcon(): Promise<string> {
         console.warn("[notification] 아이콘 생성 실패, 기본 아이콘 사용:", error)
         return fallback
       }
-    })()
+    })())
   }
 
-  return paddedNotificationIconUrlPromise
+  const promise = paddedNotificationIconUrlPromises.get(asset)
+  return promise ?? chrome.runtime.getURL(asset)
 }
 
 async function playPostureAlertSound(soundEnabled: boolean): Promise<void> {
@@ -564,7 +574,7 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
 
   const notificationId = `posture-${Date.now()}`
   notificationClickTargets.set(notificationId, DASHBOARD_URL)
-  const iconUrl = await getNotificationIcon()
+  const iconUrl = await getNotificationIcon(msg.state)
   await chrome.notifications.create(notificationId, {
     type: "basic",
     iconUrl,

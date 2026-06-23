@@ -927,7 +927,7 @@ export default function DashboardPage() {
               </button>
               <div className="mt-1.5 w-full shrink-0 rounded-lg px-2.5 py-1.5 text-center ring-1 ring-zinc-100">
                 <div className="text-[9px] font-semibold text-zinc-400">실시간 감지 상태</div>
-                <div className={`mt-0.5 text-[11px] font-bold ${
+                <div className={`mt-0.5 flex min-h-[18px] items-center justify-center text-[12px] font-bold leading-tight ${
                   liveIsGood
                     ? "text-emerald-500"
                     : liveIsBad
@@ -937,7 +937,7 @@ export default function DashboardPage() {
                   {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : sessionStatus === "stopped" ? "세션을 시작해주세요." : "분석 대기 중"}
                 </div>
                 {liveDetection?.message ? (
-                  <div className="mt-0.5 truncate text-[9px] text-zinc-500">{liveDetection.message}</div>
+                  <div className="mt-0.5 truncate text-[8px] leading-none text-zinc-500">{liveDetection.message}</div>
                 ) : null}
                 <div className="mt-0.5 text-[8px] text-zinc-300">
                   {liveDetection ? `${liveDetection.updatedAt} 갱신` : sessionStatus === "stopped" ? "" : "웹캠 연결 후 자동 갱신"}

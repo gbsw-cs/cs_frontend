@@ -73,13 +73,13 @@ function injectStyle() {
       top: 24px;
       right: 24px;
       z-index: 2147483647;
-      width: min(460px, calc(100vw - 32px));
+      width: min(440px, calc(100vw - 32px));
       overflow: hidden;
-      border: 1px solid rgba(191, 219, 254, 0.9);
-      border-radius: 22px;
-      background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+      border: 1px solid rgba(251, 113, 133, 0.36);
+      border-radius: 18px;
+      background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
       color: #18181b;
-      box-shadow: 0 22px 60px rgba(37, 99, 235, 0.18), 0 8px 22px rgba(15, 23, 42, 0.1);
+      box-shadow: 0 18px 48px rgba(225, 29, 72, 0.18), 0 6px 18px rgba(15, 23, 42, 0.12);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
       pointer-events: auto;
       animation: anjava-toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -94,19 +94,24 @@ function injectStyle() {
     #${TOAST_ID}.is-good:before {
       background: linear-gradient(90deg, #2563eb, #22c55e);
     }
+    #${TOAST_ID}.is-good {
+      border-color: rgba(74, 222, 128, 0.36);
+      background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+      box-shadow: 0 18px 48px rgba(34, 197, 94, 0.14), 0 6px 18px rgba(15, 23, 42, 0.1);
+    }
     #${TOAST_ID}.is-out {
       animation: anjava-toast-out 0.22s ease forwards;
     }
     #${TOAST_ID} .toast-main {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px 16px 14px;
+      gap: 10px;
+      padding: 15px 14px 13px 18px;
     }
     #${TOAST_ID} .toast-icon {
       display: flex;
-      width: 38px;
-      height: 38px;
+      width: 32px;
+      height: 32px;
       flex-shrink: 0;
       align-items: center;
       justify-content: center;
@@ -151,11 +156,11 @@ function injectStyle() {
       word-break: keep-all;
     }
     #${TOAST_ID} .toast-avatar {
-      width: 58px;
-      height: 68px;
+      width: 76px;
+      height: 84px;
       flex-shrink: 0;
       overflow: hidden;
-      border-radius: 16px;
+      border-radius: 0;
     }
     #${TOAST_ID} .toast-avatar img {
       display: block;

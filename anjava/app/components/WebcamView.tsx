@@ -281,46 +281,81 @@ const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
+const POSTURE_IMAGE_BY_STATE: Partial<Record<DetectionState, string>> = {
+  TURTLE_NECK: "/turtleneck.png",
+  SLOUCHING: "/avatar.png",
+  SLOUCH: "/avatar.png",
+  ROUND_SHOULDER: "/round-shoulder.png",
+  SHOULDER_ISSUE: "/round-shoulder.png",
+  SHOULDER_ASYMMETRY: "/shoulder-notsame.png",
+  DARK_ENV: "/avatar.png",
+  GOOD_POSTURE: "/avatar.png",
+  UNCLASSIFIED: "/avatar.png",
+};
+
+function getPostureImageUrl(state: DetectionState) {
+  return POSTURE_IMAGE_BY_STATE[state] ?? "/avatar.png";
+}
+
 const TOAST_STYLE = `
   #anjava-web-toast {
     position: fixed; top: 20px; right: 20px;
-    background: #fff; color: #18181b;
-    border-radius: 16px; z-index: 2147483647;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
-    width: 360px; max-width: calc(100vw - 32px); overflow: hidden;
-    border: 1px solid rgba(0,0,0,0.07);
+    background: linear-gradient(135deg, #fff 0%, #fff7f7 100%); color: #18181b;
+    border-radius: 18px; z-index: 2147483647;
+    box-shadow: 0 18px 48px rgba(225,29,72,0.18), 0 6px 18px rgba(15,23,42,0.12);
+    width: 390px; max-width: calc(100vw - 32px); overflow: hidden;
+    border: 1px solid rgba(251,113,133,0.34);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
     animation: anjava-web-in 0.32s cubic-bezier(0.16,1,0.3,1);
     pointer-events: auto;
   }
+  #anjava-web-toast:before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+    background: linear-gradient(180deg, #ef4444, #fb7185);
+  }
+  #anjava-web-toast.is-good {
+    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+    border-color: rgba(74,222,128,0.36);
+    box-shadow: 0 18px 48px rgba(34,197,94,0.14), 0 6px 18px rgba(15,23,42,0.1);
+  }
+  #anjava-web-toast.is-good:before { background: linear-gradient(180deg, #22c55e, #60a5fa); }
   #anjava-web-toast.out { animation: anjava-web-out 0.24s ease forwards; }
   #anjava-web-toast .anjava-web-header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 14px 10px; border-bottom: 1px solid #f4f4f5;
+    display: flex; align-items: center; gap: 10px;
+    padding: 15px 14px 6px 18px;
   }
   #anjava-web-toast .anjava-web-avatar {
-    width: 52px; height: 52px; flex-shrink: 0;
+    width: 76px; height: 82px; flex-shrink: 0; margin-left: 4px;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
   }
   #anjava-web-toast .anjava-web-avatar img {
     width: 100%; height: 100%; object-fit: contain; display: block;
   }
-  #anjava-web-toast .anjava-web-icon { font-size: 18px; flex-shrink: 0; }
+  #anjava-web-toast .anjava-web-icon {
+    width: 30px; height: 30px; border-radius: 999px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #ffe4e6; color: #e11d48; font-size: 17px; font-weight: 900;
+  }
+  #anjava-web-toast.is-good .anjava-web-icon { background: #dcfce7; color: #16a34a; }
   #anjava-web-toast .anjava-web-title {
-    font-weight: 700; font-size: 13px; color: #2563eb; flex: 1;
+    font-weight: 800; font-size: 14px; color: #be123c; flex: 1;
+  }
+  #anjava-web-toast.is-good .anjava-web-title {
+    color: #15803d;
   }
   #anjava-web-toast .anjava-web-close {
     background: none; border: none; color: #a1a1aa; cursor: pointer;
     font-size: 16px; padding: 0; line-height: 1;
   }
   #anjava-web-toast .anjava-web-body {
-    padding: 10px 14px 12px; font-size: 12.5px; color: #3f3f46; line-height: 1.55;
+    padding: 2px 98px 12px 58px; font-size: 12.5px; color: #3f3f46; line-height: 1.45;
   }
   #anjava-web-toast .anjava-web-progress {
-    height: 3px; background: #2563eb;
+    height: 3px; background: linear-gradient(90deg, #ef4444, #fb7185);
     animation: anjava-web-progress 6s linear forwards; transform-origin: left;
   }
+  #anjava-web-toast.is-good .anjava-web-progress { background: linear-gradient(90deg, #22c55e, #60a5fa); }
   @keyframes anjava-web-in {
     from { opacity: 0; transform: translateX(60px) scale(0.95); }
     to   { opacity: 1; transform: translateX(0) scale(1); }
@@ -387,13 +422,14 @@ function showWebPostureToast(state: DetectionState, message: string, soundEnable
 
   const toast = document.createElement("div");
   toast.id = "anjava-web-toast";
+  if (state === "GOOD_POSTURE") toast.classList.add("is-good");
   const header = document.createElement("div");
   header.className = "anjava-web-header";
   const avatar = document.createElement("div");
   avatar.className = "anjava-web-avatar";
   avatar.setAttribute("aria-hidden", "true");
   const avatarImage = document.createElement("img");
-  avatarImage.src = "/avatar.png";
+  avatarImage.src = getPostureImageUrl(state);
   avatarImage.alt = "";
   avatar.append(avatarImage);
   const icon = document.createElement("div");
