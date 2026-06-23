@@ -1123,8 +1123,8 @@ export default function DashboardPage() {
               <div className="text-xs font-bold text-zinc-900">실시간 감지 상태</div>
 
               {/* 종합 상태 메시지 */}
-              <div className={`mt-1.5 rounded-full px-3 py-1.5 text-center text-[11px] font-semibold ring-2 ${liveStatusTone.color} ${liveStatusTone.ring}`}>
-                {me?.name ?? "사용자"}님의 상태는 {liveStatusTone.sentence}.
+              <div className={`mt-1.5 truncate whitespace-nowrap rounded-full px-2 py-1.5 text-center text-[10px] font-semibold ring-2 ${liveStatusTone.color} ${liveStatusTone.ring}`}>
+                {(me?.name ?? "사용자").slice(0, 8)}님 · {liveStatusTone.text}
               </div>
 
               {/* 감지 항목 리스트 */}
