@@ -826,12 +826,14 @@ async function notifyDashboard(type: string): Promise<void> {
 }
 
 // ─── Timeline ────────────────────────────────────────────────
-// 백엔드 허용값: TURTLE_NECK, SLOUCH, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE
+// 백엔드 허용값: TURTLE_NECK, SLOUCHING, ROUND_SHOULDER, SHOULDER_ASYMMETRY, DARK_ENV, GOOD_POSTURE, UNCLASSIFIED
 const TIMELINE_STATE_MAP: Record<string, string> = {
   TURTLE_NECK:        "TURTLE_NECK",
   turtle_neck:        "TURTLE_NECK",
-  SLOUCH:             "SLOUCH",
-  slouch:             "SLOUCH",
+  SLOUCH:             "SLOUCHING",
+  SLOUCHING:          "SLOUCHING",
+  slouch:             "SLOUCHING",
+  slouching:          "SLOUCHING",
   SHOULDER_ISSUE:     "ROUND_SHOULDER",
   ROUND_SHOULDER:     "ROUND_SHOULDER",
   round_shoulder:     "ROUND_SHOULDER",

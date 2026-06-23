@@ -49,13 +49,15 @@ const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
   good_posture: "GOOD_POSTURE",
   normal: "GOOD_POSTURE",
   turtle_neck: "TURTLE_NECK",
-  slouch: "SLOUCH",
+  slouch: "SLOUCHING",
+  slouching: "SLOUCHING",
   round_shoulder: "ROUND_SHOULDER",
   shoulder_tilted: "SHOULDER_ASYMMETRY",
   shoulder_asymmetry: "SHOULDER_ASYMMETRY",
   shoulder_issue: "ROUND_SHOULDER",
   dark_env: "DARK_ENV",
   dark_environment: "DARK_ENV",
+  unclassified: "UNCLASSIFIED",
 };
 
 function toBackendState(finalStatus: string): DetectionState {
@@ -258,6 +260,7 @@ const POSTURE_MESSAGES: Record<string, string> = {
   TURTLE_NECK:        "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
   slouch:             "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   SLOUCH:             "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
+  SLOUCHING:          "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   round_shoulder:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   ROUND_SHOULDER:     "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   shoulder_tilted:    "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
@@ -272,6 +275,7 @@ const POSTURE_MESSAGES: Record<string, string> = {
 const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   TURTLE_NECK: "거북목 자세가 감지되었어요! 목을 바르게 펴주세요.",
   SLOUCH: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
+  SLOUCHING: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
@@ -283,7 +287,7 @@ const TOAST_STYLE = `
     background: #fff; color: #18181b;
     border-radius: 16px; z-index: 2147483647;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
-    width: 300px; overflow: hidden;
+    width: 360px; max-width: calc(100vw - 32px); overflow: hidden;
     border: 1px solid rgba(0,0,0,0.07);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
     animation: anjava-web-in 0.32s cubic-bezier(0.16,1,0.3,1);
@@ -295,9 +299,9 @@ const TOAST_STYLE = `
     padding: 12px 14px 10px; border-bottom: 1px solid #f4f4f5;
   }
   #anjava-web-toast .anjava-web-avatar {
-    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    width: 52px; height: 52px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    background: #eff6ff; overflow: hidden; border: 1px solid #dbeafe;
+    overflow: hidden;
   }
   #anjava-web-toast .anjava-web-avatar img {
     width: 100%; height: 100%; object-fit: contain; display: block;
@@ -638,7 +642,7 @@ export default function WebcamView({
           if (!extensionSessionRef.current) {
             queueCurrentState();
             const flushed = await flushQueuedEvents();
-            if (!flushed) throw new Error("일시정지 전 감지 기록을 전송하지 못했습니다.");
+            if (!flushed) console.warn("일시정지 전 일부 감지 기록 전송이 지연되었습니다.");
           }
           await pauseDetectionSession(sessionIdRef.current);
           sessionPausedRef.current = true;
@@ -662,7 +666,7 @@ export default function WebcamView({
           queueCurrentState();
           const flushed = await flushQueuedEvents();
           if (!flushed && eventQueueRef.current.length > 0) {
-            throw new Error("마지막 감지 기록을 전송하지 못했습니다. 잠시 후 종료를 다시 시도해주세요.");
+            console.warn("종료 전 일부 감지 기록 전송이 지연되었습니다.");
           }
         }
         const sessionId = sessionIdRef.current;
@@ -673,7 +677,7 @@ export default function WebcamView({
         setIsExtensionSession(false);
         lastBackendStateRef.current = null;
         if (sessionId) await endDetectionSession(sessionId);
-        if (!wasExtension) persistPendingEvents(null, []);
+        if (!wasExtension && eventQueueRef.current.length === 0) persistPendingEvents(null, []);
         if (operation === sessionOperationRef.current) {
           onSessionActiveChangeRef.current?.(false, "stopped");
           onSessionControlStateChangeRef.current?.("stopped");

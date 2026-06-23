@@ -678,6 +678,16 @@ type RawDailyDashboardSlot = Partial<DailyDashboard> & {
   shoulderAsymmetryTotalSec?: number | string | null;
   darkEnvTotalSec?: number | string | null;
   unclassifiedTotalSec?: number | string | null;
+  screenTimeSec?: number | string | null;
+  screen_time_sec?: number | string | null;
+  detectionSec?: number | string | null;
+  detection_sec?: number | string | null;
+  durationSec?: number | string | null;
+  duration_sec?: number | string | null;
+  sessionDurationSec?: number | string | null;
+  session_duration_sec?: number | string | null;
+  activeSec?: number | string | null;
+  active_sec?: number | string | null;
   total_detection_sec?: number | string | null;
   total_duration_sec?: number | string | null;
   good_posture_sec?: number | string | null;
@@ -713,7 +723,7 @@ export type TimelineDashboard = {
     time?: string;
     startHour?: number;
     startMin?: number;
-    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SLOUCH" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV";
+    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SLOUCH" | "SLOUCHING" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV" | "UNCLASSIFIED";
     message?: string;
     healthScore?: number;
     detectedAt?: string;
@@ -725,13 +735,17 @@ export type DetectionState =
   | "GOOD_POSTURE"
   | "TURTLE_NECK"
   | "SLOUCH"
+  | "SLOUCHING"
   | "SHOULDER_ISSUE"
   | "ROUND_SHOULDER"
   | "SHOULDER_ASYMMETRY"
-  | "DARK_ENV";
+  | "DARK_ENV"
+  | "UNCLASSIFIED";
 
 function toSessionSegmentState(state: DetectionState) {
-  return state === "SHOULDER_ISSUE" ? "ROUND_SHOULDER" : state;
+  if (state === "SHOULDER_ISSUE") return "ROUND_SHOULDER";
+  if (state === "SLOUCH") return "SLOUCHING";
+  return state;
 }
 
 export type DetectionSession = {
@@ -820,7 +834,24 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       const darkEnvSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"], day);
       const badSec = turtleNeckSec + slouchSec + finalRoundSec + finalAsymSec;
       const totalDetectionSec = n(
-        ["totalDetectionSec", "totalDurationSec", "totalScreenSec", "screenTimeSec", "detectionSec", "total_detection_sec", "total_duration_sec", "total_screen_sec", "screen_time_sec"],
+        [
+          "totalDetectionSec",
+          "totalDurationSec",
+          "totalScreenSec",
+          "screenTimeSec",
+          "detectionSec",
+          "durationSec",
+          "sessionDurationSec",
+          "activeSec",
+          "total_detection_sec",
+          "total_duration_sec",
+          "total_screen_sec",
+          "screen_time_sec",
+          "detection_sec",
+          "duration_sec",
+          "session_duration_sec",
+          "active_sec",
+        ],
         day,
       );
       const explicitGoodPostureSec = n(
@@ -950,10 +981,17 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     "totalScreenSec",
     "screenTimeSec",
     "detectionSec",
+    "durationSec",
+    "sessionDurationSec",
+    "activeSec",
     "total_detection_sec",
     "total_duration_sec",
     "total_screen_sec",
     "screen_time_sec",
+    "detection_sec",
+    "duration_sec",
+    "session_duration_sec",
+    "active_sec",
   ]);
 
   // 신 API: goodPostureRatio (0~1) 또는 riskPercent (0~100) 중 있는 쪽 사용
@@ -1060,7 +1098,20 @@ function normalizeDailyDashboardSlot(
       ? toApiNumber(source.singleBadCount)
       : turtleNeckCount + slouchCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
   const totalDetectionSec = toApiNumber(
-    source.totalDetectionSec ?? source.totalDurationSec ?? source.total_detection_sec ?? source.total_duration_sec,
+    source.totalDetectionSec
+      ?? source.totalDurationSec
+      ?? source.screenTimeSec
+      ?? source.detectionSec
+      ?? source.durationSec
+      ?? source.sessionDurationSec
+      ?? source.activeSec
+      ?? source.total_detection_sec
+      ?? source.total_duration_sec
+      ?? source.screen_time_sec
+      ?? source.detection_sec
+      ?? source.duration_sec
+      ?? source.session_duration_sec
+      ?? source.active_sec,
   );
   const explicitGoodPostureSec = toApiNumber(
     source.goodPostureSec ?? source.goodPostureTotalSec ?? source.good_posture_sec ?? source.good_posture_total_sec,
@@ -1111,6 +1162,11 @@ function normalizeDailyDashboardSlot(
   const hasDurationData = [
     source.totalDetectionSec,
     source.totalDurationSec,
+    source.screenTimeSec,
+    source.detectionSec,
+    source.durationSec,
+    source.sessionDurationSec,
+    source.activeSec,
     source.goodPostureSec,
     source.goodPostureTotalSec,
     source.turtleNeckSec,
@@ -1129,6 +1185,11 @@ function normalizeDailyDashboardSlot(
     source.unclassifiedTotalSec,
     source.total_detection_sec,
     source.total_duration_sec,
+    source.screen_time_sec,
+    source.detection_sec,
+    source.duration_sec,
+    source.session_duration_sec,
+    source.active_sec,
     source.good_posture_sec,
     source.good_posture_total_sec,
     source.turtle_neck_sec,

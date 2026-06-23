@@ -71,7 +71,7 @@ function createDetectionEvent(state: string, startedAtMs: number, endedAtMs: num
 
 function toBackendType(state: string): string {
   if (state === "TURTLE_NECK" || state === "turtle_neck") return "TURTLE_NECK"
-  if (state === "SLOUCH" || state === "slouch") return "SLOUCH"
+  if (state === "SLOUCH" || state === "SLOUCHING" || state === "slouch" || state === "slouching") return "SLOUCHING"
   if (state === "SHOULDER_ISSUE" || state === "round_shoulder") return "ROUND_SHOULDER"
   if (state === "shoulder_tilted" || state === "shoulder_asymmetry") return "SHOULDER_ASYMMETRY"
   if (state === "DARK_ENV" || state === "dark_env" || state === "dark_environment") return "DARK_ENV"
@@ -302,7 +302,7 @@ export default function OffscreenPage() {
       const timeoutId = setTimeout(() => controller.abort(), 10000)
       const segments = events.map(({ eventId, state, startedAt, endedAt }) => ({
         clientEventId: eventId,
-        state,
+        state: toBackendType(state),
         startedAt,
         endedAt,
       }))

@@ -16,7 +16,9 @@ const TOAST_MESSAGES: Record<string, string> = {
   TURTLE_NECK: "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
   turtle_neck: "거북목 자세가 감지됐어요. 목을 바르게 세워주세요.",
   SLOUCH: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
+  SLOUCHING: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
   slouch: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
+  slouching: "구부정한 자세가 감지됐어요. 허리를 세워주세요.",
   SHOULDER_ISSUE: "어깨 자세 이상이 감지됐어요. 어깨를 뒤로 펴주세요.",
   ROUND_SHOULDER: "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
   round_shoulder: "라운드숄더가 감지됐어요. 어깨를 뒤로 펴주세요.",
@@ -37,6 +39,7 @@ const POSTURE_IMAGE_BY_STATE: Record<string, string> = {
 const NORMALIZED_POSTURE_STATE: Record<string, string> = {
   turtle_neck: "TURTLE_NECK",
   slouch: "SLOUCH",
+  slouching: "SLOUCH",
   round_shoulder: "ROUND_SHOULDER",
   shoulder_issue: "SHOULDER_ISSUE",
   shoulder_tilted: "SHOULDER_ASYMMETRY",
@@ -70,7 +73,7 @@ function injectStyle() {
       top: 24px;
       right: 24px;
       z-index: 2147483647;
-      width: min(420px, calc(100vw - 32px));
+      width: min(460px, calc(100vw - 32px));
       overflow: hidden;
       border: 1px solid rgba(191, 219, 254, 0.9);
       border-radius: 22px;
@@ -148,8 +151,8 @@ function injectStyle() {
       word-break: keep-all;
     }
     #${TOAST_ID} .toast-avatar {
-      width: 46px;
-      height: 54px;
+      width: 58px;
+      height: 68px;
       flex-shrink: 0;
       overflow: hidden;
       border-radius: 16px;

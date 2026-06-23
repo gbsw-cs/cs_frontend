@@ -65,7 +65,9 @@ const STATE_LABEL: Record<string, string> = {
   TURTLE_NECK:        "거북목 발생",
   turtle_neck:        "거북목 발생",
   SLOUCH:             "구부정한 자세 발생",
+  SLOUCHING:          "구부정한 자세 발생",
   slouch:             "구부정한 자세 발생",
+  slouching:          "구부정한 자세 발생",
   SHOULDER_ISSUE:     "어깨 자세 이상 발생",
   shoulder_issue:     "어깨 자세 이상 발생",
   ROUND_SHOULDER:     "라운드숄더 발생",
@@ -152,7 +154,7 @@ function normalizeTimelineState(state: string): string {
   const value = state.toLowerCase();
   if (value === "good" || value === "good_posture") return "GOOD_POSTURE";
   if (value === "turtle_neck") return "TURTLE_NECK";
-  if (value === "slouch") return "SLOUCH";
+  if (value === "slouch" || value === "slouching") return "SLOUCHING";
   if (value === "round_shoulder" || value === "shoulder_issue") return "ROUND_SHOULDER";
   if (value === "shoulder_tilted" || value === "shoulder_asymmetry") return "SHOULDER_ASYMMETRY";
   if (value === "dark_env" || value === "dark_environment") return "DARK_ENV";
@@ -761,7 +763,7 @@ export default function DashboardPage() {
                       ? "bg-emerald-400"
                       : state === "DARK_ENV"
                       ? "bg-zinc-400"
-                      : state === "SLOUCH"
+                      : state === "SLOUCH" || state === "SLOUCHING"
                       ? "bg-sky-400"
                       : "bg-amber-400";
                   const label = `${STATE_LABEL[state] ?? "자세 이상 발생"} ${icon}`;
