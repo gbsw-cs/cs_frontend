@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, ChevronLeft, Play, RotateCcw, Square } from "lucide-react";
+import { Camera, CheckCircle2, ChevronLeft, Play } from "lucide-react";
 import { createPostureFrame, isUsablePostureFrame, type PostureFrame } from "../lib/poseFrame";
 
 const BASELINE_SECONDS = 10;
@@ -12,6 +13,7 @@ const BASELINE_MIN_FRAMES = 20;
 type Phase = "idle" | "preview" | "measuring" | "done" | "error";
 
 export default function BaselineCalibrationPage() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -53,6 +55,7 @@ export default function BaselineCalibrationPage() {
         await videoRef.current.play().catch(() => {});
       }
       setPhase("preview");
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "웹캠 접근 실패";
       if (/Permission|NotAllowed/i.test(msg)) {
@@ -63,6 +66,7 @@ export default function BaselineCalibrationPage() {
         setError(msg);
       }
       setPhase("error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -142,7 +146,14 @@ export default function BaselineCalibrationPage() {
     }
   }, []);
 
-  const canMeasure = phase === "preview" || phase === "done" || phase === "error";
+  const startBaseline = useCallback(async () => {
+    if (!streamRef.current) {
+      const opened = await startCamera();
+      if (!opened) return;
+    }
+    await measureBaseline();
+  }, [measureBaseline, startCamera]);
+
   const measuring = phase === "measuring";
   const isCameraActive = phase === "preview" || phase === "measuring" || phase === "done";
 
@@ -221,21 +232,21 @@ export default function BaselineCalibrationPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={isCameraActive ? stopCamera : startCamera}
-                  disabled={busy || phase === "measuring"}
+                  onClick={startBaseline}
+                  disabled={busy || measuring}
                   className="flex items-center justify-center gap-2 rounded-lg bg-zinc-100 px-3 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-200 disabled:opacity-50"
                 >
-                  {isCameraActive ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                  {isCameraActive ? "카메라 끄기" : busy ? "여는 중..." : "카메라 켜기"}
+                  <Play size={14} fill="currentColor" />
+                  {busy ? "준비 중..." : measuring ? "측정 중..." : "시작"}
                 </button>
                 <button
                   type="button"
-                  onClick={measureBaseline}
-                  disabled={!canMeasure || measuring}
+                  onClick={() => router.push("/dashboard")}
+                  disabled={measuring}
                   className="flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-3 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <RotateCcw size={14} />
-                  {phase === "measuring" ? "측정 중..." : phase === "done" ? "다시 측정" : "측정 시작"}
+                  <CheckCircle2 size={14} />
+                  완료
                 </button>
               </div>
             </div>

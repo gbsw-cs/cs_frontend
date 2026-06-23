@@ -11,7 +11,6 @@ import {
   logout,
   type ApiBadge,
   type Me,
-  type ReportPushWay,
   type UserSettings,
   type UserSettingsPatch,
   setDarkDetection,
@@ -585,32 +584,6 @@ export default function SettingsPage() {
               />
             </Group>
 
-            {/* Notification delivery */}
-            <Group title="알림 수신 방법">
-              <Row
-                title="수신 채널"
-                desc="어디로 리포트를 받을지 선택합니다."
-                action={
-                  <div className="flex items-center gap-3">
-                    <WayButton
-                      active={settings.reportPushWay === "EMAIL"}
-                      onClick={() => patchSettings({ reportPushWay: "EMAIL" })}
-                      ariaLabel="Gmail 로 수신"
-                    >
-                      <GmailIcon />
-                    </WayButton>
-                    <WayButton
-                      active={settings.reportPushWay === "NOTION"}
-                      onClick={() => patchSettings({ reportPushWay: "NOTION" })}
-                      ariaLabel="Notion 으로 수신"
-                    >
-                      <NotionIcon />
-                    </WayButton>
-                  </div>
-                }
-              />
-            </Group>
-
             {/* Push notifications */}
             <Group title="알림">
               <Row
@@ -811,74 +784,3 @@ function Toggle({
     </button>
   );
 }
-
-function WayButton({
-  active,
-  onClick,
-  ariaLabel,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  ariaLabel: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      aria-label={ariaLabel}
-      className={`flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm transition ${
-        active
-          ? "ring-2 ring-[#2563EB]"
-          : "ring-1 ring-zinc-200 hover:ring-zinc-300"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function GmailIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 48 48"
-      aria-hidden="true"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fill="#4285F4"
-        d="M6 40V14.5l16 12 16-12V40H32V24.5l-10 7.5-10-7.5V40z"
-      />
-      <path fill="#34A853" d="M32 40h8a2 2 0 0 0 2-2V14.5L32 22z" />
-      <path fill="#FBBC04" d="M42 14.5V12a4 4 0 0 0-4-4h-1L32 11.7v10.3z" />
-      <path
-        fill="#EA4335"
-        d="M6 14.5V12a4 4 0 0 1 4-4h1L16 11.7l6 4.5 6-4.5L33 8h5a4 4 0 0 1 4 4v2.5L22 30z"
-      />
-      <path fill="#C5221F" d="M6 14.5V12a4 4 0 0 1 4-4h1L16 11.7v10.3z" />
-    </svg>
-  );
-}
-
-function NotionIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 32 32"
-      aria-hidden="true"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fill="#000"
-        d="M6.02 4.24c.96.79 1.32.73 3.13.61l17.06-1.03c.36 0 .06-.36-.06-.42L23.33 1.35c-.54-.42-1.27-.91-2.65-.79L4.14 1.77c-.6.06-.72.36-.48.6zm.79 3.09v17.95c0 .97.48 1.33 1.57 1.27l18.75-1.09c1.09-.06 1.21-.73 1.21-1.51V6.12c0-.78-.3-1.2-.97-1.14L7.78 6.06c-.73.06-.97.43-.97 1.27zm18.29 1.03c.12.55 0 1.09-.55 1.15l-.9.18v13.29c-.79.42-1.51.66-2.11.66-.97 0-1.21-.3-1.94-1.21l-5.93-9.33v9.02l1.87.43s0 1.09-1.51 1.09l-4.29.24c-.12-.24 0-.85.42-.97l1.09-.3V11.06l-1.51-.12c-.12-.67.36-1.39 1.02-1.45l4.47-.3 6.17 9.44v-8.35l-1.57-.18c-.12-.67.36-1.15.97-1.21z"
-      />
-    </svg>
-  );
-}
-
-export type { ReportPushWay };

@@ -730,6 +730,10 @@ export type DetectionState =
   | "SHOULDER_ASYMMETRY"
   | "DARK_ENV";
 
+function toSessionSegmentState(state: DetectionState) {
+  return state === "SHOULDER_ISSUE" ? "ROUND_SHOULDER" : state;
+}
+
 export type DetectionSession = {
   sessionId: string;
   startedAt: string;
@@ -1292,7 +1296,7 @@ export function postSessionSegments(
       body: JSON.stringify({
         segments: events.map(({ eventId, state, startedAt, endedAt }) => ({
           clientEventId: eventId,
-          state,
+          state: toSessionSegmentState(state),
           startedAt,
           endedAt,
         })),

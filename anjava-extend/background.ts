@@ -137,7 +137,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 async function getNotificationIcon(): Promise<string> {
   if (!paddedNotificationIconUrlPromise) {
     paddedNotificationIconUrlPromise = (async () => {
-      const fallback = chrome.runtime.getURL("assets/logo.png")
+      const fallback = chrome.runtime.getURL("assets/avatar.png")
       try {
         const source = await fetch(fallback)
         const blob = await source.blob()

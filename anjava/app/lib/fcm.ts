@@ -45,6 +45,10 @@ type SyncWebPushTokenResult =
         | "token-registration-failed";
     };
 
+type RichNotificationOptions = NotificationOptions & {
+  image?: string;
+};
+
 function getFirebaseConfig(): FirebaseOptions {
   const config = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? FIREBASE_CONFIG.apiKey,
@@ -102,13 +106,14 @@ function getNotificationContent(payload: MessagePayload) {
     title: notification.title ?? data.title ?? "Anjava 알림",
     options: {
       body: notification.body ?? data.body ?? "자세 상태를 확인해주세요.",
-      icon: notification.icon ?? "/logo.png",
-      badge: "/logo.png",
+      icon: notification.icon ?? "/avatar.png",
+      badge: "/avatar.png",
+      image: notification.image ?? data.image ?? "/avatar.png",
       data: {
         url: data.url ?? "/dashboard",
         ...data,
       },
-    } satisfies NotificationOptions,
+    } satisfies RichNotificationOptions,
   };
 }
 
@@ -216,10 +221,12 @@ export async function showLocalPostureNotification({
   const title = "자세 교정 알림";
   const options = {
     body: message,
-    icon: "/logo.png",
+    icon: "/avatar.png",
+    badge: "/avatar.png",
+    image: "/avatar.png",
     silent: !soundEnabled,
     data: { url: "/dashboard", state },
-  } satisfies NotificationOptions;
+  } satisfies RichNotificationOptions;
 
   // macOS Chrome은 서비스 워커 알림이 시스템 배너와 더 안정적으로 연동된다.
   // Windows Chromium은 페이지 Notification이 배너 표시 누락을 덜 일으킨다.

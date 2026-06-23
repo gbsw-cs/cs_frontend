@@ -53,7 +53,7 @@ const AI_STATUS_TO_BACKEND_STATE: Record<string, DetectionState> = {
   round_shoulder: "ROUND_SHOULDER",
   shoulder_tilted: "SHOULDER_ASYMMETRY",
   shoulder_asymmetry: "SHOULDER_ASYMMETRY",
-  shoulder_issue: "SHOULDER_ISSUE",
+  shoulder_issue: "ROUND_SHOULDER",
   dark_env: "DARK_ENV",
   dark_environment: "DARK_ENV",
 };
@@ -274,7 +274,6 @@ const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
   SLOUCH: "구부정한 자세가 감지되었어요! 허리를 세워주세요.",
   ROUND_SHOULDER: "라운드숄더가 감지되었어요! 어깨를 뒤로 젖혀주세요.",
   SHOULDER_ASYMMETRY: "어깨 비대칭이 감지되었어요! 어깨 높이를 맞춰주세요.",
-  SHOULDER_ISSUE: "어깨 자세 이상이 감지되었어요! 어깨를 바르게 펴주세요.",
   DARK_ENV: "어두운 환경이 감지되었어요! 주변 밝기를 높여주세요.",
 };
 
@@ -294,6 +293,14 @@ const TOAST_STYLE = `
   #anjava-web-toast .anjava-web-header {
     display: flex; align-items: center; gap: 8px;
     padding: 12px 14px 10px; border-bottom: 1px solid #f4f4f5;
+  }
+  #anjava-web-toast .anjava-web-avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #eff6ff; overflow: hidden; border: 1px solid #dbeafe;
+  }
+  #anjava-web-toast .anjava-web-avatar img {
+    width: 100%; height: 100%; object-fit: contain; display: block;
   }
   #anjava-web-toast .anjava-web-icon { font-size: 18px; flex-shrink: 0; }
   #anjava-web-toast .anjava-web-title {
@@ -378,6 +385,13 @@ function showWebPostureToast(state: DetectionState, message: string, soundEnable
   toast.id = "anjava-web-toast";
   const header = document.createElement("div");
   header.className = "anjava-web-header";
+  const avatar = document.createElement("div");
+  avatar.className = "anjava-web-avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  const avatarImage = document.createElement("img");
+  avatarImage.src = "/avatar.png";
+  avatarImage.alt = "";
+  avatar.append(avatarImage);
   const icon = document.createElement("div");
   icon.className = "anjava-web-icon";
   icon.textContent = state === "GOOD_POSTURE" ? "✓" : "!";
@@ -396,7 +410,7 @@ function showWebPostureToast(state: DetectionState, message: string, soundEnable
   const progress = document.createElement("div");
   progress.className = "anjava-web-progress";
 
-  header.append(icon, title, close);
+  header.append(icon, title, avatar, close);
   toast.append(header, body, progress);
   document.body.appendChild(toast);
   playWebToastTone(soundEnabled);

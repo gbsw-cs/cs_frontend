@@ -23,8 +23,9 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title, {
     body,
-    icon: notification.icon || "/logo.png",
-    image: notification.image || data.image || "/logo.png",
+    icon: notification.icon || "/avatar.png",
+    badge: "/avatar.png",
+    image: notification.image || data.image || "/avatar.png",
     data: {
       ...data,
       url: data.url || "/dashboard",
