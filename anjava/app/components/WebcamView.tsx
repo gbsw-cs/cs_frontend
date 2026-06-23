@@ -303,7 +303,7 @@ const TOAST_STYLE = `
     background: linear-gradient(135deg, #fff 0%, #fff7f7 100%); color: #18181b;
     border-radius: 18px; z-index: 2147483647;
     box-shadow: 0 18px 48px rgba(225,29,72,0.18), 0 6px 18px rgba(15,23,42,0.12);
-    width: 390px; max-width: calc(100vw - 32px); overflow: hidden;
+    width: 460px; max-width: calc(100vw - 32px); overflow: hidden;
     border: 1px solid rgba(251,113,133,0.34);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
     animation: anjava-web-in 0.32s cubic-bezier(0.16,1,0.3,1);
@@ -322,10 +322,10 @@ const TOAST_STYLE = `
   #anjava-web-toast.out { animation: anjava-web-out 0.24s ease forwards; }
   #anjava-web-toast .anjava-web-header {
     display: flex; align-items: center; gap: 10px;
-    padding: 15px 14px 6px 18px;
+    padding: 12px 14px 3px 18px;
   }
   #anjava-web-toast .anjava-web-avatar {
-    width: 76px; height: 82px; flex-shrink: 0; margin-left: 4px;
+    width: 74px; height: 68px; flex-shrink: 0; margin-left: 4px;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
   }
@@ -349,7 +349,8 @@ const TOAST_STYLE = `
     font-size: 16px; padding: 0; line-height: 1;
   }
   #anjava-web-toast .anjava-web-body {
-    padding: 2px 98px 12px 58px; font-size: 12.5px; color: #3f3f46; line-height: 1.45;
+    padding: 0 96px 10px 58px; font-size: 12.5px; color: #3f3f46; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #anjava-web-toast .anjava-web-progress {
     height: 3px; background: linear-gradient(90deg, #ef4444, #fb7185);

@@ -73,7 +73,7 @@ function injectStyle() {
       top: 24px;
       right: 24px;
       z-index: 2147483647;
-      width: min(440px, calc(100vw - 32px));
+      width: min(500px, calc(100vw - 32px));
       overflow: hidden;
       border: 1px solid rgba(251, 113, 133, 0.36);
       border-radius: 18px;
@@ -106,7 +106,7 @@ function injectStyle() {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 15px 14px 13px 18px;
+      padding: 12px 14px 10px 18px;
     }
     #${TOAST_ID} .toast-icon {
       display: flex;
@@ -132,13 +132,13 @@ function injectStyle() {
       flex: 1;
     }
     #${TOAST_ID} .toast-kicker {
-      margin-bottom: 2px;
-      height: 18px;
+      margin-bottom: 1px;
+      height: 16px;
     }
     #${TOAST_ID} .toast-logo {
       display: block;
-      width: 64px;
-      height: 18px;
+      width: 60px;
+      height: 16px;
       object-fit: contain;
       object-position: left center;
     }
@@ -149,15 +149,17 @@ function injectStyle() {
       letter-spacing: -0.01em;
     }
     #${TOAST_ID} .toast-body {
-      margin-top: 3px;
+      margin-top: 2px;
       color: #52525b;
       font-size: 13px;
-      line-height: 1.55;
-      word-break: keep-all;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     #${TOAST_ID} .toast-avatar {
       width: 76px;
-      height: 84px;
+      height: 70px;
       flex-shrink: 0;
       overflow: hidden;
       border-radius: 0;
