@@ -77,9 +77,9 @@ function injectStyle() {
       overflow: hidden;
       border: 1px solid rgba(251, 113, 133, 0.36);
       border-radius: 18px;
-      background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+      background: #ffffff;
       color: #18181b;
-      box-shadow: 0 18px 48px rgba(225, 29, 72, 0.18), 0 6px 18px rgba(15, 23, 42, 0.12);
+      box-shadow: 0 16px 42px rgba(15, 23, 42, 0.14);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
       pointer-events: auto;
       animation: anjava-toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -96,8 +96,8 @@ function injectStyle() {
     }
     #${TOAST_ID}.is-good {
       border-color: rgba(74, 222, 128, 0.36);
-      background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
-      box-shadow: 0 18px 48px rgba(34, 197, 94, 0.14), 0 6px 18px rgba(15, 23, 42, 0.1);
+      background: #ffffff;
+      box-shadow: 0 16px 42px rgba(15, 23, 42, 0.12);
     }
     #${TOAST_ID}.is-out {
       animation: anjava-toast-out 0.22s ease forwards;
@@ -194,13 +194,13 @@ function injectStyle() {
       color: #27272a;
     }
     #${TOAST_ID} .toast-progress {
-      height: 4px;
-      background: linear-gradient(90deg, #ef4444, #fb7185);
+      height: 2px;
+      background: #fb7185;
       transform-origin: left;
       animation: anjava-toast-progress 6s linear forwards;
     }
     #${TOAST_ID}.is-good .toast-progress {
-      background: linear-gradient(90deg, #2563eb, #22c55e);
+      background: #22c55e;
     }
     @keyframes anjava-toast-in {
       from { opacity: 0; transform: translateX(28px) scale(0.98); }

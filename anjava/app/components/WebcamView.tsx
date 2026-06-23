@@ -300,11 +300,11 @@ function getPostureImageUrl(state: DetectionState) {
 const TOAST_STYLE = `
   #anjava-web-toast {
     position: fixed; top: 20px; right: 20px;
-    background: linear-gradient(135deg, #fff 0%, #fff7f7 100%); color: #18181b;
+    background: #fff; color: #18181b;
     border-radius: 18px; z-index: 2147483647;
-    box-shadow: 0 18px 48px rgba(225,29,72,0.18), 0 6px 18px rgba(15,23,42,0.12);
+    box-shadow: 0 16px 42px rgba(15,23,42,0.14);
     width: 460px; max-width: calc(100vw - 32px); overflow: hidden;
-    border: 1px solid rgba(251,113,133,0.34);
+    border: 1px solid #fecdd3;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
     animation: anjava-web-in 0.32s cubic-bezier(0.16,1,0.3,1);
     pointer-events: auto;
@@ -314,9 +314,8 @@ const TOAST_STYLE = `
     background: linear-gradient(180deg, #ef4444, #fb7185);
   }
   #anjava-web-toast.is-good {
-    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
-    border-color: rgba(74,222,128,0.36);
-    box-shadow: 0 18px 48px rgba(34,197,94,0.14), 0 6px 18px rgba(15,23,42,0.1);
+    border-color: #bbf7d0;
+    box-shadow: 0 16px 42px rgba(15,23,42,0.12);
   }
   #anjava-web-toast.is-good:before { background: linear-gradient(180deg, #22c55e, #60a5fa); }
   #anjava-web-toast.out { animation: anjava-web-out 0.24s ease forwards; }
@@ -353,10 +352,10 @@ const TOAST_STYLE = `
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #anjava-web-toast .anjava-web-progress {
-    height: 3px; background: linear-gradient(90deg, #ef4444, #fb7185);
+    height: 2px; background: #fb7185;
     animation: anjava-web-progress 6s linear forwards; transform-origin: left;
   }
-  #anjava-web-toast.is-good .anjava-web-progress { background: linear-gradient(90deg, #22c55e, #60a5fa); }
+  #anjava-web-toast.is-good .anjava-web-progress { background: #22c55e; }
   @keyframes anjava-web-in {
     from { opacity: 0; transform: translateX(60px) scale(0.95); }
     to   { opacity: 1; transform: translateX(0) scale(1); }
