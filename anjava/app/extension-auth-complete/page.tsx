@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { AutoClose } from "./AutoClose";
+import { CloseButton } from "./CloseButton";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -29,28 +28,16 @@ export default async function ExtensionAuthCompletePage({ searchParams }: PagePr
         <p className="mt-3 text-sm leading-relaxed text-zinc-500">
           {failed
             ? "확장 프로그램이 설치되어 있고 최신 버전인지 확인한 뒤 확장 팝업에서 Google 로그인을 다시 시도해 주세요."
-            : "잠시 후 이 탭이 자동으로 닫힙니다. 확장 팝업을 열면 바로 로그인된 상태로 사용할 수 있습니다."}
+            : "로그인이 완료되었습니다. 완료 버튼을 눌러 이 창을 닫을 수 있습니다."}
         </p>
         {failed && reason && (
           <p className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
             {reason}
           </p>
         )}
-        <div className="mt-6 grid gap-2">
-          <Link
-            href="/extension-guide"
-            className="flex h-11 items-center justify-center rounded-lg bg-[#2563EB] text-sm font-semibold text-white transition hover:opacity-90"
-          >
-            확장 가이드 보기
-          </Link>
-          <Link
-            href="/dashboard"
-            className="flex h-11 items-center justify-center rounded-lg border border-zinc-200 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
-          >
-            대시보드로 이동
-          </Link>
+        <div className="mt-6">
+          <CloseButton />
         </div>
-        {!failed && <AutoClose delayMs={2500} />}
       </section>
     </main>
   );
