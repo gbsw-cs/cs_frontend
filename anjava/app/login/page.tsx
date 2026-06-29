@@ -9,6 +9,7 @@ import { syncWebPushTokenIfEnabled } from "../lib/fcm";
 import { validatePassword } from "../lib/validation";
 import {
   clearPendingExtensionLoginId,
+  getCurrentBaselineForExtension,
   getCurrentTokensForExtension,
   getPendingExtensionLoginId,
   sendExtensionLogin,
@@ -45,9 +46,10 @@ export default function LoginPage() {
         let extensionPath = "";
         if (pendingExtensionId) {
           const tokens = getCurrentTokensForExtension();
+          const baselineData = getCurrentBaselineForExtension();
           if (tokens) {
             try {
-              const linked = await sendExtensionLogin(pendingExtensionId, tokens);
+              const linked = await sendExtensionLogin(pendingExtensionId, tokens, baselineData ?? undefined);
               clearPendingExtensionLoginId();
               extensionPath = extensionAuthCompletePath({
                 failed: !linked,
@@ -90,8 +92,9 @@ export default function LoginPage() {
       void syncWebPushTokenIfEnabled();
       let extensionPath = "";
       if (extensionId) {
+        const baselineData = getCurrentBaselineForExtension();
         try {
-          const linked = await sendExtensionLogin(extensionId, tokens);
+          const linked = await sendExtensionLogin(extensionId, tokens, baselineData ?? undefined);
           clearPendingExtensionLoginId();
           extensionPath = extensionAuthCompletePath({
             failed: !linked,

@@ -69,7 +69,7 @@ type ExternalMessage =
   | { type: "PING" }
   | { type: "GET_STATUS" }
   | { type: "BASELINE_DONE"; baselineData: unknown }
-  | { type: "LOGIN_FROM_WEB"; credential?: unknown; refreshToken?: unknown }
+  | { type: "LOGIN_FROM_WEB"; credential?: unknown; refreshToken?: unknown; baselineData?: unknown }
 
 type ApiJson = {
   data?: unknown
@@ -1317,6 +1317,7 @@ chrome.runtime.onMessageExternal.addListener((rawMsg, _sender, sendResponse) => 
             profileImg: me.profileImg ?? "",
             userName: me.name ?? "",
             lastSettingsSyncedAt: new Date().toISOString(),
+            ...(msg.baselineData ? { baselineDone: true, baselineData: msg.baselineData } : {}),
           })
           await syncExtensionPushToken(merged.pushEnabled).catch((e) =>
             console.error("[push] extension FCM 토큰 동기화 실패:", e)

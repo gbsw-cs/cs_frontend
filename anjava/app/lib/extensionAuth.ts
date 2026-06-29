@@ -61,7 +61,26 @@ export function getCurrentTokensForExtension(): Tokens | null {
   } as Tokens;
 }
 
-export function sendExtensionLogin(extensionId: string, tokens: Tokens) {
+export function getCurrentBaselineForExtension() {
+  if (typeof window === "undefined") return null;
+  const ready = localStorage.getItem("aiBaselineReady") === "1";
+  if (!ready) return null;
+
+  const raw = localStorage.getItem("aiBaseline");
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function sendExtensionLogin(
+  extensionId: string,
+  tokens: Tokens,
+  baselineData?: unknown,
+) {
   return new Promise<boolean>((resolve, reject) => {
     const id = normalizeExtensionId(extensionId);
     if (!id) {
@@ -87,6 +106,7 @@ export function sendExtensionLogin(extensionId: string, tokens: Tokens) {
         type: "LOGIN_FROM_WEB",
         credential,
         [REFRESH_KEY]: (tokens as Record<string, string | undefined>)[REFRESH_KEY],
+        baselineData,
       },
       (response) => {
         const error = runtime.lastError;

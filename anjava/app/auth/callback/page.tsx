@@ -6,6 +6,7 @@ import { resolvePostAuthPath, saveTokens } from "../../lib/api";
 import { syncWebPushTokenIfEnabled } from "../../lib/fcm";
 import {
   clearPendingExtensionLoginId,
+  getCurrentBaselineForExtension,
   getPendingExtensionLoginId,
   sendExtensionLogin,
 } from "../../lib/extensionAuth";
@@ -93,8 +94,9 @@ function CallbackInner() {
         const extensionId = getPendingExtensionLoginId();
         let extensionPath = "";
         if (extensionId) {
+          const baselineData = getCurrentBaselineForExtension();
           try {
-            const linked = await sendExtensionLogin(extensionId, tokens);
+            const linked = await sendExtensionLogin(extensionId, tokens, baselineData ?? undefined);
             clearPendingExtensionLoginId();
             extensionPath = extensionAuthCompletePath({
               failed: !linked,
