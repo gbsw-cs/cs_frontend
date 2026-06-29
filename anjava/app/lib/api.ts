@@ -563,7 +563,7 @@ export function getReportsSummary(week?: number, limit = 10) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (week !== undefined) params.set("week", String(week));
   return request<{ items: WeeklyReportSummary[] }>(
-    `/reports/summary?${params.toString()}`,
+    `/users/me/reports/summary?${params.toString()}`,
     { method: "GET" },
     true,
   );
