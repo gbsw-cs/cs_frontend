@@ -195,6 +195,7 @@ function playAlertTone(soundEnabled: boolean) {
 function getPostureNotificationIcon(state: string) {
   const normalized = state.trim().toUpperCase();
   if (normalized === "TURTLE_NECK") return "/turtleneck.png";
+  if (normalized === "SLOUCH" || normalized === "SLOUCHING") return "/slouch.png";
   if (normalized === "ROUND_SHOULDER" || normalized === "SHOULDER_ISSUE") return "/round-shoulder.png";
   if (normalized === "SHOULDER_ASYMMETRY") return "/shoulder-notsame.png";
   return "/avatar.png";

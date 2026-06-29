@@ -31,6 +31,8 @@ const TOAST_MESSAGES: Record<string, string> = {
 
 const POSTURE_IMAGE_BY_STATE: Record<string, string> = {
   TURTLE_NECK: "assets/turtleneck.png",
+  SLOUCH: "assets/slouch.png",
+  SLOUCHING: "assets/slouch.png",
   ROUND_SHOULDER: "assets/round-shoulder.png",
   SHOULDER_ISSUE: "assets/round-shoulder.png",
   SHOULDER_ASYMMETRY: "assets/shoulder-notsame.png"

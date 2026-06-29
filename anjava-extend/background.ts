@@ -137,6 +137,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 function getPostureNotificationAsset(state?: unknown): string {
   const normalized = typeof state === "string" ? state.trim().toUpperCase() : ""
   if (normalized === "TURTLE_NECK") return "assets/turtleneck.png"
+  if (normalized === "SLOUCH" || normalized === "SLOUCHING") return "assets/slouch.png"
   if (normalized === "ROUND_SHOULDER" || normalized === "SHOULDER_ISSUE") return "assets/round-shoulder.png"
   if (normalized === "SHOULDER_ASYMMETRY") return "assets/shoulder-notsame.png"
   return "assets/avatar.png"

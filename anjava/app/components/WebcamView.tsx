@@ -283,8 +283,8 @@ const BACKEND_STATE_MESSAGES: Partial<Record<DetectionState, string>> = {
 
 const POSTURE_IMAGE_BY_STATE: Partial<Record<DetectionState, string>> = {
   TURTLE_NECK: "/turtleneck.png",
-  SLOUCHING: "/avatar.png",
-  SLOUCH: "/avatar.png",
+  SLOUCHING: "/slouch.png",
+  SLOUCH: "/slouch.png",
   ROUND_SHOULDER: "/round-shoulder.png",
   SHOULDER_ISSUE: "/round-shoulder.png",
   SHOULDER_ASYMMETRY: "/shoulder-notsame.png",
