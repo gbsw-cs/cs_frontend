@@ -499,7 +499,7 @@ export default function DashboardPage() {
 
   const todayIssueEntries = [
     { key: "turtleNeckCount", count: breakdownNumber(today?.breakdown, "turtleNeckCount") },
-    { key: "slouchCount", count: breakdownNumber(today?.breakdown, "slouchCount", "slouch_count") },
+    { key: "slouchCount", count: breakdownNumber(today?.breakdown, "slouchCount", "slouchingCount", "slouch_count", "slouching_count") },
     { key: "roundShoulderCount", count: toFiniteNumber(today?.breakdown?.roundShoulderCount) },
     { key: "shoulderAsymmetryCount", count: toFiniteNumber(today?.breakdown?.shoulderAsymmetryCount) },
     { key: "shoulderIssueCount", count: toFiniteNumber(today?.breakdown?.shoulderIssueCount) },
@@ -764,7 +764,7 @@ export default function DashboardPage() {
                       : state === "DARK_ENV"
                       ? "bg-zinc-400"
                       : state === "SLOUCH" || state === "SLOUCHING"
-                      ? "bg-sky-400"
+                      ? "bg-yellow-400"
                       : "bg-amber-400";
                   const label = `${STATE_LABEL[state] ?? "자세 이상 발생"} ${icon}`;
                   return (
@@ -957,8 +957,8 @@ export default function DashboardPage() {
                   <>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />정상</span>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
-                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />구부정</span>
-                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-400" />구부정</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-400" />라운드숄더</span>
                     <span className="flex items-center gap-1 text-zinc-500"><span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
                   </>
                 ) : (
@@ -1006,8 +1006,8 @@ export default function DashboardPage() {
                             <div className="bg-zinc-300" style={{ height: `${pct(otherSec)}%` }} />
                             <div className="bg-emerald-400" style={{ height: `${pct(slot.goodPostureSec)}%` }} />
                             <div className="bg-rose-400" style={{ height: `${pct(slot.turtleNeckSec)}%` }} />
-                            <div className="bg-sky-400" style={{ height: `${pct(slot.slouchSec)}%` }} />
-                            <div className="bg-amber-400" style={{ height: `${pct(slot.roundShoulderSec)}%` }} />
+                            <div className="bg-yellow-400" style={{ height: `${pct(slot.slouchSec)}%` }} />
+                            <div className="bg-orange-400" style={{ height: `${pct(slot.roundShoulderSec)}%` }} />
                             <div className="bg-violet-400" style={{ height: `${pct(slot.shoulderAsymmetrySec)}%` }} />
                           </div>
                         </div>
@@ -1201,8 +1201,8 @@ export default function DashboardPage() {
                   ) : (
                     <>
                       <IssueBar label="거북목" sec={turtleSec} totalSec={badPostureSec} color="bg-rose-400" />
-                      <IssueBar label="구부정한 자세" sec={slouchSec} totalSec={badPostureSec} color="bg-sky-400" />
-                      <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-amber-400" />
+                      <IssueBar label="구부정한 자세" sec={slouchSec} totalSec={badPostureSec} color="bg-yellow-400" />
+                      <IssueBar label="라운드 숄더" sec={roundShoulderSec} totalSec={badPostureSec} color="bg-orange-400" />
                       <IssueBar label="자세 비대칭" sec={asymSec} totalSec={badPostureSec} color="bg-violet-400" />
                     </>
                   )}
@@ -1215,8 +1215,8 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[8px] text-zinc-400">
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />정상</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-rose-400" />거북목</span>
-                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-sky-400" />구부정</span>
-                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />라운드숄더</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />구부정</span>
+                    <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-orange-400" />라운드숄더</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-violet-400" />비대칭</span>
                     <span className="flex items-center gap-0.5"><span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />기타</span>
                   </div>
@@ -1291,8 +1291,8 @@ export default function DashboardPage() {
                                       <div className="w-full bg-zinc-300 transition-all" style={{ height: `${otherH}%` }} />
                                       <div className="w-full bg-emerald-300 transition-all" style={{ height: `${goodH}%` }} />
                                       <div className="w-full bg-rose-400 transition-all" style={{ height: `${turtleH}%` }} />
-                                      <div className="w-full bg-sky-400 transition-all" style={{ height: `${slouchH}%` }} />
-                                      <div className="w-full bg-amber-400 transition-all" style={{ height: `${roundH}%` }} />
+                                      <div className="w-full bg-yellow-400 transition-all" style={{ height: `${slouchH}%` }} />
+                                      <div className="w-full bg-orange-400 transition-all" style={{ height: `${roundH}%` }} />
                                       <div className="w-full bg-violet-400 transition-all" style={{ height: `${asymH}%` }} />
                                     </>
                                   ) : value > 0 ? (
