@@ -37,6 +37,39 @@ import {
 } from "../lib/api";
 import { syncWebPushToken } from "../lib/fcm";
 
+const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "";
+
+type ExtensionLiveStatus = {
+  sessionActive: boolean;
+  offscreenActive: boolean;
+  isPaused: boolean;
+  offscreenError: string;
+  latestPostureState: string;
+  latestPostureMessage: string;
+  latestPostureUpdatedAt: string;
+};
+
+type ChromeRuntimeWindow = Window & {
+  chrome?: {
+    runtime?: {
+      sendMessage: (
+        extensionId: string,
+        message: unknown,
+        responseCallback?: (response?: {
+          ok?: boolean;
+          sessionActive?: boolean;
+          offscreenActive?: boolean;
+          isPaused?: boolean;
+          offscreenError?: string;
+          latestPostureState?: string;
+          latestPostureMessage?: string;
+          latestPostureUpdatedAt?: string;
+        }) => void,
+      ) => void;
+    };
+  };
+};
+
 // ── 날짜 헬퍼 ──────────────────────────────────────────────
 
 function getKSTDate(): string {
@@ -252,6 +285,7 @@ export default function DashboardPage() {
     "unsupported",
   );
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
+  const [extensionLiveStatus, setExtensionLiveStatus] = useState<ExtensionLiveStatus | null>(null);
 
   const redirectToLogin = useCallback(() => {
     if (pollRef.current) {
@@ -476,6 +510,40 @@ export default function DashboardPage() {
     };
   }, [loadDashboardData, redirectToLogin, router]);
 
+  useEffect(() => {
+    if (!EXTENSION_ID) return;
+    const runtime = (window as ChromeRuntimeWindow).chrome?.runtime;
+    if (!runtime?.sendMessage) return;
+
+    let cancelled = false;
+
+    const syncExtensionStatus = () => {
+      runtime.sendMessage(EXTENSION_ID, { type: "GET_STATUS" }, (response) => {
+        if (cancelled) return;
+        if (!response?.ok) {
+          setExtensionLiveStatus(null);
+          return;
+        }
+        setExtensionLiveStatus({
+          sessionActive: response.sessionActive === true,
+          offscreenActive: response.offscreenActive === true,
+          isPaused: response.isPaused === true,
+          offscreenError: typeof response.offscreenError === "string" ? response.offscreenError : "",
+          latestPostureState: typeof response.latestPostureState === "string" ? response.latestPostureState : "",
+          latestPostureMessage: typeof response.latestPostureMessage === "string" ? response.latestPostureMessage : "",
+          latestPostureUpdatedAt: typeof response.latestPostureUpdatedAt === "string" ? response.latestPostureUpdatedAt : "",
+        });
+      });
+    };
+
+    syncExtensionStatus();
+    const intervalId = window.setInterval(syncExtensionStatus, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   // ── 파생 데이터 ────────────────────────────────────────
 
   // 일일 슬롯 차트 (8개 slots, 데이터 없으면 더미)
@@ -615,19 +683,48 @@ export default function DashboardPage() {
       : worstWeekday
       ? WEEK_LABELS[worstWeekday.index]
       : "—";
-  const liveIsGood = liveDetection?.state === "GOOD_POSTURE";
-  const liveIsBad = Boolean(liveDetection && !liveIsGood);
-  const liveJudgementText = liveDetection
+  const extensionSessionActive =
+    extensionLiveStatus?.sessionActive === true && extensionLiveStatus?.isPaused !== true;
+  const extensionHasLiveDetection =
+    Boolean(extensionLiveStatus?.latestPostureState) && Boolean(extensionLiveStatus?.latestPostureUpdatedAt);
+  const effectiveLiveDetection =
+    liveDetection ??
+    (extensionHasLiveDetection
+      ? {
+          state: normalizeTimelineState(extensionLiveStatus?.latestPostureState ?? "") as DetectionState,
+          message: extensionLiveStatus?.latestPostureMessage ?? "",
+          updatedAt: new Date(extensionLiveStatus?.latestPostureUpdatedAt ?? "").toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Seoul",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }
+      : null);
+  const liveIsGood = effectiveLiveDetection?.state === "GOOD_POSTURE";
+  const liveIsBad = Boolean(effectiveLiveDetection && !liveIsGood);
+  const liveJudgementText = effectiveLiveDetection
     ? liveIsGood
       ? "정상"
       : "교정 필요"
+    : extensionSessionActive
+    ? extensionLiveStatus?.offscreenActive
+      ? "정상"
+      : extensionLiveStatus?.offscreenError
+      ? "확인 필요"
+      : "분석 중"
     : rawScore !== null && healthScore >= 70
     ? "정상"
     : "분석 중";
-  const liveStatusTone = liveDetection
+  const liveStatusTone = effectiveLiveDetection
     ? liveIsGood
       ? { text: "양호", sentence: "양호합니다", color: "text-emerald-500", ring: "ring-emerald-300" }
       : { text: "주의 필요", sentence: "주의가 필요합니다", color: "text-rose-500", ring: "ring-rose-300" }
+    : extensionSessionActive
+    ? extensionLiveStatus?.offscreenActive
+      ? { text: "감지 중", sentence: "감지 중입니다", color: "text-sky-500", ring: "ring-sky-300" }
+      : extensionLiveStatus?.offscreenError
+      ? { text: "확인 필요", sentence: "확인이 필요합니다", color: "text-amber-500", ring: "ring-amber-300" }
+      : { text: "준비 중", sentence: "준비 중입니다", color: "text-zinc-400", ring: "ring-zinc-200" }
     : rawScore !== null
     ? healthScore >= 70
       ? { text: "양호", sentence: "양호합니다", color: "text-emerald-500", ring: "ring-emerald-300" }
@@ -641,10 +738,16 @@ export default function DashboardPage() {
       : liveJudgementText === "분석 중"
       ? { dot: "bg-zinc-300", color: "text-zinc-400" }
       : { dot: "bg-rose-400", color: "text-rose-500" };
-  const avatarStatusText = liveDetection
+  const avatarStatusText = effectiveLiveDetection
     ? liveIsGood
       ? "정확한 자세입니다 ✅"
-      : `${STATE_LABEL[liveDetection.state] ?? "자세 이상 발생"}`
+      : `${STATE_LABEL[effectiveLiveDetection.state] ?? "자세 이상 발생"}`
+    : extensionSessionActive
+    ? extensionLiveStatus?.offscreenActive
+      ? "확장 프로그램이 자세를 감지 중입니다."
+      : extensionLiveStatus?.offscreenError
+      ? "확장 프로그램 카메라 확인이 필요합니다."
+      : "확장 프로그램 분석 준비 중..."
     : sessionStatus === "stopped"
     ? "세션을 시작해주세요."
     : rawScore !== null
@@ -917,6 +1020,12 @@ export default function DashboardPage() {
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
                   ? "bg-rose-50 text-rose-600 ring-rose-200 hover:bg-rose-100"
+                  : extensionSessionActive
+                  ? extensionLiveStatus?.offscreenActive
+                    ? "bg-sky-50 text-sky-600 ring-sky-200 hover:bg-sky-100"
+                    : extensionLiveStatus?.offscreenError
+                    ? "bg-amber-50 text-amber-600 ring-amber-200 hover:bg-amber-100"
+                    : "bg-zinc-50 text-zinc-500 ring-zinc-200 hover:bg-zinc-100"
                   : rawScore !== null && healthScore > 0
                   ? healthScore >= 60
                     ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
@@ -932,16 +1041,40 @@ export default function DashboardPage() {
                     ? "text-emerald-500"
                     : liveIsBad
                     ? "text-rose-500"
+                    : extensionSessionActive && extensionLiveStatus?.offscreenActive
+                    ? "text-sky-500"
+                    : extensionLiveStatus?.offscreenError
+                    ? "text-amber-500"
                     : "text-zinc-400"
                 }`}>
-                  {liveDetection ? (STATE_LABEL[liveDetection.state] ?? liveDetection.state) : sessionStatus === "stopped" ? "세션을 시작해주세요." : "분석 대기 중"}
+                  {effectiveLiveDetection
+                    ? (STATE_LABEL[effectiveLiveDetection.state] ?? effectiveLiveDetection.state)
+                    : sessionStatus === "stopped" && !extensionSessionActive
+                    ? "세션을 시작해주세요."
+                    : extensionSessionActive
+                    ? extensionLiveStatus?.offscreenActive
+                      ? "확장 프로그램 감지 중"
+                      : extensionLiveStatus?.offscreenError
+                      ? "카메라 확인 필요"
+                      : "확장 프로그램 분석 준비 중"
+                    : "분석 대기 중"}
                 </div>
-                {liveDetection?.message ? (
-                  <div className="h-[9px] truncate text-[7px] leading-[9px] text-zinc-500">{liveDetection.message}</div>
+                {effectiveLiveDetection?.message ? (
+                  <div className="h-[9px] truncate text-[7px] leading-[9px] text-zinc-500">{effectiveLiveDetection.message}</div>
+                ) : extensionLiveStatus?.offscreenError ? (
+                  <div className="h-[9px] truncate text-[7px] leading-[9px] text-amber-500">{extensionLiveStatus.offscreenError}</div>
                 ) : null}
-                {!liveDetection?.message && (
+                {!effectiveLiveDetection?.message && !extensionLiveStatus?.offscreenError && (
                   <div className="mt-0.5 text-[8px] leading-none text-zinc-300">
-                    {liveDetection ? `${liveDetection.updatedAt} 갱신` : sessionStatus === "stopped" ? "" : "웹캠 연결 후 자동 갱신"}
+                    {effectiveLiveDetection
+                      ? `${effectiveLiveDetection.updatedAt} 갱신`
+                      : sessionStatus === "stopped" && !extensionSessionActive
+                      ? ""
+                      : extensionSessionActive
+                      ? extensionLiveStatus?.offscreenActive
+                        ? "확장 프로그램에서 자동 갱신"
+                        : "확장 프로그램 연결 후 자동 갱신"
+                      : "웹캠 연결 후 자동 갱신"}
                   </div>
                 )}
               </div>

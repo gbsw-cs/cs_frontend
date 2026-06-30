@@ -116,6 +116,9 @@ const pendingApprovals = new Map<string, PendingApproval>()
 const lastPostureAlertAt = new Map<string, number>()
 const notificationClickTargets = new Map<string, string>()
 const paddedNotificationIconUrlPromises = new Map<string, Promise<string>>()
+const LIVE_DETECTION_STATE_KEY = "latestPostureState"
+const LIVE_DETECTION_MESSAGE_KEY = "latestPostureMessage"
+const LIVE_DETECTION_UPDATED_AT_KEY = "latestPostureUpdatedAt"
 
 function debugLog(...args: unknown[]): void {
   if (DEBUG_ENABLED) console.log(...args)
@@ -286,6 +289,7 @@ async function syncExtensionPushToken(enabled: boolean): Promise<void> {
 async function startSession(): Promise<void> {
   const stored = await chrome.storage.local.get(["accessToken", "currentSessionId", "sessionSource"])
   if (!stored.accessToken) return
+  await clearLatestLiveDetection().catch(() => {})
 
   // 실제 세션 ID가 이미 있으면 offscreen만 시작 (local- 폴백은 무효 처리)
   const isRealSession = stored.currentSessionId && !String(stored.currentSessionId).startsWith("local-")
@@ -355,6 +359,7 @@ async function endSession(): Promise<void> {
     }
   }
   await chrome.storage.local.remove(["currentSessionId", "sessionStartedAt", "sessionSource"])
+  await clearLatestLiveDetection().catch(() => {})
 }
 
 async function pauseSession(): Promise<void> {
@@ -515,20 +520,42 @@ async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
     .slice(0, 1)
 }
 
-async function sendToActiveTab(msg: PostureMessage): Promise<void> {
-  const tabs = await getToastTargetTabs()
-  if (tabs.length === 0) {
-    console.warn("[toast] ?? ??? HTTP/HTTPS ?? ????.")
-    return
-  }
+async function getDashboardTabs(): Promise<chrome.tabs.Tab[]> {
+  return chrome.tabs.query({ url: `${WEB_URL}/*` }).catch(() => [] as chrome.tabs.Tab[])
+}
 
-  const tasks = tabs
-    .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
-    .map((tab) => chrome.tabs.sendMessage(tab.id!, msg).catch((e) => {
-      console.warn("[toast] content script ??? ?? ??:", tab.url, e)
-    }))
+async function sendToastToTabs(tabs: chrome.tabs.Tab[], msg: PostureMessage): Promise<number> {
+  const results = await Promise.all(
+    tabs
+      .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
+      .map((tab) =>
+        chrome.tabs.sendMessage(tab.id!, msg).then(
+          () => true,
+          (error) => {
+            console.warn("[toast] content script 전송 실패:", tab.url, error)
+            return false
+          },
+        ),
+      ),
+  )
+  return results.filter(Boolean).length
+}
 
-  await Promise.allSettled(tasks)
+async function setLatestLiveDetection(state: unknown, message: string): Promise<void> {
+  const normalizedState = typeof state === "string" && state.trim() ? state.trim() : "GOOD_POSTURE"
+  await chrome.storage.local.set({
+    [LIVE_DETECTION_STATE_KEY]: normalizedState,
+    [LIVE_DETECTION_MESSAGE_KEY]: message,
+    [LIVE_DETECTION_UPDATED_AT_KEY]: new Date().toISOString(),
+  })
+}
+
+async function clearLatestLiveDetection(): Promise<void> {
+  await chrome.storage.local.remove([
+    LIVE_DETECTION_STATE_KEY,
+    LIVE_DETECTION_MESSAGE_KEY,
+    LIVE_DETECTION_UPDATED_AT_KEY,
+  ])
 }
 
 function getPostureAlertMessage(state: unknown, fallback: unknown): string {
@@ -589,34 +616,31 @@ async function showPostureSystemNotification(msg: PostureMessage, settings: Noti
 
 async function deliverPostureAlert(msg: PostureMessage, settings: NotificationSettings): Promise<void> {
   const soundEnabled = msg.soundEnabled ?? (settings.soundEnabled !== false)
+  const message = getPostureAlertMessage(msg.state, msg.message)
   const alert: PostureMessage = {
     type: "POSTURE_ALERT",
     state: msg.state,
-    message: getPostureAlertMessage(msg.state, msg.message),
+    message,
     soundEnabled,
   }
 
-  // 웹 대시보드 탭이 열려있으면 해당 탭에 직접 토스트 전송
-  const webTabs = await chrome.tabs.query({ url: `${WEB_URL}/*` }).catch(() => [] as chrome.tabs.Tab[])
-  const toastTasks: Promise<void>[] = webTabs
-    .filter(t => t.id)
-    .map(t => chrome.tabs.sendMessage(t.id!, alert).catch(() => {}))
+  await setLatestLiveDetection(alert.state, message)
 
-  // 웹 대시보드 탭이 없으면 현재 활성 탭에 토스트 전송
-  if (toastTasks.length === 0) {
-    toastTasks.push(sendToActiveTab(alert))
+  const toastTargets = await getToastTargetTabs()
+  let deliveredCount = await sendToastToTabs(toastTargets, alert)
+
+  // 활성 탭에 토스트를 붙일 수 없는 경우에만 대시보드 탭으로 fallback
+  if (deliveredCount === 0) {
+    const dashboardTabs = await getDashboardTabs()
+    deliveredCount = await sendToastToTabs(dashboardTabs, alert)
   }
 
   const suppressSystemNotification = await shouldSuppressSystemPostureNotification(msg)
-  if (!suppressSystemNotification) {
-    toastTasks.unshift(showPostureSystemNotification(alert, { ...settings, soundEnabled }))
-  }
-
-  const results = await Promise.allSettled(toastTasks)
-
-  for (const result of results) {
-    if (result.status === "rejected") {
-      console.error("[notification] 자세 알림 처리 실패:", result.reason)
+  if (!suppressSystemNotification && deliveredCount === 0) {
+    try {
+      await showPostureSystemNotification(alert, { ...settings, soundEnabled })
+    } catch (error) {
+      console.error("[notification] 시스템 알림 처리 실패:", error)
     }
   }
 }
@@ -754,6 +778,9 @@ async function getPublicExtensionStatus() {
     "offscreenActive",
     "offscreenError",
     "lastSettingsSyncedAt",
+    LIVE_DETECTION_STATE_KEY,
+    LIVE_DETECTION_MESSAGE_KEY,
+    LIVE_DETECTION_UPDATED_AT_KEY,
   ])
   return {
     ok: true,
@@ -766,6 +793,12 @@ async function getPublicExtensionStatus() {
     offscreenError: typeof stored.offscreenError === "string" ? stored.offscreenError : "",
     lastSettingsSyncedAt:
       typeof stored.lastSettingsSyncedAt === "string" ? stored.lastSettingsSyncedAt : "",
+    latestPostureState:
+      typeof stored[LIVE_DETECTION_STATE_KEY] === "string" ? stored[LIVE_DETECTION_STATE_KEY] : "",
+    latestPostureMessage:
+      typeof stored[LIVE_DETECTION_MESSAGE_KEY] === "string" ? stored[LIVE_DETECTION_MESSAGE_KEY] : "",
+    latestPostureUpdatedAt:
+      typeof stored[LIVE_DETECTION_UPDATED_AT_KEY] === "string" ? stored[LIVE_DETECTION_UPDATED_AT_KEY] : "",
   }
 }
 
@@ -947,20 +980,18 @@ chrome.runtime.onMessage.addListener((rawMsg, sender, sendResponse) => {
         message: getPostureAlertMessage(msg.state, msg.message),
         soundEnabled,
       }
-      const tasks: Promise<void>[] = []
+      let deliveredCount = 0
       // 릴레이를 보낸 탭(웹 대시보드)에 직접 토스트 전송
       if (sourceTabId) {
-        tasks.push(
-          chrome.tabs.sendMessage(sourceTabId, alert).catch(() => {})
-        )
+        const directTab = await chrome.tabs.get(sourceTabId).catch(() => null)
+        deliveredCount = directTab ? await sendToastToTabs([directTab], alert) : 0
       } else {
-        tasks.push(sendToActiveTab(alert))
+        deliveredCount = await sendToastToTabs(await getToastTargetTabs(), alert)
       }
       // 시스템 알림: 웹 페이지가 suppressSystemNotification을 요청하지 않은 경우
-      if (!msg.suppressSystemNotification) {
-        tasks.push(showPostureSystemNotification({ ...alert, soundEnabled }, { ...s, soundEnabled }))
+      if (!msg.suppressSystemNotification && deliveredCount === 0) {
+        await showPostureSystemNotification({ ...alert, soundEnabled }, { ...s, soundEnabled })
       }
-      await Promise.allSettled(tasks)
       sendResponse({ ok: true })
     }).catch((e) => {
       console.error("[notification] web relay 처리 실패:", e)
@@ -1134,7 +1165,8 @@ chrome.runtime.onMessage.addListener((rawMsg, sender, sendResponse) => {
       .then(() =>
         chrome.storage.local.remove([
           "accessToken", "refreshToken", "currentSessionId", "sessionStartedAt",
-          "baselineDone", "baselineData", "userId", "profileImg", "userName"
+          "baselineDone", "baselineData", "userId", "profileImg", "userName",
+          LIVE_DETECTION_STATE_KEY, LIVE_DETECTION_MESSAGE_KEY, LIVE_DETECTION_UPDATED_AT_KEY,
         ])
       )
       .then(() =>
@@ -1233,7 +1265,14 @@ chrome.runtime.onMessage.addListener((rawMsg, sender, sendResponse) => {
       }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }))
     } else if (state === "stopped") {
       chrome.storage.local
-        .remove(["currentSessionId", "sessionStartedAt", "sessionSource"])
+        .remove([
+          "currentSessionId",
+          "sessionStartedAt",
+          "sessionSource",
+          LIVE_DETECTION_STATE_KEY,
+          LIVE_DETECTION_MESSAGE_KEY,
+          LIVE_DETECTION_UPDATED_AT_KEY,
+        ])
         .then(() => chrome.storage.local.set({ isPaused: false, pausedAt: null, pausedTotalMs: 0 }))
         .then(() => sendResponse({ ok: true }))
         .catch(() => sendResponse({ ok: false }))
