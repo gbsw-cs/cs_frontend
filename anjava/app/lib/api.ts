@@ -928,7 +928,9 @@ function resolvePostureDurations(params: {
 
     const unresolvedTargets = [
       !hasTurtleDuration && turtleNeckCount > 0 ? { key: "turtle" as const, weight: turtleNeckCount } : null,
-      !hasSlouchDuration && slouchCount > 0 ? { key: "slouch" as const, weight: slouchCount } : null,
+      !hasSlouchDuration
+        ? { key: "slouch" as const, weight: slouchCount > 0 ? slouchCount : 1 }
+        : null,
       !hasRoundDuration && (roundShoulderCount > 0 || shoulderIssueCount > 0)
         ? { key: "round" as const, weight: roundShoulderCount > 0 ? roundShoulderCount : shoulderIssueCount / 2 }
         : null,

@@ -620,21 +620,6 @@ export default function DashboardPage() {
   const wDiff = firstFiniteNumber(today?.vsLastWeek);
 
   // 주간 통계 (서버 값 직접 사용)
-  const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec);
-  const slouchSec = toFiniteNumber(weekly?.slouchTotalSec);
-  const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec);
-  const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec);
-  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec);
-  const badPostureSec = weekly
-    ? toFiniteNumber(weekly.badPostureSec, turtleSec + slouchSec + roundShoulderSec + asymSec)
-    : 0;
-  const weeklyScreenSec: number | null = weekly ? toFiniteNumber(weekly.totalDetectionSec) : null;
-  const weeklyGoodSec: number | null = weekly ? toFiniteNumber(weekly.goodPostureSec) : null;
-  const weeklyRiskPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.riskPercent))) : 0;
-  const unclassifiedSec: number | null = weekly ? toFiniteNumber(weekly.unclassifiedSec) : null;
-  const weeklyGoodPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.goodPostureRatio) * 100)) : 0;
-
-  // 주간 선형 차트 값
   const mondayKST = getMondayKST();
   const todayKST = getKSTDate();
   const weeklyDays = Array.from({ length: 7 }, (_, i) => {
@@ -661,6 +646,26 @@ export default function DashboardPage() {
       darkEnvSec: day ? toFiniteNumber(day.darkEnvSec) : 0,
     };
   });
+  const weeklyDayTurtleSec = weeklyDays.reduce((sum, day) => sum + day.turtleNeckSec, 0);
+  const weeklyDaySlouchSec = weeklyDays.reduce((sum, day) => sum + day.slouchSec, 0);
+  const weeklyDayRoundSec = weeklyDays.reduce((sum, day) => sum + day.roundShoulderSec, 0);
+  const weeklyDayAsymSec = weeklyDays.reduce((sum, day) => sum + day.shoulderAsymmetrySec, 0);
+  const weeklyDayDarkSec = weeklyDays.reduce((sum, day) => sum + day.darkEnvSec, 0);
+  const turtleSec = toFiniteNumber(weekly?.turtleNeckTotalSec, weeklyDayTurtleSec);
+  const slouchSec = toFiniteNumber(weekly?.slouchTotalSec, weeklyDaySlouchSec);
+  const roundShoulderSec = toFiniteNumber(weekly?.roundShoulderTotalSec, weeklyDayRoundSec);
+  const asymSec = toFiniteNumber(weekly?.shoulderAsymmetryTotalSec, weeklyDayAsymSec);
+  const darkSec = toFiniteNumber(weekly?.darkEnvTotalSec, weeklyDayDarkSec);
+  const badPostureSec = weekly
+    ? toFiniteNumber(weekly.badPostureSec, turtleSec + slouchSec + roundShoulderSec + asymSec)
+    : 0;
+  const weeklyScreenSec: number | null = weekly ? toFiniteNumber(weekly.totalDetectionSec) : null;
+  const weeklyGoodSec: number | null = weekly ? toFiniteNumber(weekly.goodPostureSec) : null;
+  const weeklyRiskPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.riskPercent))) : 0;
+  const unclassifiedSec: number | null = weekly ? toFiniteNumber(weekly.unclassifiedSec) : null;
+  const weeklyGoodPct = weekly ? clampPercent(Math.round(toFiniteNumber(weekly.goodPostureRatio) * 100)) : 0;
+
+  // 주간 선형 차트 값
   const weeklyBadValues = weeklyDays.map((d) =>
     !d.hasData || d.badPostureRatio === null
       ? null
