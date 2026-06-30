@@ -755,6 +755,7 @@ export default function DashboardPage() {
       ? "정확한 자세입니다 ✅"
       : "자세를 교정해주세요 ⚠️"
     : "자세 데이터 수집 중...";
+  const avatarShowsStartPrompt = !effectiveLiveDetection && !extensionSessionActive && sessionStatus === "stopped";
 
   if (!me) {
     return (
@@ -1016,7 +1017,9 @@ export default function DashboardPage() {
                 />
               </div>
               <button className={`-mt-0.5 w-full shrink-0 rounded-full py-1 text-[10px] font-semibold ring-1 transition ${
-                liveIsGood
+                avatarShowsStartPrompt
+                  ? "bg-blue-50 text-[#2563EB] ring-blue-200 hover:bg-blue-100"
+                  : liveIsGood
                   ? "bg-emerald-50 text-emerald-600 ring-emerald-200 hover:bg-emerald-100"
                   : liveIsBad
                   ? "bg-rose-50 text-rose-600 ring-rose-200 hover:bg-rose-100"

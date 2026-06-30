@@ -524,19 +524,179 @@ async function getDashboardTabs(): Promise<chrome.tabs.Tab[]> {
   return chrome.tabs.query({ url: `${WEB_URL}/*` }).catch(() => [] as chrome.tabs.Tab[])
 }
 
+function renderInjectedToast(state: string | undefined, message: string, soundEnabled: boolean) {
+  const TOAST_ID = "anjava-posture-toast-fallback"
+  const STYLE_ID = "anjava-posture-style-fallback"
+  const isGood = state === "GOOD_POSTURE"
+  const imageByState: Record<string, string> = {
+    TURTLE_NECK: chrome.runtime.getURL("assets/turtleneck.png"),
+    SLOUCH: chrome.runtime.getURL("assets/slouch.png"),
+    SLOUCHING: chrome.runtime.getURL("assets/slouch.png"),
+    ROUND_SHOULDER: chrome.runtime.getURL("assets/round-shoulder.png"),
+    SHOULDER_ISSUE: chrome.runtime.getURL("assets/round-shoulder.png"),
+    SHOULDER_ASYMMETRY: chrome.runtime.getURL("assets/shoulder-notsame.png"),
+  }
+  const normalizedState = typeof state === "string" ? state.toUpperCase() : ""
+  const imageUrl = imageByState[normalizedState] ?? chrome.runtime.getURL("assets/avatar.png")
+
+  if (!document.getElementById(STYLE_ID)) {
+    const style = document.createElement("style")
+    style.id = STYLE_ID
+    style.textContent = `
+      #${TOAST_ID} {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 2147483647;
+        width: min(500px, calc(100vw - 32px));
+        overflow: hidden;
+        border: 1px solid rgba(251, 113, 133, 0.36);
+        border-radius: 18px;
+        background: #ffffff;
+        color: #18181b;
+        box-shadow: 0 16px 42px rgba(15, 23, 42, 0.14);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
+      }
+      #${TOAST_ID}:before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        background: linear-gradient(90deg, #ef4444, #fb7185);
+      }
+      #${TOAST_ID}.is-good:before {
+        background: linear-gradient(90deg, #2563eb, #22c55e);
+      }
+      #${TOAST_ID}.is-good { border-color: rgba(74, 222, 128, 0.36); }
+      #${TOAST_ID}.is-out { opacity: 0; transform: translateX(28px) scale(0.98); transition: opacity 0.2s ease, transform 0.2s ease; }
+      #${TOAST_ID} .toast-main { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px 18px; }
+      #${TOAST_ID} .toast-icon {
+        display: flex; width: 32px; height: 32px; flex-shrink: 0; align-items: center; justify-content: center;
+        border-radius: 999px; background: #fef2f2; color: #dc2626; font-size: 18px; font-weight: 900;
+        box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.18);
+      }
+      #${TOAST_ID}.is-good .toast-icon {
+        background: #eff6ff; color: #2563eb; box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.16);
+      }
+      #${TOAST_ID} .toast-copy { min-width: 0; flex: 1; }
+      #${TOAST_ID} .toast-title { color: #111827; font-size: 14px; font-weight: 850; }
+      #${TOAST_ID} .toast-body {
+        margin-top: 2px; color: #52525b; font-size: 13px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      #${TOAST_ID} .toast-avatar { width: 76px; height: 70px; flex-shrink: 0; }
+      #${TOAST_ID} .toast-avatar img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+      #${TOAST_ID} .toast-close {
+        position: absolute; right: 10px; top: 10px; display: flex; width: 24px; height: 24px; align-items: center; justify-content: center;
+        border: 0; border-radius: 999px; background: rgba(244, 244, 245, 0.9); color: #71717a; cursor: pointer; font-size: 14px; line-height: 1;
+      }
+      #${TOAST_ID} .toast-progress { height: 2px; background: #fb7185; transform-origin: left; animation: anjava-toast-progress-fallback 6s linear forwards; }
+      #${TOAST_ID}.is-good .toast-progress { background: #22c55e; }
+      @keyframes anjava-toast-progress-fallback { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+    `
+    document.head.appendChild(style)
+  }
+
+  const existing = document.getElementById(TOAST_ID)
+  if (existing) existing.remove()
+
+  const el = document.createElement("div")
+  el.id = TOAST_ID
+  if (isGood) el.classList.add("is-good")
+
+  const main = document.createElement("div")
+  main.className = "toast-main"
+
+  const icon = document.createElement("div")
+  icon.className = "toast-icon"
+  icon.textContent = isGood ? "✓" : "!"
+
+  const copy = document.createElement("div")
+  copy.className = "toast-copy"
+
+  const title = document.createElement("div")
+  title.className = "toast-title"
+  title.textContent = isGood ? "좋은 자세를 유지하고 있어요" : "자세 교정 알림"
+
+  const body = document.createElement("div")
+  body.className = "toast-body"
+  body.textContent = message
+
+  const avatar = document.createElement("div")
+  avatar.className = "toast-avatar"
+  const avatarImage = document.createElement("img")
+  avatarImage.src = imageUrl
+  avatarImage.alt = ""
+  avatar.append(avatarImage)
+
+  const close = document.createElement("button")
+  close.className = "toast-close"
+  close.textContent = "×"
+  close.onclick = () => {
+    el.classList.add("is-out")
+    window.setTimeout(() => el.remove(), 220)
+  }
+
+  const progress = document.createElement("div")
+  progress.className = "toast-progress"
+
+  copy.append(title, body)
+  main.append(icon, copy, avatar, close)
+  el.append(main, progress)
+  document.body.appendChild(el)
+
+  if (soundEnabled) {
+    try {
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (AudioContextCtor) {
+        const ctx = new AudioContextCtor()
+        const oscillator = ctx.createOscillator()
+        const gain = ctx.createGain()
+        oscillator.type = "sine"
+        oscillator.frequency.setValueAtTime(isGood ? 880 : 1318.5, ctx.currentTime)
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18)
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+        oscillator.start()
+        oscillator.stop(ctx.currentTime + 0.2)
+        window.setTimeout(() => ctx.close().catch(() => {}), 400)
+      }
+    } catch {}
+  }
+
+  window.setTimeout(() => {
+    el.classList.add("is-out")
+    window.setTimeout(() => el.remove(), 220)
+  }, 6000)
+}
+
+async function showToastInTab(tabId: number, msg: PostureMessage): Promise<boolean> {
+  try {
+    await chrome.tabs.sendMessage(tabId, msg)
+    return true
+  } catch (error) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: renderInjectedToast,
+        args: [typeof msg.state === "string" ? msg.state : undefined, msg.message ?? "", msg.soundEnabled !== false],
+      })
+      return true
+    } catch (injectionError) {
+      console.warn("[toast] content script/직접 주입 모두 실패:", tabId, error, injectionError)
+      return false
+    }
+  }
+}
+
 async function sendToastToTabs(tabs: chrome.tabs.Tab[], msg: PostureMessage): Promise<number> {
   const results = await Promise.all(
     tabs
       .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
-      .map((tab) =>
-        chrome.tabs.sendMessage(tab.id!, msg).then(
-          () => true,
-          (error) => {
-            console.warn("[toast] content script 전송 실패:", tab.url, error)
-            return false
-          },
-        ),
-      ),
+      .map((tab) => showToastInTab(tab.id!, msg)),
   )
   return results.filter(Boolean).length
 }
