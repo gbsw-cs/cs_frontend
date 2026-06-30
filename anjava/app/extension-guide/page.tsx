@@ -22,7 +22,7 @@ import {
 const TOTAL = 5;
 const STORE_URL =
   process.env.NEXT_PUBLIC_EXTENSION_STORE_URL ??
-  "https://chromewebstore.google.com/detail/anjava-extend/ieiojonlbjdkdlpjlcfealifodahjfal";
+  "https://chromewebstore.google.com/search/Anjava%20extend";
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? "";
 
 type ExtensionInstallStatus = "unknown" | "installed" | "missing" | "unconfigured";
