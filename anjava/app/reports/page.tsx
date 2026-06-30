@@ -9,12 +9,14 @@ import {
 import { useRouter } from "next/navigation";
 import {
   getCurrentReport,
-  getReportsSummary,
+  getReports,
+  getReport,
   resendReport,
   clearTokens,
   getAccessToken,
   type CurrentReport,
-  type WeeklyReportSummary,
+  type ReportDetail,
+  type ReportListItem,
   type ReportStatus,
 } from "../lib/api";
 import AppToast from "../components/AppToast";
@@ -32,7 +34,9 @@ const ISSUE_LABELS: Record<string, string> = {
   ROUND_SHOULDER:     "라운드숄더",
   SHOULDER_ASYMMETRY: "어깨 비대칭",
   DARK_ENV:           "어둠 환경",
+  GOOD:               "바른 자세",
   GOOD_POSTURE:       "바른 자세",
+  UNCLASSIFIED:       "미분류",
 };
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -71,31 +75,6 @@ function scoreLabel(score: number | null): { text: string; color: string; bg: st
   return                   { text: "개선 필요", color: "text-rose-600",    bg: "bg-rose-50 ring-1 ring-rose-200" };
 }
 
-function parseAIBullets(text: string | null, max = 3): string[] {
-  if (!text) return [];
-  return text
-    .split(/\.\s+/)
-    .map((s) => s.replace(/\.$/, "").trim())
-    .filter((s) => s.length > 4)
-    .slice(0, max);
-}
-
-function summaryToReport(s: WeeklyReportSummary): CurrentReport {
-  return {
-    weekStartDate: s.weekStartDate,
-    weekEndDate: s.weekEndDate,
-    session: {
-      firstStartedAt: s.weekStartDate + "T00:00:00Z",
-      lastEndedAt: s.weekEndDate + "T23:59:59Z",
-      totalDetectionSec: s.totalDetectionSec,
-    },
-    healthScore: s.healthScore ?? null,
-    timeline: [],
-    topIssues: s.topIssues,
-    aiSolution: s.aiSolution,
-  };
-}
-
 // ── Mock 데이터 (샘플 미리보기용) ───────────────────────────
 
 const MOCK_REPORT: CurrentReport = {
@@ -121,12 +100,13 @@ export default function ReportsPage() {
   const [showSample, setShowSample] = useState(false);
   const [currentLoading, setCurrentLoading] = useState(true);
 
-  const [summaries, setSummaries] = useState<WeeklyReportSummary[]>([]);
+  const [reports, setReports] = useState<ReportListItem[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
-  const [modalDetail, setModalDetail] = useState<CurrentReport | null>(null);
+  const [modalDetail, setModalDetail] = useState<ReportDetail | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -152,8 +132,8 @@ export default function ReportsPage() {
       })
       .finally(() => setCurrentLoading(false));
 
-    getReportsSummary(undefined, 10)
-      .then((res) => setSummaries(res.items))
+    getReports()
+      .then((res) => setReports(res.items))
       .catch((e) => {
         const status = e && typeof e === "object" && "status" in e
           ? Number((e as { status?: unknown }).status) : 0;
@@ -169,17 +149,30 @@ export default function ReportsPage() {
     toastTimer.current = setTimeout(() => setToast(null), 2500);
   }
 
-  function openDetail(summary: WeeklyReportSummary) {
-    setModalDetail(summaryToReport(summary));
+  async function openDetail(reportId: string) {
     setModalOpen(true);
+    setModalLoading(true);
+    setModalDetail(null);
+    try {
+      const detail = await getReport(reportId);
+      setModalDetail(detail);
+    } catch (e) {
+      const status = e && typeof e === "object" && "status" in e
+        ? Number((e as { status?: unknown }).status) : 0;
+      if (status === 401) { clearTokens(); router.replace("/login"); return; }
+      showToast((e as Error).message ?? "리포트 상세를 불러오지 못했습니다.");
+      setModalOpen(false);
+    } finally {
+      setModalLoading(false);
+    }
   }
 
   async function handleResend(reportId: string) {
     setResendingId(reportId);
     try {
       await resendReport(reportId);
-      setSummaries((prev) =>
-        prev.map((s) => s.reportId === reportId ? { ...s, status: "PENDING" as ReportStatus } : s),
+      setReports((prev) =>
+        prev.map((report) => report.id === reportId ? { ...report, status: "PENDING" as ReportStatus } : report),
       );
       showToast("재발송 요청이 완료되었습니다.");
     } catch (e) {
@@ -256,7 +249,7 @@ export default function ReportsPage() {
             AI 분석 리포트
           </span>
           <span className="text-[10px] text-zinc-400">
-            최근 {summaries.length > 0 ? summaries.length : "—"}개
+            최근 {reports.length > 0 ? reports.length : "—"}개
           </span>
         </div>
 
@@ -272,7 +265,7 @@ export default function ReportsPage() {
             <div className="text-sm font-semibold text-zinc-500">리포트를 불러오지 못했습니다</div>
             <div className="mt-1.5 text-xs text-zinc-400">{summaryError}</div>
           </div>
-        ) : summaries.length === 0 ? (
+        ) : reports.length === 0 ? (
           <div className="overflow-hidden rounded-2xl bg-white py-16 text-center shadow-sm ring-1 ring-zinc-100">
             <div className="mb-3 text-4xl">📭</div>
             <div className="text-sm font-semibold text-zinc-500">아직 AI 분석 리포트가 없습니다</div>
@@ -282,13 +275,13 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {summaries.map((s) => (
+            {reports.map((report) => (
               <SummaryCard
-                key={s.reportId}
-                summary={s}
-                onView={() => openDetail(s)}
-                onResend={() => handleResend(s.reportId)}
-                resending={resendingId === s.reportId}
+                key={report.id}
+                report={report}
+                onView={() => openDetail(report.id)}
+                onResend={() => handleResend(report.id)}
+                resending={resendingId === report.id}
               />
             ))}
           </div>
@@ -325,7 +318,13 @@ export default function ReportsPage() {
               </button>
             </div>
             <div className="overflow-y-auto">
-              {modalDetail ? <ReportDetailView detail={modalDetail} /> : null}
+              {modalLoading ? (
+                <div className="space-y-3 p-6">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-20 animate-pulse rounded-xl bg-zinc-100" />
+                  ))}
+                </div>
+              ) : modalDetail ? <ReportDetailView detail={modalDetail} /> : null}
             </div>
           </div>
         </div>
@@ -400,22 +399,17 @@ function ScoreBarChart({ data }: { data: (number | null)[] }) {
 // ── SummaryCard ───────────────────────────────────────────────
 
 function SummaryCard({
-  summary,
+  report,
   onView,
   onResend,
   resending,
 }: {
-  summary: WeeklyReportSummary;
+  report: ReportListItem;
   onView: () => void;
   onResend: () => void;
   resending: boolean;
 }) {
-  const status = STATUS_CONFIG[summary.status];
-  const weekly = summary.healthScore?.weekly ?? null;
-  const daily = (summary.healthScore?.daily ?? Array(7).fill(null)) as (number | null)[];
-  const { text: labelText, color: labelColor, bg: labelBg } = scoreLabel(weekly);
-  const bullets = parseAIBullets(summary.aiSolution, 3);
-  const topIssue = summary.topIssues[0];
+  const status = STATUS_CONFIG[report.status];
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100">
@@ -423,19 +417,19 @@ function SummaryCard({
       <div className="flex items-center justify-between border-b border-zinc-50 px-5 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-bold text-zinc-900">
-            {fmtDate(summary.weekStartDate)} ~ {fmtDate(summary.weekEndDate)}
+            {fmtDate(report.weekStartDate)} ~ {fmtDate(report.weekEndDate)}
           </span>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.cls}`}>
             {status.label}
           </span>
-          {summary.sentAt && (
+          {report.sentAt && (
             <span className="text-[10px] text-zinc-400">
-              {summary.deliveryWay === "EMAIL" ? "📧" : "📓"} {fmtDateTime(summary.sentAt)}
+              {report.deliveryWay === "EMAIL" ? "📧" : "📓"} {fmtDateTime(report.sentAt)}
             </span>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {summary.status === "FAILED" && (
+          {report.status === "FAILED" && (
             <button
               onClick={onResend}
               disabled={resending}
@@ -456,88 +450,30 @@ function SummaryCard({
         </div>
       </div>
 
-      {/* 카드 바디: 좌 점수 | 중 AI 분석 | 우 차트 */}
-      <div className="grid grid-cols-3 divide-x divide-zinc-50">
-
-        {/* 좌: 점수 */}
-        <div className="flex flex-col p-4">
-          <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-400">
-            자세 점수
-          </div>
-          <div className="text-5xl font-black leading-none text-[#2563EB]">
-            {weekly ?? "—"}
-          </div>
-          <div className={`mt-2 self-start rounded-full px-2 py-0.5 text-[9px] font-bold ${labelBg} ${labelColor}`}>
-            {labelText}
-          </div>
-          <div className="mt-auto space-y-1.5 border-t border-zinc-100 pt-3 text-[10px]">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">감지 시간</span>
-              <span className="font-semibold text-zinc-700">{fmtSec(summary.totalDetectionSec)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">위험도</span>
-              <span className="font-semibold text-rose-500">{summary.riskPercent}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-400">정자세 비율</span>
-              <span className="font-semibold text-emerald-600">
-                {Math.round((summary.goodPostureRatio ?? 0) * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 중: AI 분석 */}
-        <div className="flex flex-col p-4">
-          <div className="mb-2 flex items-center gap-1.5">
-            <span className="text-lg">🤖</span>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-[#2563EB]">
-              AI 분석
+      <div className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="space-y-2">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">리포트 이력 메타데이터</div>
+          <div className="flex flex-wrap gap-2 text-[11px] text-zinc-500">
+            <span className="rounded-full bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
+              발송 채널: <span className="font-semibold text-zinc-700">{report.deliveryWay}</span>
             </span>
-            {summary.aiAnalyzedAt && (
-              <span className="ml-auto text-[9px] text-zinc-300">
-                {fmtDateTime(summary.aiAnalyzedAt)}
-              </span>
-            )}
+            <span className="rounded-full bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
+              상태: <span className="font-semibold text-zinc-700">{status.label}</span>
+            </span>
+            <span className="rounded-full bg-zinc-50 px-2.5 py-1 ring-1 ring-zinc-100">
+              발송 시각: <span className="font-semibold text-zinc-700">{report.sentAt ? fmtDateTime(report.sentAt) : "미발송"}</span>
+            </span>
           </div>
-          {bullets.length > 0 ? (
-            <ul className="flex-1 space-y-2">
-              {bullets.map((b, i) => (
-                <li key={i} className="flex items-start gap-2 text-[11px] leading-relaxed text-zinc-700">
-                  <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[#2563EB]" />
-                  {b}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="flex-1 text-[11px] text-zinc-400">
-              {summary.aiAnalyzedAt
-                ? "AI 분석 내용이 없습니다."
-                : "아직 AI 분석이 완료되지 않았습니다."}
-            </p>
-          )}
-          {topIssue && (
-            <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[10px] ring-1 ring-rose-100">
-              <span className="text-zinc-400">주요 이슈 </span>
-              <span className="font-semibold text-rose-600">
-                {ISSUE_LABELS[topIssue.type] ?? topIssue.type}
-              </span>
-              <span className="mx-1 text-zinc-300">·</span>
-              <span className="text-zinc-500">{fmtSec(topIssue.durationSec)}</span>
-            </div>
-          )}
+          <p className="text-[11px] leading-relaxed text-zinc-400">
+            상세 보기를 누르면 저장된 payload 스냅샷을 단건 조회하여 건강 점수, 타임라인, 상위 이슈, AI 솔루션을 표시합니다.
+          </p>
         </div>
-
-        {/* 우: 요일별 점수 차트 */}
-        <div className="flex flex-col p-4">
-          <div className="mb-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-400">
-            요일별 점수
-          </div>
-          <div className="min-h-0 flex-1">
-            <ScoreBarChart data={daily} />
-          </div>
-        </div>
+        <button
+          onClick={onView}
+          className="rounded-xl bg-[#2563EB]/10 px-4 py-2 text-sm font-semibold text-[#2563EB] transition hover:bg-[#2563EB]/20"
+        >
+          단건 조회 보기
+        </button>
       </div>
     </div>
   );
@@ -545,7 +481,7 @@ function SummaryCard({
 
 // ── ReportDetailView (모달 + 이번주 현황 공용) ────────────────
 
-function ReportDetailView({ detail }: { detail: CurrentReport }) {
+function ReportDetailView({ detail }: { detail: CurrentReport | ReportDetail }) {
   const daily = detail.healthScore?.daily ?? [];
   const validScores = daily.filter((s): s is number => s != null);
   const weekly =
@@ -558,6 +494,10 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
   const totalSec = detail.session?.totalDetectionSec ?? 0;
   const totalCount = detail.topIssues.reduce((s, i) => s + i.count, 0);
   const chartData: (number | null)[] = daily.length > 0 ? daily : Array(7).fill(null);
+  const detailStatus = "status" in detail ? STATUS_CONFIG[detail.status] : null;
+  const detailId = "id" in detail ? detail.id : null;
+  const detailDeliveryWay = "deliveryWay" in detail ? detail.deliveryWay : null;
+  const detailSentAt = "sentAt" in detail ? detail.sentAt : null;
 
   const nextGoal =
     weekly !== null && weekly >= 70
@@ -566,6 +506,39 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
 
   return (
     <div className="space-y-3 p-5">
+
+      {(detailId || detailStatus || detailDeliveryWay) && (
+        <div className="grid grid-cols-1 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-100 sm:grid-cols-2 xl:grid-cols-4">
+          {detailId && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">리포트 ID</div>
+              <div className="mt-1 break-all text-xs font-semibold text-zinc-700">{detailId}</div>
+            </div>
+          )}
+          {detailStatus && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">상태</div>
+              <div className="mt-1">
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${detailStatus.cls}`}>
+                  {detailStatus.label}
+                </span>
+              </div>
+            </div>
+          )}
+          {detailDeliveryWay && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">발송 채널</div>
+              <div className="mt-1 text-xs font-semibold text-zinc-700">{detailDeliveryWay}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">발송 시각</div>
+            <div className="mt-1 text-xs font-semibold text-zinc-700">
+              {detailSentAt ? fmtDateTime(detailSentAt) : "미발송"}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Row 1: 점수 | 추이 | 요일별 */}
       <div className="grid grid-cols-3 gap-3">
@@ -608,6 +581,36 @@ function ReportDetailView({ detail }: { detail: CurrentReport }) {
           </div>
         </div>
       </div>
+
+      {detail.timeline.length > 0 && (
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-100">
+          <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+            타임라인 스냅샷
+          </div>
+          <div className="space-y-2">
+            {detail.timeline.map((entry, index) => (
+              <div
+                key={`${entry.date}-${entry.startHour}-${entry.startMin}-${index}`}
+                className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 rounded-xl bg-zinc-50 px-3 py-2"
+              >
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-100">
+                  {fmtDate(entry.date)}
+                </span>
+                <span className="text-xs font-medium text-zinc-700">
+                  {String(entry.startHour).padStart(2, "0")}:
+                  {String(entry.startMin).padStart(2, "0")}
+                </span>
+                <span className="text-xs font-semibold text-zinc-600">
+                  {ISSUE_LABELS[entry.dominantState] ?? entry.dominantState}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#2563EB] ring-1 ring-blue-100">
+                  {entry.healthScore}점
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* AI 솔루션 */}
       <div className="rounded-2xl border-l-4 border-[#2563EB] bg-white p-5 ring-1 ring-blue-100">
