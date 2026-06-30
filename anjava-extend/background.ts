@@ -505,19 +505,45 @@ function getTabLastAccessed(tab: chrome.tabs.Tab): number {
   return (tab as TabWithLastAccessed).lastAccessed ?? 0
 }
 
-async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
-  const activeFocused = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-  const activeTabs = activeFocused.length > 0
-    ? activeFocused
-    : await chrome.tabs.query({ active: true })
-  const httpTabs = activeTabs.filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
-  if (httpTabs.length > 0) return httpTabs
+function isHttpTab(tab: chrome.tabs.Tab | undefined): tab is chrome.tabs.Tab & { id: number; url: string } {
+  return Boolean(tab?.id && typeof tab.url === "string" && /^https?:\/\//.test(tab.url))
+}
 
-  const allTabs = await chrome.tabs.query({})
-  return allTabs
-    .filter((tab) => tab?.id && tab.url?.match(/^https?:\/\//))
-    .sort((a, b) => getTabLastAccessed(b) - getTabLastAccessed(a))
-    .slice(0, 1)
+function isDashboardTab(tab: chrome.tabs.Tab): boolean {
+  return typeof tab.url === "string" && tab.url.startsWith(WEB_URL)
+}
+
+function compareToastPriority(a: chrome.tabs.Tab, b: chrome.tabs.Tab): number {
+  const aDashboard = isDashboardTab(a)
+  const bDashboard = isDashboardTab(b)
+  if (aDashboard !== bDashboard) return aDashboard ? 1 : -1
+  return getTabLastAccessed(b) - getTabLastAccessed(a)
+}
+
+async function getToastTargetTabs(): Promise<chrome.tabs.Tab[]> {
+  const windows = await chrome.windows.getAll({ populate: true }).catch(() => [] as chrome.windows.Window[])
+  const normalWindows = windows.filter((window) => window.type === "normal")
+  const focusedWindow = normalWindows.find((window) => window.focused)
+
+  const focusedActiveTabs = (focusedWindow?.tabs ?? [])
+    .filter((tab) => tab.active)
+    .filter(isHttpTab)
+    .sort(compareToastPriority)
+  if (focusedActiveTabs.length > 0) return focusedActiveTabs
+
+  const activeTabs = normalWindows
+    .flatMap((window) => window.tabs ?? [])
+    .filter((tab) => tab.active)
+    .filter(isHttpTab)
+    .sort(compareToastPriority)
+  if (activeTabs.length > 0) return activeTabs
+
+  const allTabs = normalWindows
+    .flatMap((window) => window.tabs ?? [])
+    .filter(isHttpTab)
+    .sort(compareToastPriority)
+
+  return allTabs.slice(0, 3)
 }
 
 async function getDashboardTabs(): Promise<chrome.tabs.Tab[]> {
@@ -737,7 +763,8 @@ async function shouldSuppressSystemPostureNotification(msg: PostureMessage): Pro
 
   const activeTab = focusedWindow.tabs.find((tab) => tab.active)
   const activeUrl = activeTab?.url ?? ""
-  return activeUrl.startsWith(WEB_URL)
+  if (activeUrl.startsWith(WEB_URL)) return true
+  return /^https?:\/\//.test(activeUrl)
 }
 
 function isPostureSystemNotificationCoolingDown(state: unknown): boolean {
