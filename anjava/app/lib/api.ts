@@ -1,6 +1,6 @@
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
-const API_URL = /cs-backend\.p-e\.kr/i.test(configuredApiUrl)
-  ? "/api/backend"
+const API_URL = /cs-backend\.kro\.kr/i.test(configuredApiUrl)
+  ? "/api"
   : configuredApiUrl.replace(/\/$/, "");
 
 type ApiSuccess<T> = {
@@ -74,7 +74,9 @@ export type UserSettings = {
   avatarHoodColor: string;
 };
 
-export type UserSettingsPatch = Partial<Omit<UserSettings, "darkDetectionEnabled">>;
+export type UserSettingsPatch = Partial<
+  Omit<UserSettings, "darkDetectionEnabled">
+>;
 
 export type PushTokenPlatform = "web" | "extension";
 
@@ -160,12 +162,16 @@ export function getCachedUserId() {
   return localStorage.getItem(USER_ID_KEY);
 }
 
-export function hasCompletedOnboarding(userId: string | null = getCachedUserId()) {
+export function hasCompletedOnboarding(
+  userId: string | null = getCachedUserId(),
+) {
   if (typeof window === "undefined" || !userId) return false;
   return localStorage.getItem(ONBOARDING_PREFIX + userId) === "1";
 }
 
-export function markOnboardingComplete(userId: string | null = getCachedUserId()) {
+export function markOnboardingComplete(
+  userId: string | null = getCachedUserId(),
+) {
   if (typeof window === "undefined" || !userId) return;
   localStorage.setItem(ONBOARDING_PREFIX + userId, "1");
 }
@@ -175,7 +181,9 @@ export function markOnboardingComplete(userId: string | null = getCachedUserId()
  * 온보딩 완료 여부에 따라 `/dashboard` 또는 `/webcam-guide` 경로를 반환한다.
  * `forceGuide=true` 면 회원가입처럼 항상 가이드로 보내고 싶을 때 사용.
  */
-export async function resolvePostAuthPath(options: { forceGuide?: boolean } = {}) {
+export async function resolvePostAuthPath(
+  options: { forceGuide?: boolean } = {},
+) {
   try {
     const me = await getMe();
     cacheUserId(me.id);
@@ -206,9 +214,17 @@ async function rawRequest<T>(
   const externalSignal = init.signal as AbortSignal | undefined;
   if (externalSignal) {
     if (externalSignal.aborted) controller.abort(externalSignal.reason);
-    else externalSignal.addEventListener("abort", () => controller.abort(externalSignal.reason), { once: true });
+    else
+      externalSignal.addEventListener(
+        "abort",
+        () => controller.abort(externalSignal.reason),
+        { once: true },
+      );
   }
-  const timeoutId = setTimeout(() => controller.abort(new Error("timeout")), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(new Error("timeout")),
+    REQUEST_TIMEOUT_MS,
+  );
 
   let res: Response;
   try {
@@ -237,7 +253,11 @@ async function rawRequest<T>(
     try {
       json = JSON.parse(text);
     } catch {
-      json = { success: false, statusCode: res.status, message: text } as ApiError;
+      json = {
+        success: false,
+        statusCode: res.status,
+        message: text,
+      } as ApiError;
     }
   }
   if (!res.ok || (json as ApiError).success === false) {
@@ -270,7 +290,9 @@ async function request<T>(
     const err = e as Error & { status?: number };
     if (auth && err.status === 401 && getRefreshToken()) {
       if (!refreshing) {
-        refreshing = refresh().finally(() => { refreshing = null; });
+        refreshing = refresh().finally(() => {
+          refreshing = null;
+        });
       }
       try {
         const tokens = await refreshing;
@@ -313,7 +335,10 @@ export function refresh() {
   const refreshToken = getRefreshToken();
   return rawRequest<Tokens>(
     "/auth/refresh",
-    { method: "POST", body: JSON.stringify(refreshToken ? { refreshToken } : {}) },
+    {
+      method: "POST",
+      body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+    },
     false,
   );
 }
@@ -405,7 +430,10 @@ export function googleLoginUrl() {
   return "/api/auth/google";
 }
 
-export function updateProfile(patch: { name?: string; profileImg?: string | null }) {
+export function updateProfile(patch: {
+  name?: string;
+  profileImg?: string | null;
+}) {
   return request<{ id: string; name: string; profileImg: string }>(
     "/users/me/profile",
     { method: "PATCH", body: JSON.stringify(patch) },
@@ -510,7 +538,11 @@ export type CurrentReport = {
 };
 
 export function getCurrentReport() {
-  return request<CurrentReport>("/users/me/reports/current", { method: "GET" }, true);
+  return request<CurrentReport>(
+    "/users/me/reports/current",
+    { method: "GET" },
+    true,
+  );
 }
 
 export function getReports(from?: string, to?: string) {
@@ -526,7 +558,11 @@ export function getReports(from?: string, to?: string) {
 }
 
 export function getReport(id: string) {
-  return request<ReportDetail>(`/users/me/reports/${id}`, { method: "GET" }, true);
+  return request<ReportDetail>(
+    `/users/me/reports/${id}`,
+    { method: "GET" },
+    true,
+  );
 }
 
 export function resendReport(id: string) {
@@ -745,7 +781,17 @@ export type TimelineDashboard = {
     time?: string;
     startHour?: number;
     startMin?: number;
-    dominantState: "GOOD" | "GOOD_POSTURE" | "TURTLE_NECK" | "SLOUCH" | "SLOUCHING" | "SHOULDER_ISSUE" | "ROUND_SHOULDER" | "SHOULDER_ASYMMETRY" | "DARK_ENV" | "UNCLASSIFIED";
+    dominantState:
+      | "GOOD"
+      | "GOOD_POSTURE"
+      | "TURTLE_NECK"
+      | "SLOUCH"
+      | "SLOUCHING"
+      | "SHOULDER_ISSUE"
+      | "ROUND_SHOULDER"
+      | "SHOULDER_ASYMMETRY"
+      | "DARK_ENV"
+      | "UNCLASSIFIED";
     message?: string;
     healthScore?: number;
     detectedAt?: string;
@@ -800,8 +846,8 @@ function toApiNumber(value: unknown, fallback = 0): number {
     typeof value === "number"
       ? value
       : typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : NaN;
+        ? Number(value)
+        : NaN;
   return Number.isFinite(n) ? n : fallback;
 }
 
@@ -812,7 +858,12 @@ function normalizeRatio(value: unknown, fallback = 0): number {
   return Math.max(0, Math.min(1, n));
 }
 
-const TURTLE_NECK_SEC_KEYS = ["turtleNeckSec", "turtleNeckTotalSec", "turtle_neck_sec", "turtle_neck_total_sec"];
+const TURTLE_NECK_SEC_KEYS = [
+  "turtleNeckSec",
+  "turtleNeckTotalSec",
+  "turtle_neck_sec",
+  "turtle_neck_total_sec",
+];
 const SLOUCH_SEC_KEYS = [
   "slouchSec",
   "slouchingSec",
@@ -831,18 +882,43 @@ const SLOUCH_SEC_KEYS = [
   "slouch_total_duration_sec",
   "slouching_total_duration_sec",
 ];
-const ROUND_SHOULDER_SEC_KEYS = ["roundShoulderSec", "roundShoulderTotalSec", "round_shoulder_sec", "round_shoulder_total_sec"];
+const ROUND_SHOULDER_SEC_KEYS = [
+  "roundShoulderSec",
+  "roundShoulderTotalSec",
+  "round_shoulder_sec",
+  "round_shoulder_total_sec",
+];
 const SHOULDER_ASYMMETRY_SEC_KEYS = [
   "shoulderAsymmetrySec",
   "shoulderAsymmetryTotalSec",
   "shoulder_asymmetry_sec",
   "shoulder_asymmetry_total_sec",
 ];
-const SHOULDER_ISSUE_SEC_KEYS = ["shoulderIssueSec", "shoulderIssueTotalSec", "shoulder_issue_sec", "shoulder_issue_total_sec"];
-const BAD_POSTURE_SEC_KEYS = ["badPostureSec", "badPostureTotalSec", "bad_posture_sec", "bad_posture_total_sec"];
-const UNCLASSIFIED_SEC_KEYS = ["unclassifiedSec", "unclassifiedTotalSec", "unclassified_sec", "unclassified_total_sec"];
+const SHOULDER_ISSUE_SEC_KEYS = [
+  "shoulderIssueSec",
+  "shoulderIssueTotalSec",
+  "shoulder_issue_sec",
+  "shoulder_issue_total_sec",
+];
+const BAD_POSTURE_SEC_KEYS = [
+  "badPostureSec",
+  "badPostureTotalSec",
+  "bad_posture_sec",
+  "bad_posture_total_sec",
+];
+const UNCLASSIFIED_SEC_KEYS = [
+  "unclassifiedSec",
+  "unclassifiedTotalSec",
+  "unclassified_sec",
+  "unclassified_total_sec",
+];
 const TURTLE_NECK_COUNT_KEYS = ["turtleNeckCount"];
-const SLOUCH_COUNT_KEYS = ["slouchCount", "slouchingCount", "slouch_count", "slouching_count"];
+const SLOUCH_COUNT_KEYS = [
+  "slouchCount",
+  "slouchingCount",
+  "slouch_count",
+  "slouching_count",
+];
 const ROUND_SHOULDER_COUNT_KEYS = ["roundShoulderCount"];
 const SHOULDER_ASYMMETRY_COUNT_KEYS = ["shoulderAsymmetryCount"];
 const SHOULDER_ISSUE_COUNT_KEYS = ["shoulderIssueCount"];
@@ -862,13 +938,23 @@ function firstNumberFromSources(
   return fallback;
 }
 
-function hasAnyValueInSources(keys: string[], sources: Array<Record<string, unknown> | null | undefined>): boolean {
-  return sources.some((source) => Boolean(source) && keys.some((key) => source?.[key] !== undefined && source?.[key] !== null));
+function hasAnyValueInSources(
+  keys: string[],
+  sources: Array<Record<string, unknown> | null | undefined>,
+): boolean {
+  return sources.some(
+    (source) =>
+      Boolean(source) &&
+      keys.some((key) => source?.[key] !== undefined && source?.[key] !== null),
+  );
 }
 
 function distributeByWeights(total: number, weights: number[]): number[] {
   const safeTotal = Math.max(0, total);
-  const weightSum = weights.reduce((sum, weight) => sum + Math.max(0, weight), 0);
+  const weightSum = weights.reduce(
+    (sum, weight) => sum + Math.max(0, weight),
+    0,
+  );
   if (safeTotal <= 0 || weightSum <= 0) return weights.map(() => 0);
   let remainder = safeTotal;
   return weights.map((weight, index) => {
@@ -888,59 +974,145 @@ function resolvePostureDurations(params: {
   unclassifiedSec: number;
   darkEnvSec: number;
 }) {
-  const turtleNeckSec = firstNumberFromSources(TURTLE_NECK_SEC_KEYS, params.durationSources);
-  const slouchSec = firstNumberFromSources(SLOUCH_SEC_KEYS, params.durationSources);
-  const roundShoulderSec = firstNumberFromSources(ROUND_SHOULDER_SEC_KEYS, params.durationSources);
-  const shoulderAsymmetrySec = firstNumberFromSources(SHOULDER_ASYMMETRY_SEC_KEYS, params.durationSources);
-  const shoulderIssueSec = firstNumberFromSources(SHOULDER_ISSUE_SEC_KEYS, params.durationSources);
+  const turtleNeckSec = firstNumberFromSources(
+    TURTLE_NECK_SEC_KEYS,
+    params.durationSources,
+  );
+  const slouchSec = firstNumberFromSources(
+    SLOUCH_SEC_KEYS,
+    params.durationSources,
+  );
+  const roundShoulderSec = firstNumberFromSources(
+    ROUND_SHOULDER_SEC_KEYS,
+    params.durationSources,
+  );
+  const shoulderAsymmetrySec = firstNumberFromSources(
+    SHOULDER_ASYMMETRY_SEC_KEYS,
+    params.durationSources,
+  );
+  const shoulderIssueSec = firstNumberFromSources(
+    SHOULDER_ISSUE_SEC_KEYS,
+    params.durationSources,
+  );
 
-  const hasRoundDuration = hasAnyValueInSources(ROUND_SHOULDER_SEC_KEYS, params.durationSources);
-  const hasAsymDuration = hasAnyValueInSources(SHOULDER_ASYMMETRY_SEC_KEYS, params.durationSources);
-  const hasSlouchDuration = hasAnyValueInSources(SLOUCH_SEC_KEYS, params.durationSources);
-  const hasTurtleDuration = hasAnyValueInSources(TURTLE_NECK_SEC_KEYS, params.durationSources);
+  const hasRoundDuration = hasAnyValueInSources(
+    ROUND_SHOULDER_SEC_KEYS,
+    params.durationSources,
+  );
+  const hasAsymDuration = hasAnyValueInSources(
+    SHOULDER_ASYMMETRY_SEC_KEYS,
+    params.durationSources,
+  );
+  const hasSlouchDuration = hasAnyValueInSources(
+    SLOUCH_SEC_KEYS,
+    params.durationSources,
+  );
+  const hasTurtleDuration = hasAnyValueInSources(
+    TURTLE_NECK_SEC_KEYS,
+    params.durationSources,
+  );
 
-  let finalRoundSec = roundShoulderSec > 0 ? roundShoulderSec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+  let finalRoundSec =
+    roundShoulderSec > 0
+      ? roundShoulderSec
+      : shoulderIssueSec > 0
+        ? Math.round(shoulderIssueSec * 0.5)
+        : 0;
   let finalAsymSec =
-    shoulderAsymmetrySec > 0 ? shoulderAsymmetrySec : shoulderIssueSec > 0 ? Math.round(shoulderIssueSec * 0.5) : 0;
+    shoulderAsymmetrySec > 0
+      ? shoulderAsymmetrySec
+      : shoulderIssueSec > 0
+        ? Math.round(shoulderIssueSec * 0.5)
+        : 0;
   let finalSlouchSec = slouchSec;
   let finalTurtleNeckSec = turtleNeckSec;
 
-  const knownBadSec = finalTurtleNeckSec + finalSlouchSec + finalRoundSec + finalAsymSec;
-  const explicitBadSec = firstNumberFromSources(BAD_POSTURE_SEC_KEYS, params.durationSources, NaN);
+  const knownBadSec =
+    finalTurtleNeckSec + finalSlouchSec + finalRoundSec + finalAsymSec;
+  const explicitBadSec = firstNumberFromSources(
+    BAD_POSTURE_SEC_KEYS,
+    params.durationSources,
+    NaN,
+  );
   const inferredBadSec =
     params.totalDetectionSec > 0
-      ? Math.max(0, params.totalDetectionSec - params.goodPostureSec - params.unclassifiedSec - params.darkEnvSec)
+      ? Math.max(
+          0,
+          params.totalDetectionSec -
+            params.goodPostureSec -
+            params.unclassifiedSec -
+            params.darkEnvSec,
+        )
       : 0;
   const targetBadSec =
     Number.isFinite(explicitBadSec) && explicitBadSec > 0
       ? explicitBadSec
       : inferredBadSec > knownBadSec
-      ? inferredBadSec
-      : knownBadSec;
+        ? inferredBadSec
+        : knownBadSec;
 
   const unresolvedSec = Math.max(0, targetBadSec - knownBadSec);
   if (unresolvedSec > 0) {
-    const turtleNeckCount = firstNumberFromSources(TURTLE_NECK_COUNT_KEYS, params.countSources);
-    const slouchCount = firstNumberFromSources(SLOUCH_COUNT_KEYS, params.countSources);
-    const roundShoulderCount = firstNumberFromSources(ROUND_SHOULDER_COUNT_KEYS, params.countSources);
-    const shoulderAsymmetryCount = firstNumberFromSources(SHOULDER_ASYMMETRY_COUNT_KEYS, params.countSources);
-    const shoulderIssueCount = firstNumberFromSources(SHOULDER_ISSUE_COUNT_KEYS, params.countSources);
+    const turtleNeckCount = firstNumberFromSources(
+      TURTLE_NECK_COUNT_KEYS,
+      params.countSources,
+    );
+    const slouchCount = firstNumberFromSources(
+      SLOUCH_COUNT_KEYS,
+      params.countSources,
+    );
+    const roundShoulderCount = firstNumberFromSources(
+      ROUND_SHOULDER_COUNT_KEYS,
+      params.countSources,
+    );
+    const shoulderAsymmetryCount = firstNumberFromSources(
+      SHOULDER_ASYMMETRY_COUNT_KEYS,
+      params.countSources,
+    );
+    const shoulderIssueCount = firstNumberFromSources(
+      SHOULDER_ISSUE_COUNT_KEYS,
+      params.countSources,
+    );
 
     const unresolvedTargets = [
-      !hasTurtleDuration && turtleNeckCount > 0 ? { key: "turtle" as const, weight: turtleNeckCount } : null,
+      !hasTurtleDuration && turtleNeckCount > 0
+        ? { key: "turtle" as const, weight: turtleNeckCount }
+        : null,
       !hasSlouchDuration
         ? { key: "slouch" as const, weight: slouchCount > 0 ? slouchCount : 1 }
         : null,
       !hasRoundDuration && (roundShoulderCount > 0 || shoulderIssueCount > 0)
-        ? { key: "round" as const, weight: roundShoulderCount > 0 ? roundShoulderCount : shoulderIssueCount / 2 }
+        ? {
+            key: "round" as const,
+            weight:
+              roundShoulderCount > 0
+                ? roundShoulderCount
+                : shoulderIssueCount / 2,
+          }
         : null,
       !hasAsymDuration && (shoulderAsymmetryCount > 0 || shoulderIssueCount > 0)
-        ? { key: "asym" as const, weight: shoulderAsymmetryCount > 0 ? shoulderAsymmetryCount : shoulderIssueCount / 2 }
+        ? {
+            key: "asym" as const,
+            weight:
+              shoulderAsymmetryCount > 0
+                ? shoulderAsymmetryCount
+                : shoulderIssueCount / 2,
+          }
         : null,
-    ].filter((entry): entry is { key: "turtle" | "slouch" | "round" | "asym"; weight: number } => Boolean(entry));
+    ].filter(
+      (
+        entry,
+      ): entry is {
+        key: "turtle" | "slouch" | "round" | "asym";
+        weight: number;
+      } => Boolean(entry),
+    );
 
     if (unresolvedTargets.length > 0) {
-      const shares = distributeByWeights(unresolvedSec, unresolvedTargets.map((entry) => entry.weight));
+      const shares = distributeByWeights(
+        unresolvedSec,
+        unresolvedTargets.map((entry) => entry.weight),
+      );
       unresolvedTargets.forEach((entry, index) => {
         const share = shares[index] ?? 0;
         if (entry.key === "turtle") finalTurtleNeckSec += share;
@@ -956,7 +1128,8 @@ function resolvePostureDurations(params: {
     slouchSec: finalSlouchSec,
     roundShoulderSec: finalRoundSec,
     shoulderAsymmetrySec: finalAsymSec,
-    badPostureSec: finalTurtleNeckSec + finalSlouchSec + finalRoundSec + finalAsymSec,
+    badPostureSec:
+      finalTurtleNeckSec + finalSlouchSec + finalRoundSec + finalAsymSec,
   };
 }
 
@@ -971,7 +1144,9 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
 
   // 신 API: breakdown 중첩 객체 지원
   const breakdown =
-    raw.breakdown && typeof raw.breakdown === "object" && !Array.isArray(raw.breakdown)
+    raw.breakdown &&
+    typeof raw.breakdown === "object" &&
+    !Array.isArray(raw.breakdown)
       ? (raw.breakdown as Record<string, unknown>)
       : null;
 
@@ -979,13 +1154,19 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
   const rawDays: unknown[] = Array.isArray(raw.dailyStats)
     ? raw.dailyStats
     : Array.isArray(raw.days)
-    ? raw.days
-    : [];
+      ? raw.days
+      : [];
 
   const days = rawDays
-    .filter((day): day is Record<string, unknown> => Boolean(day) && typeof day === "object")
+    .filter(
+      (day): day is Record<string, unknown> =>
+        Boolean(day) && typeof day === "object",
+    )
     .map((day) => {
-      const darkEnvSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"], day);
+      const darkEnvSec = n(
+        ["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"],
+        day,
+      );
       const totalDetectionSec = n(
         [
           "totalDetectionSec",
@@ -1008,7 +1189,12 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
         day,
       );
       const explicitGoodPostureSec = n(
-        ["goodPostureSec", "goodPostureTotalSec", "good_posture_sec", "good_posture_total_sec"],
+        [
+          "goodPostureSec",
+          "goodPostureTotalSec",
+          "good_posture_sec",
+          "good_posture_total_sec",
+        ],
         day,
       );
       const hasExplicitGoodPostureData = [
@@ -1019,10 +1205,7 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
         "goodPostureRatio",
         "good_posture_ratio",
       ].some((key) => day[key] !== undefined && day[key] !== null);
-      const explicitUnclassifiedSec = n(
-        UNCLASSIFIED_SEC_KEYS,
-        day,
-      );
+      const explicitUnclassifiedSec = n(UNCLASSIFIED_SEC_KEYS, day);
       const postureDurations = resolvePostureDurations({
         durationSources: [day],
         countSources: [day],
@@ -1036,30 +1219,46 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
       const finalRoundSec = postureDurations.roundShoulderSec;
       const finalAsymSec = postureDurations.shoulderAsymmetrySec;
       const badSec = postureDurations.badPostureSec;
-      const ratioFromDuration = totalDetectionSec > 0 ? badSec / totalDetectionSec : 0;
+      const ratioFromDuration =
+        totalDetectionSec > 0 ? badSec / totalDetectionSec : 0;
       const rawBadRatio = day.badPostureRatio ?? day.bad_posture_ratio;
       const badPostureRatio =
         typeof rawBadRatio === "number" && Number.isFinite(rawBadRatio)
           ? normalizeRatio(rawBadRatio)
           : typeof rawBadRatio === "string"
-          ? normalizeRatio(rawBadRatio)
+            ? normalizeRatio(rawBadRatio)
+            : "goodPostureRatio" in day || "good_posture_ratio" in day
+              ? 1 -
+                normalizeRatio(day.goodPostureRatio ?? day.good_posture_ratio)
+              : ratioFromDuration;
+      const goodPostureSec =
+        explicitGoodPostureSec > 0
+          ? explicitGoodPostureSec
           : "goodPostureRatio" in day || "good_posture_ratio" in day
-          ? 1 - normalizeRatio(day.goodPostureRatio ?? day.good_posture_ratio)
-          : ratioFromDuration;
-      const goodPostureSec = explicitGoodPostureSec > 0
-        ? explicitGoodPostureSec
-        : "goodPostureRatio" in day || "good_posture_ratio" in day
-        ? Math.round(totalDetectionSec * normalizeRatio(day.goodPostureRatio ?? day.good_posture_ratio))
-        : 0;
-      const unclassifiedSec = explicitUnclassifiedSec > 0
-        ? explicitUnclassifiedSec
-        : Math.max(0, totalDetectionSec - goodPostureSec - badSec - darkEnvSec);
-      const hasData = typeof day.hasData === "boolean" ? day.hasData : totalDetectionSec > 0 || badSec > 0;
+            ? Math.round(
+                totalDetectionSec *
+                  normalizeRatio(
+                    day.goodPostureRatio ?? day.good_posture_ratio,
+                  ),
+              )
+            : 0;
+      const unclassifiedSec =
+        explicitUnclassifiedSec > 0
+          ? explicitUnclassifiedSec
+          : Math.max(
+              0,
+              totalDetectionSec - goodPostureSec - badSec - darkEnvSec,
+            );
+      const hasData =
+        typeof day.hasData === "boolean"
+          ? day.hasData
+          : totalDetectionSec > 0 || badSec > 0;
       const weekday = typeof day.weekday === "string" ? day.weekday : undefined;
       const rawGoodRatioDay = day.goodPostureRatio ?? day.good_posture_ratio;
-      const goodPostureRatioDay = rawGoodRatioDay !== undefined && rawGoodRatioDay !== null
-        ? normalizeRatio(rawGoodRatioDay as number | string)
-        : 1 - badPostureRatio;
+      const goodPostureRatioDay =
+        rawGoodRatioDay !== undefined && rawGoodRatioDay !== null
+          ? normalizeRatio(rawGoodRatioDay as number | string)
+          : 1 - badPostureRatio;
       return {
         date: typeof day.date === "string" ? day.date : "",
         weekday,
@@ -1121,7 +1320,13 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     "active_sec",
   ]);
   const explicitUnclassifiedSec = n(UNCLASSIFIED_SEC_KEYS);
-  const explicitDarkSec = n(["darkEnvSec", "darkEnvTotalSec", "dark_env_sec", "dark_env_total_sec"]) || summedDarkSec;
+  const explicitDarkSec =
+    n([
+      "darkEnvSec",
+      "darkEnvTotalSec",
+      "dark_env_sec",
+      "dark_env_total_sec",
+    ]) || summedDarkSec;
   const summaryPostureDurations = resolvePostureDurations({
     durationSources: summaryDurationSources,
     countSources: summaryCountSources,
@@ -1135,11 +1340,15 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
   const turtleSec = summaryPostureDurations.turtleNeckSec || summedTurtleSec;
   const slouchSec = summaryPostureDurations.slouchSec || summedSlouchSec;
   const finalRound = summaryPostureDurations.roundShoulderSec || summedRoundSec;
-  const finalAsym = summaryPostureDurations.shoulderAsymmetrySec || summedAsymSec;
+  const finalAsym =
+    summaryPostureDurations.shoulderAsymmetrySec || summedAsymSec;
   const darkSec = explicitDarkSec;
   const badSec = summaryPostureDurations.badPostureSec || summedBadSec;
 
-  const summedDayTotalSec = days.reduce((sum, day) => sum + day.totalDetectionSec, 0);
+  const summedDayTotalSec = days.reduce(
+    (sum, day) => sum + day.totalDetectionSec,
+    0,
+  );
 
   // 신 API: goodPostureRatio (0~1) 또는 riskPercent (0~100) 중 있는 쪽 사용
   const rawGoodRatio = raw.goodPostureRatio ?? raw.good_posture_ratio;
@@ -1148,50 +1357,60 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     rawGoodRatio !== undefined
       ? normalizeRatio(rawGoodRatio)
       : Number.isFinite(rawRiskPct)
-      ? Math.max(0, 1 - rawRiskPct / 100)
-      : explicitTotalSec > 0
-      ? Math.max(0, 1 - badSec / explicitTotalSec)
-      : 0;
+        ? Math.max(0, 1 - rawRiskPct / 100)
+        : explicitTotalSec > 0
+          ? Math.max(0, 1 - badSec / explicitTotalSec)
+          : 0;
 
   const totalDetectionSec =
     explicitTotalSec > 0
       ? Math.max(explicitTotalSec, badSec)
       : summedDayTotalSec > 0
-      ? Math.max(summedDayTotalSec, badSec)
-      : explicitGoodSec > 0
-      ? explicitGoodSec + badSec
-      : goodPostureRatio < 1 && badSec > 0
-      ? Math.round(badSec / (1 - goodPostureRatio))
-      : badSec;
+        ? Math.max(summedDayTotalSec, badSec)
+        : explicitGoodSec > 0
+          ? explicitGoodSec + badSec
+          : goodPostureRatio < 1 && badSec > 0
+            ? Math.round(badSec / (1 - goodPostureRatio))
+            : badSec;
   // 서버가 goodPostureRatio를 직접 제공하면 그대로 사용; 없을 때만 (total-bad)/total 추정
   const normalizedGoodPostureRatio =
     rawGoodRatio !== undefined
       ? goodPostureRatio
       : totalDetectionSec > 0
-      ? Math.max(0, Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec))
-      : goodPostureRatio;
+        ? Math.max(
+            0,
+            Math.min(1, (totalDetectionSec - badSec) / totalDetectionSec),
+          )
+        : goodPostureRatio;
 
   // 정자세 시간: 서버 제공값 우선 → 일별 합계 → total * goodRatio 추정
   const goodPostureSecNormalized =
     explicitGoodSec > 0
       ? explicitGoodSec
       : summedGoodSec > 0
-      ? summedGoodSec
-      : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
+        ? summedGoodSec
+        : Math.round(totalDetectionSec * normalizedGoodPostureRatio);
   const unclassifiedSec =
     explicitUnclassifiedSec ||
     summedUnclassifiedSec ||
-    Math.max(0, totalDetectionSec - goodPostureSecNormalized - badSec - darkSec);
+    Math.max(
+      0,
+      totalDetectionSec - goodPostureSecNormalized - badSec - darkSec,
+    );
 
   // 신 API: weekStartDate/weekEndDate / 구 API: from/to
   const from =
-    typeof raw.weekStartDate === "string" ? raw.weekStartDate
-    : typeof raw.from === "string" ? raw.from
-    : "";
+    typeof raw.weekStartDate === "string"
+      ? raw.weekStartDate
+      : typeof raw.from === "string"
+        ? raw.from
+        : "";
   const to =
-    typeof raw.weekEndDate === "string" ? raw.weekEndDate
-    : typeof raw.to === "string" ? raw.to
-    : "";
+    typeof raw.weekEndDate === "string"
+      ? raw.weekEndDate
+      : typeof raw.to === "string"
+        ? raw.to
+        : "";
 
   return {
     from,
@@ -1199,7 +1418,15 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     days,
     totalDetectionSec,
     goodPostureSec: goodPostureSecNormalized,
-    badPostureSec: n(["badPostureSec", "badPostureTotalSec", "bad_posture_sec", "bad_posture_total_sec"]) || badSec || summedBadSec,
+    badPostureSec:
+      n([
+        "badPostureSec",
+        "badPostureTotalSec",
+        "bad_posture_sec",
+        "bad_posture_total_sec",
+      ]) ||
+      badSec ||
+      summedBadSec,
     unclassifiedSec,
     turtleNeckTotalSec: turtleSec,
     slouchTotalSec: slouchSec,
@@ -1210,33 +1437,44 @@ function normalizeWeeklyDashboard(raw: RawWeeklyDashboard): WeeklyDashboard {
     riskPercent: Number.isFinite(rawRiskPct)
       ? Math.max(0, Math.min(100, rawRiskPct))
       : totalDetectionSec > 0
-      ? Math.max(0, Math.min(100, (badSec / totalDetectionSec) * 100))
-      : 0,
+        ? Math.max(0, Math.min(100, (badSec / totalDetectionSec) * 100))
+        : 0,
     worstWeekday:
-      typeof raw.worstWeekday === "string" ? raw.worstWeekday
-      : typeof raw.worst_weekday === "string" ? (raw.worst_weekday as string)
-      : (() => {
-          const worst = days
-            .filter((d) => d.hasData && d.badPostureRatio > 0)
-            .sort((a, b) => b.badPostureRatio - a.badPostureRatio)[0];
-          return worst?.weekday ?? null;
-        })(),
+      typeof raw.worstWeekday === "string"
+        ? raw.worstWeekday
+        : typeof raw.worst_weekday === "string"
+          ? (raw.worst_weekday as string)
+          : (() => {
+              const worst = days
+                .filter((d) => d.hasData && d.badPostureRatio > 0)
+                .sort((a, b) => b.badPostureRatio - a.badPostureRatio)[0];
+              return worst?.weekday ?? null;
+            })(),
   };
 }
 
 export function getDashboardWeekly(from: string) {
-  return request<RawWeeklyDashboard>(`/dashboard/weekly?from=${from}`, { method: "GET" }, true)
-    .then(normalizeWeeklyDashboard);
+  return request<RawWeeklyDashboard>(
+    `/dashboard/weekly?from=${from}`,
+    { method: "GET" },
+    true,
+  ).then(normalizeWeeklyDashboard);
 }
 
 function normalizeDailyDashboardSlot(
   source: RawDailyDashboardSlot,
   fallback: RawDailyDashboard,
 ): DailyDashboard {
-  const slotIndex = Math.max(0, Math.min(7, Math.trunc(toApiNumber(source.slotIndex))));
+  const slotIndex = Math.max(
+    0,
+    Math.min(7, Math.trunc(toApiNumber(source.slotIndex))),
+  );
   const turtleNeckCount = toApiNumber(source.turtleNeckCount);
   const slouchCount = toApiNumber(
-    source.slouchCount ?? source.slouchingCount ?? source.slouch_count ?? source.slouching_count,
+    source.slouchCount ??
+      source.slouchingCount ??
+      source.slouch_count ??
+      source.slouching_count,
   );
   const roundShoulderCount = toApiNumber(source.roundShoulderCount);
   const shoulderAsymmetryCount = toApiNumber(source.shoulderAsymmetryCount);
@@ -1245,40 +1483,52 @@ function normalizeDailyDashboardSlot(
   const singleBadCount =
     source.singleBadCount !== undefined
       ? toApiNumber(source.singleBadCount)
-      : turtleNeckCount + slouchCount + roundShoulderCount + shoulderAsymmetryCount + shoulderIssueCount + darkEnvCount;
+      : turtleNeckCount +
+        slouchCount +
+        roundShoulderCount +
+        shoulderAsymmetryCount +
+        shoulderIssueCount +
+        darkEnvCount;
   const totalDetectionSec = toApiNumber(
-    source.totalDetectionSec
-      ?? source.totalDurationSec
-      ?? source.screenTimeSec
-      ?? source.detectionSec
-      ?? source.durationSec
-      ?? source.sessionDurationSec
-      ?? source.activeSec
-      ?? source.total_detection_sec
-      ?? source.total_duration_sec
-      ?? source.screen_time_sec
-      ?? source.detection_sec
-      ?? source.duration_sec
-      ?? source.session_duration_sec
-      ?? source.active_sec,
+    source.totalDetectionSec ??
+      source.totalDurationSec ??
+      source.screenTimeSec ??
+      source.detectionSec ??
+      source.durationSec ??
+      source.sessionDurationSec ??
+      source.activeSec ??
+      source.total_detection_sec ??
+      source.total_duration_sec ??
+      source.screen_time_sec ??
+      source.detection_sec ??
+      source.duration_sec ??
+      source.session_duration_sec ??
+      source.active_sec,
   );
   const explicitGoodPostureSec = toApiNumber(
-    source.goodPostureSec ?? source.goodPostureTotalSec ?? source.good_posture_sec ?? source.good_posture_total_sec,
+    source.goodPostureSec ??
+      source.goodPostureTotalSec ??
+      source.good_posture_sec ??
+      source.good_posture_total_sec,
   );
   const goodPostureRatio = source.goodPostureRatio ?? source.good_posture_ratio;
-  const goodPostureSec = explicitGoodPostureSec > 0
-    ? explicitGoodPostureSec
-    : goodPostureRatio !== undefined && goodPostureRatio !== null
-    ? Math.round(totalDetectionSec * normalizeRatio(goodPostureRatio))
-    : 0;
+  const goodPostureSec =
+    explicitGoodPostureSec > 0
+      ? explicitGoodPostureSec
+      : goodPostureRatio !== undefined && goodPostureRatio !== null
+        ? Math.round(totalDetectionSec * normalizeRatio(goodPostureRatio))
+        : 0;
   const darkEnvSec = toApiNumber(
-    source.darkEnvSec ?? source.darkEnvTotalSec ?? source.dark_env_sec ?? source.dark_env_total_sec,
+    source.darkEnvSec ??
+      source.darkEnvTotalSec ??
+      source.dark_env_sec ??
+      source.dark_env_total_sec,
   );
   const explicitUnclassifiedSec = toApiNumber(
-    source.unclassifiedSec
-      ?? source.unclassifiedTotalSec
-      ?? source.unclassified_sec
-      ?? source.unclassified_total_sec,
+    source.unclassifiedSec ??
+      source.unclassifiedTotalSec ??
+      source.unclassified_sec ??
+      source.unclassified_total_sec,
   );
   const postureDurations = resolvePostureDurations({
     durationSources: [source, fallback],
@@ -1292,12 +1542,19 @@ function normalizeDailyDashboardSlot(
   const slouchSec = postureDurations.slouchSec;
   const roundShoulderSec = postureDurations.roundShoulderSec;
   const shoulderAsymmetrySec = postureDurations.shoulderAsymmetrySec;
-  const unclassifiedSec = explicitUnclassifiedSec > 0
-    ? explicitUnclassifiedSec
-    : Math.max(
-        0,
-        totalDetectionSec - goodPostureSec - turtleNeckSec - slouchSec - roundShoulderSec - shoulderAsymmetrySec - darkEnvSec,
-      );
+  const unclassifiedSec =
+    explicitUnclassifiedSec > 0
+      ? explicitUnclassifiedSec
+      : Math.max(
+          0,
+          totalDetectionSec -
+            goodPostureSec -
+            turtleNeckSec -
+            slouchSec -
+            roundShoulderSec -
+            shoulderAsymmetrySec -
+            darkEnvSec,
+        );
   const hasDurationData = [
     source.totalDetectionSec,
     source.totalDurationSec,
@@ -1358,11 +1615,12 @@ function normalizeDailyDashboardSlot(
   ].some((value) => value !== undefined && value !== null);
 
   return {
-    date: typeof source.date === "string"
-      ? source.date
-      : typeof fallback.date === "string"
-      ? fallback.date
-      : "",
+    date:
+      typeof source.date === "string"
+        ? source.date
+        : typeof fallback.date === "string"
+          ? fallback.date
+          : "",
     slotIndex,
     startHour: toApiNumber(source.startHour, slotIndex * 3),
     endHour: toApiNumber(source.endHour, slotIndex * 3 + 3),
@@ -1388,22 +1646,30 @@ function normalizeDailyDashboard(
   const rawSlots = Array.isArray(raw.slots)
     ? raw.slots
     : Array.isArray(raw.dailyStats)
-    ? raw.dailyStats
-    : Array.isArray(response)
-    ? response
-    : [raw];
+      ? raw.dailyStats
+      : Array.isArray(response)
+        ? response
+        : [raw];
 
   return rawSlots.map((slot) => normalizeDailyDashboardSlot(slot, raw));
 }
 
 export function getDashboardDaily(date?: string) {
-  const url = "/dashboard/daily" + (date ? "?date=" + encodeURIComponent(date) : "");
-  return request<RawDailyDashboard | RawDailyDashboardSlot[]>(url, { method: "GET" }, true)
-    .then(normalizeDailyDashboard);
+  const url =
+    "/dashboard/daily" + (date ? "?date=" + encodeURIComponent(date) : "");
+  return request<RawDailyDashboard | RawDailyDashboardSlot[]>(
+    url,
+    { method: "GET" },
+    true,
+  ).then(normalizeDailyDashboard);
 }
 
 export function getDashboardTimeline(date: string) {
-  return request<TimelineDashboard>(`/dashboard/timeline?date=${date}`, { method: "GET" }, true);
+  return request<TimelineDashboard>(
+    `/dashboard/timeline?date=${date}`,
+    { method: "GET" },
+    true,
+  );
 }
 
 export function startDetectionSession(
@@ -1419,7 +1685,9 @@ export function startDetectionSession(
 
 export function getCurrentDetectionSession() {
   if (Date.now() < currentSessionBackoffUntil) {
-    const error = new Error("세션 조회 요청을 잠시 후 다시 시도해주세요.") as Error & {
+    const error = new Error(
+      "세션 조회 요청을 잠시 후 다시 시도해주세요.",
+    ) as Error & {
       status?: number;
     };
     error.status = 429;
@@ -1431,21 +1699,27 @@ export function getCurrentDetectionSession() {
     "/sessions/current",
     { method: "GET" },
     true,
-  ).catch((error: unknown) => {
-    const status = error && typeof error === "object" && "status" in error
-      ? Number((error as { status?: unknown }).status)
-      : 0;
-    if (status === 429) currentSessionBackoffUntil = Date.now() + 60_000;
-    else if (status >= 500) currentSessionBackoffUntil = Date.now() + 20_000;
-    throw error;
-  }).finally(() => {
-    currentSessionRequest = null;
-  });
+  )
+    .catch((error: unknown) => {
+      const status =
+        error && typeof error === "object" && "status" in error
+          ? Number((error as { status?: unknown }).status)
+          : 0;
+      if (status === 429) currentSessionBackoffUntil = Date.now() + 60_000;
+      else if (status >= 500) currentSessionBackoffUntil = Date.now() + 20_000;
+      throw error;
+    })
+    .finally(() => {
+      currentSessionRequest = null;
+    });
 
   return currentSessionRequest;
 }
 
-export function endDetectionSession(sessionId: string, endedAt = new Date().toISOString()) {
+export function endDetectionSession(
+  sessionId: string,
+  endedAt = new Date().toISOString(),
+) {
   return request<{
     sessionId: string;
     totalDurationSec: number;
@@ -1468,7 +1742,10 @@ export function endDetectionSession(sessionId: string, endedAt = new Date().toIS
   );
 }
 
-export function pauseDetectionSession(sessionId: string, pausedAt = new Date().toISOString()) {
+export function pauseDetectionSession(
+  sessionId: string,
+  pausedAt = new Date().toISOString(),
+) {
   return request<DetectionSession>(
     `/sessions/${sessionId}/pause`,
     { method: "POST", body: JSON.stringify({ pausedAt }) },
@@ -1476,7 +1753,10 @@ export function pauseDetectionSession(sessionId: string, pausedAt = new Date().t
   );
 }
 
-export function resumeDetectionSession(sessionId: string, resumedAt = new Date().toISOString()) {
+export function resumeDetectionSession(
+  sessionId: string,
+  resumedAt = new Date().toISOString(),
+) {
   return request<DetectionSession>(
     `/sessions/${sessionId}/resume`,
     { method: "POST", body: JSON.stringify({ resumedAt }) },
@@ -1484,7 +1764,10 @@ export function resumeDetectionSession(sessionId: string, resumedAt = new Date()
   );
 }
 
-export function postSessionEvents(sessionId: string, events: DetectionSessionEvent[]) {
+export function postSessionEvents(
+  sessionId: string,
+  events: DetectionSessionEvent[],
+) {
   return request<{ accepted: number; duplicated?: number }>(
     `/sessions/${sessionId}/events`,
     { method: "POST", body: JSON.stringify({ events }) },
