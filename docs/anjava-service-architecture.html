@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anjava Service Architecture</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #121313;
+        --panel: #171818;
+        --panel-strong: #20221d;
+        --line: #e5e7eb;
+        --muted: #a7adb3;
+        --text: #f7f8f8;
+        --green: #38c172;
+        --blue: #60a5fa;
+        --red: #ef4444;
+        --yellow: #facc15;
+        --purple: #a78bfa;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.055), transparent 28%),
+          linear-gradient(135deg, #181919 0%, #0f1010 100%);
+        color: var(--text);
+        font-family:
+          Inter,
+          "Pretendard",
+          "Apple SD Gothic Neo",
+          system-ui,
+          sans-serif;
+      }
+
+      main {
+        width: min(1280px, 100vw);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .architecture {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        min-height: 650px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(18, 19, 19, 0.82);
+        overflow: hidden;
+      }
+
+      .layer-label {
+        position: absolute;
+        top: -10px;
+        left: 14px;
+        padding: 3px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 3px;
+        background: #171818;
+        color: #d8dde2;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .service-layer,
+      .oauth-layer,
+      .storage-layer,
+      .notify-layer {
+        position: absolute;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.015);
+      }
+
+      .service-layer {
+        inset: 42px 230px 48px 112px;
+      }
+
+      .oauth-layer {
+        top: 42px;
+        right: 34px;
+        width: 178px;
+        height: 274px;
+      }
+
+      .storage-layer {
+        top: 245px;
+        right: 265px;
+        width: 160px;
+        height: 250px;
+      }
+
+      .notify-layer {
+        right: 34px;
+        bottom: 56px;
+        width: 178px;
+        height: 190px;
+      }
+
+      .node {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        min-width: 112px;
+        min-height: 72px;
+        padding: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.75);
+        border-radius: 10px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.08);
+        text-align: center;
+      }
+
+      .node strong {
+        display: block;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.18;
+      }
+
+      .node span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .logo {
+        font-size: 54px;
+        line-height: 1;
+      }
+
+      .logo-small {
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .customer {
+        left: 30px;
+        bottom: 77px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .person {
+        position: relative;
+        width: 82px;
+        height: 104px;
+        margin-bottom: 6px;
+      }
+
+      .person::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 23px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #fff;
+      }
+
+      .person::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 60px;
+        border-radius: 44px 44px 0 0;
+        background: #fff;
+      }
+
+      .web {
+        left: 190px;
+        bottom: 72px;
+        width: 172px;
+        min-height: 142px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .extension {
+        left: 190px;
+        top: 185px;
+        width: 176px;
+        min-height: 160px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .mediapipe {
+        left: 462px;
+        top: 70px;
+        width: 190px;
+        min-height: 78px;
+        background: var(--panel-strong);
+      }
+
+      .ai {
+        left: 525px;
+        top: 260px;
+        width: 160px;
+        min-height: 150px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .backend {
+        left: 532px;
+        bottom: 82px;
+        width: 185px;
+        min-height: 96px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .oauth {
+        right: 46px;
+        width: 150px;
+        min-height: 70px;
+      }
+
+      .google {
+        top: 60px;
+      }
+
+      .naver {
+        top: 145px;
+      }
+
+      .kakao {
+        top: 230px;
+      }
+
+      .storage {
+        right: 286px;
+        width: 116px;
+        min-height: 82px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .mysql {
+        top: 283px;
+      }
+
+      .mongo {
+        top: 382px;
+      }
+
+      .notify {
+        right: 48px;
+        width: 148px;
+        min-height: 58px;
+      }
+
+      .fcm {
+        bottom: 176px;
+      }
+
+      .chrome {
+        bottom: 108px;
+      }
+
+      .toast {
+        bottom: 40px;
+      }
+
+      .caption {
+        position: absolute;
+        color: #dce0e4;
+        font-size: 14px;
+        line-height: 1.35;
+        text-align: center;
+        white-space: pre-line;
+      }
+
+      .cap-web {
+        left: 178px;
+        bottom: 27px;
+        width: 205px;
+      }
+
+      .cap-extension {
+        left: 160px;
+        top: 130px;
+        width: 230px;
+      }
+
+      .cap-ai {
+        left: 505px;
+        top: 415px;
+        width: 210px;
+      }
+
+      .cap-backend {
+        left: 505px;
+        bottom: 34px;
+        width: 250px;
+      }
+
+      .arrow-label {
+        position: absolute;
+        color: #d9dde1;
+        font-size: 13px;
+        line-height: 1.25;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .svg-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .svg-lines path,
+      .svg-lines line {
+        fill: none;
+        stroke: var(--line);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        opacity: 0.9;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          padding: 12px;
+        }
+
+        .architecture {
+          min-width: 1120px;
+          min-height: 650px;
+        }
+
+        body {
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="architecture" aria-label="Anjava service architecture diagram">
+        <div class="service-layer"><span class="layer-label">Anjava Service Layer</span></div>
+        <div class="oauth-layer"><span class="layer-label">OAuth / Auth Layer</span></div>
+        <div class="storage-layer"><span class="layer-label">Storage Layer</span></div>
+        <div class="notify-layer"><span class="layer-label">Notification Layer</span></div>
+
+        <svg class="svg-lines" viewBox="0 0 1280 720" aria-hidden="true">
+          <defs>
+            <marker id="arrow" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4">
+              <path d="M0,0 L8,4 L0,8 z" fill="#e5e7eb"></path>
+            </marker>
+          </defs>
+
+          <line x1="135" y1="535" x2="205" y2="535" marker-end="url(#arrow)" />
+          <path d="M75 486 V90 H600" marker-end="url(#arrow)" />
+
+          <line x1="360" y1="300" x2="604" y2="300" marker-end="url(#arrow)" />
+          <path d="M340 535 H430 Q455 535 455 505 V388 Q455 360 486 360 H602" marker-end="url(#arrow)" />
+
+          <line x1="700" y1="114" x2="1072" y2="114" marker-end="url(#arrow)" />
+          <line x1="700" y1="114" x2="1072" y2="194" marker-end="url(#arrow)" />
+          <line x1="700" y1="114" x2="1072" y2="274" marker-end="url(#arrow)" />
+
+          <line x1="650" y1="148" x2="650" y2="264" marker-end="url(#arrow)" />
+          <line x1="670" y1="330" x2="852" y2="330" marker-end="url(#arrow)" />
+          <path d="M650 395 V450 Q650 475 675 475 H852" marker-end="url(#arrow)" />
+
+          <line x1="705" y1="538" x2="1048" y2="538" marker-end="url(#arrow)" />
+          <path d="M705 538 C795 608 927 596 1048 596" marker-end="url(#arrow)" />
+          <path d="M662 585 C545 675 368 628 305 575" marker-end="url(#arrow)" />
+
+          <path d="M304 445 V370" marker-end="url(#arrow)" />
+          <path d="M360 300 C450 240 505 225 560 264" marker-end="url(#arrow)" />
+        </svg>
+
+        <div class="node customer">
+          <div class="person"></div>
+          <strong>Developer</strong>
+        </div>
+
+        <div class="node web">
+          <div class="logo">N</div>
+          <strong>Next.js Web UI</strong>
+          <span>회원가입/로그인<br />웹캠 가이드<br />대시보드/리포트</span>
+        </div>
+
+        <div class="node extension">
+          <div class="logo-small" style="color: var(--purple)">EXT</div>
+          <strong>Chrome Extension</strong>
+          <span>Popup<br />Background<br />Offscreen Detection<br />Page Toast</span>
+        </div>
+
+        <div class="node mediapipe">
+          <strong>MediaPipe<br />Pose Service</strong>
+          <span>코/눈/귀/어깨<br />landmark visibility</span>
+        </div>
+
+        <div class="node ai">
+          <div class="logo">AI</div>
+          <strong>AI Posture Analyzer</strong>
+          <span>baseline calibration<br />batch posture detection</span>
+        </div>
+
+        <div class="node backend">
+          <div class="logo-small" style="color: var(--red)">API</div>
+          <strong>API Server</strong>
+          <span>세션/타임라인<br />건강 점수/뱃지<br />설정/알림 토큰</span>
+        </div>
+
+        <div class="node oauth google"><strong style="color: var(--blue)">Google</strong></div>
+        <div class="node oauth naver"><strong style="color: var(--green)">Naver</strong></div>
+        <div class="node oauth kakao"><strong style="color: var(--yellow)">kakao</strong></div>
+
+        <div class="node storage mysql">
+          <div class="logo-small" style="color: #5da8ff">MySQL</div>
+          <span>user/session<br />timeline/score</span>
+        </div>
+
+        <div class="node storage mongo">
+          <div class="logo-small" style="color: #68d391">MongoDB</div>
+          <span>baseline logs<br />analytics docs</span>
+        </div>
+
+        <div class="node notify fcm"><strong>FCM</strong><span>Web Push</span></div>
+        <div class="node notify chrome"><strong>Chrome</strong><span>Notification</span></div>
+        <div class="node notify toast"><strong>Page Toast</strong><span>Content Script</span></div>
+
+        <div class="caption cap-extension">카메라 프레임 수집<br />확장 세션 감지<br />자세 알림 전달</div>
+        <div class="caption cap-web">가이드, 기준 자세 측정<br />대시보드 결과 확인</div>
+        <div class="caption cap-ai">자세 분석 결과<br />turtle neck + slouch 등 복합 판정</div>
+        <div class="caption cap-backend">비즈니스 로직 처리<br />세션/점수/리포트 데이터 제공</div>
+
+        <div class="arrow-label" style="left: 608px; top: 185px">프레임/기준 자세</div>
+        <div class="arrow-label" style="left: 737px; top: 304px">분석 결과</div>
+        <div class="arrow-label" style="left: 735px; top: 450px">감지 이벤트</div>
+        <div class="arrow-label" style="left: 823px; top: 516px">실시간 알림</div>
+        <div class="arrow-label" style="left: 392px; top: 383px">BASELINE_DONE</div>
+      </section>
+    </main>
+  </body>
+</html>

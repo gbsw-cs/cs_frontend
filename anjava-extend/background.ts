@@ -23,6 +23,7 @@ let pendingOffscreenData: {
   accessToken: string; userId: string; baselineData: unknown
   sessionId: string
   settings: { darkDetectionEnabled: boolean }
+  requestedAt: number
 } | null = null
 
 type ExtensionSettings = {
@@ -445,7 +446,8 @@ async function startOffscreenDetection(): Promise<void> {
   pendingOffscreenData = {
     accessToken, userId: resolvedUserId, baselineData,
     sessionId: currentSessionId ?? "",
-    settings: { darkDetectionEnabled: settings?.darkDetectionEnabled ?? false }
+    settings: { darkDetectionEnabled: settings?.darkDetectionEnabled ?? false },
+    requestedAt: Date.now(),
   }
   try {
     await ensureOffscreen()
@@ -460,6 +462,15 @@ async function startOffscreenDetection(): Promise<void> {
     console.warn("[offscreen] OFFSCREEN_READY 미수신 → 강제 START_DETECTION")
     const data = pendingOffscreenData
     pendingOffscreenData = null
+    const initializationMetrics = {
+      ready: false,
+      fallbackUsed: true,
+      readyDelayMs: 3000,
+      sessionId: data.sessionId,
+      measuredAt: new Date().toISOString(),
+    }
+    console.info('[Anjava offscreen] initialization metrics:', initializationMetrics)
+    console.info('[Anjava offscreen] initialization metrics JSON:', JSON.stringify(initializationMetrics))
     chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
       .then(() => debugLog("[offscreen] 강제 START_DETECTION 완료"))
       .catch(e => console.error("[offscreen] 강제 START_DETECTION 실패:", e))
@@ -1214,6 +1225,16 @@ chrome.runtime.onMessage.addListener((rawMsg, sender, sendResponse) => {
     if (pendingOffscreenData) {
       const data = pendingOffscreenData
       pendingOffscreenData = null
+      const initializationMetrics = {
+        ready: true,
+        fallbackUsed: false,
+        readyDelayMs: Date.now() - data.requestedAt,
+        fallbackThresholdMs: 3000,
+        sessionId: data.sessionId,
+        measuredAt: new Date().toISOString(),
+      }
+      console.info('[Anjava offscreen] initialization metrics:', initializationMetrics)
+      console.info('[Anjava offscreen] initialization metrics JSON:', JSON.stringify(initializationMetrics))
       chrome.runtime.sendMessage({ type: "START_DETECTION", ...data })
         .catch(e => console.error("[offscreen] START_DETECTION 전송 실패:", e))
     }

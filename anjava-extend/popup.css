@@ -175,11 +175,19 @@
 
 /* ── Troubleshooter ─────────────────────────────────────── */
 .trouble-card {
-  background: white;
-  border: 1px solid #f4f4f5;
+  background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
+  border: 1px solid #f59e0b33;
   border-radius: 14px;
   padding: 14px 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+}
+
+.trouble-summary {
+  margin-top: 4px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #6b7280;
 }
 
 .trouble-list {
@@ -193,19 +201,38 @@
   align-items: center;
   gap: 10px;
   border-radius: 10px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
   padding: 10px;
 }
 
 .trouble-error {
   background: #fef2f2;
-  border-color: #fecaca;
+  border-color: #fca5a5;
 }
 
 .trouble-copy {
   min-width: 0;
   flex: 1;
+}
+
+.trouble-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.trouble-badge-error {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .trouble-title {

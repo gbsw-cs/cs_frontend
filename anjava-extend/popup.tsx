@@ -304,44 +304,49 @@ function Troubleshooter({
     action: string
     onClick: () => void
     tone?: "warn" | "error"
+    badge: string
   }> = []
 
   if (!loggedIn) {
     items.push({
       key: "login",
-      title: "로그인이 필요합니다",
-      desc: "소셜 계정은 Google 로그인을 사용해 확장과 연결하세요.",
+      title: "인증 토큰이 없습니다",
+      desc: "웹 계정과 확장이 연결되지 않으면 세션 상태, 알림, 동기화가 전부 중단됩니다.",
       action: "Google 로그인",
       onClick: onGoogleLogin,
       tone: "warn",
+      badge: "AUTH",
     })
   } else if (!baselineDone) {
     items.push({
       key: "baseline",
-      title: "베이스라인 측정 필요",
-      desc: "정확한 자세 감지를 위해 10초 기준 자세를 먼저 측정하세요.",
+      title: "베이스라인이 비어 있습니다",
+      desc: "10초 기준 자세가 저장되지 않으면 감지 세션을 시작해도 판정 기준이 없어집니다.",
       action: "지금 측정",
       onClick: onBaseline,
       tone: "warn",
+      badge: "BLOCKER",
     })
   } else if (!sessionId) {
     items.push({
       key: "session",
-      title: "세션이 시작되지 않았습니다",
-      desc: "세션을 시작하면 백그라운드 자세 감지와 알림이 동작합니다.",
+      title: "감지 세션이 열리지 않았습니다",
+      desc: "세션이 생성되어야 백그라운드 자세 감지와 알림 파이프라인이 올라갑니다.",
       action: "세션 시작",
       onClick: onStartSession,
+      badge: "RUNTIME",
     })
   }
 
   if (offscreenError) {
     items.push({
       key: "camera",
-      title: "카메라 연결 확인 필요",
+      title: "오프스크린 카메라 오류",
       desc: offscreenError,
       action: "카메라 설정",
       onClick: onCameraSettings,
       tone: "error",
+      badge: "CAMERA",
     })
   }
 
@@ -349,11 +354,13 @@ function Troubleshooter({
 
   return (
     <div className="trouble-card">
-      <p className="card-label">현재 문제 해결</p>
+      <p className="card-label">운영 이슈 진단</p>
+      <p className="trouble-summary">세션이 멈춘 이유를 실제 차단 지점 기준으로 보여줍니다.</p>
       <div className="trouble-list">
         {items.map((item) => (
           <div key={item.key} className={`trouble-item ${item.tone === "error" ? "trouble-error" : ""}`}>
             <div className="trouble-copy">
+              <span className={`trouble-badge ${item.tone === "error" ? "trouble-badge-error" : ""}`}>{item.badge}</span>
               <p className="trouble-title">{item.title}</p>
               <p className="trouble-desc">{item.desc}</p>
             </div>
