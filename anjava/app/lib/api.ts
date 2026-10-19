@@ -1,4 +1,4 @@
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api/backend";
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api";
 const API_URL = /cs-backend\.kro\.kr/i.test(configuredApiUrl)
   ? "/api"
   : configuredApiUrl.replace(/\/$/, "");
