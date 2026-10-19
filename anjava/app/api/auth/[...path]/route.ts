@@ -6,9 +6,9 @@ function getBackendBase() {
     "http://cs-backend.kro.kr/api" ||
     "http://3.39.235.254/api";
   const url = new URL(configured);
-  if (url.hostname === "cs-backend.p-e.kr") {
+  if (url.hostname === "http://cs-backend.kro.kr/api") {
     url.protocol = "http:";
-    url.pathname = "/api";
+    url.pathname = "/auth/google";
     url.search = "";
     url.hash = "";
   }
