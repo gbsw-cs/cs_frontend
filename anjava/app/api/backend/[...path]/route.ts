@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 function getBackendBase() {
   const configured =
     process.env.BACKEND_API_URL ||
-    "http://cs-backend.p-e.kr/api" ||
+    "http://cs-backend.kro.kr/api" ||
     "http://3.39.235.254/api";
   const url = new URL(configured);
-  if (url.hostname === "cs-backend.p-e.kr") {
+  if (url.hostname === "http://cs-backend.kro.kr") {
     url.protocol = "http:";
     url.pathname = "/api";
     url.search = "";
