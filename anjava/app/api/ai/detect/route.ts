@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildAiHeaders } from "../auth";
 
 const AI_API_URL =
-  process.env.AI_API_URL ?? "http://127.0.0.1:8000/v1/posture/detect";
+  process.env.AI_API_URL ?? "http://3.34.189.41:8000/v1/posture/detect/batch";
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);

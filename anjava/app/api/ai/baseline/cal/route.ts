@@ -5,10 +5,10 @@ export const runtime = "nodejs";
 
 function getBaselineUrl() {
   if (process.env.AI_API_BASE_URL) {
-    return `${process.env.AI_API_BASE_URL.replace(/\/$/, "")}/baseline/cal`;
+    return `${process.env.AI_API_BASE_URL.replace(/\/$/, "")}/v1/baseline/cal`;
   }
   if (process.env.AI_API_URL) {
-    return process.env.AI_API_URL.replace(/\/detect\/?$/, "/baseline/cal");
+    return process.env.AI_API_URL.replace(/\/v1\/?$/, "/baseline/cal");
   }
   return null;
 }
